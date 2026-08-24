@@ -34,25 +34,28 @@ and release tag are still unproved or absent.
 
 No production-ready, Pi-support, cross-host, or tagged-release claim is made.
 
-> **Prototype boundary:** This is the verification record for the initial
-> version-1 prototype. The 49 passing tests reproduce its deterministic
-> contract; they do not establish release readiness. The audited release gaps
-> are recorded in
-> [`docs/baseline/2026-08-24-prototype-verification.md`](baseline/2026-08-24-prototype-verification.md).
+## Archived version-1 prototype verification
 
-## Verified result
+Everything below this heading is the historical verification snapshot for the
+initial version-1 prototype. It is preserved as baseline evidence and must not
+be read as the current release status. The 49 passing tests reproduced that
+prototype's deterministic contract; they did not establish release readiness.
+The audited prototype gaps are recorded in
+[`docs/baseline/2026-08-24-prototype-verification.md`](baseline/2026-08-24-prototype-verification.md).
+
+### Historical verified result
 
 The deterministic adaptive-learning engine, shared Codex/Pi skill contract,
 Pi command adapter, persistence layer, retention scheduler, and Obsidian
 renderer pass the repository's automated and manual checks.
 
-## Environment
+### Historical environment
 
 - Node.js: `v26.0.0`
 - Repository: `/Users/0xkato/Desktop/Hobby/adaptive-learning-agent`
 - Runtime dependencies: none
 
-## Automated evidence
+### Historical automated evidence
 
 `npm test` completed with:
 
@@ -89,7 +92,7 @@ Additional checks completed successfully:
 - the Agent Skill passed the official local `quick_validate.py` validator;
 - a repository-wide text scan reported no trailing whitespace.
 
-## Manual lifecycle evidence
+### Historical manual lifecycle evidence
 
 A fresh temporary root was driven through initialization, target capture,
 probe, probe conclusion, verified source, dependency plan, teaching, transfer
@@ -104,7 +107,7 @@ assessment evidence, review schedule, synthesis, and unresolved gap.
 Temporary inspection root:
 `/private/tmp/adaptive-learning-verification.F0dRZY`
 
-## Pi compatibility check
+### Historical Pi compatibility check
 
 Pi was inspected from terminal-only source at commit
 `a470b121bf683b4c2b9fc0b3a7c807de7e0cfe9c`.
@@ -122,7 +125,7 @@ source-level compatibility, command behavior against a faithful extension API
 harness, and a real adapter-to-engine process round trip. It does not claim a
 live interactive Pi process was launched.
 
-## Acceptance audit
+### Historical acceptance audit
 
 | Requirement | Evidence | Status |
 | --- | --- | --- |
@@ -137,7 +140,7 @@ live interactive Pi process was launched.
 | Durable Obsidian learning artifact | Renderer, CLI restart, E2E, and manual inspection | Verified |
 | Codex and Pi support | Shared Agent Skill, Codex `AGENTS.md`, Pi adapter tests, pinned Pi source | Verified within the boundaries above |
 
-## Claim boundary
+### Historical claim boundary
 
 These checks establish that the implementation preserves and enforces the
 defined workflow. They do not establish that every host model will choose good
