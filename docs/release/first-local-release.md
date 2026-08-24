@@ -20,11 +20,11 @@ smoke test is not treated as release acceptance.
 | 1 | Multi-day Codex-to-Pi retention passes end to end | [`live-host-acceptance.md`](../verification/live-host-acceptance.md) and `artifacts/evals/2026-08-24-*` | **Failed / unproved.** The Codex package is pending because the byte-exact final live state was not retained. Both local Pi behavioral runs contain critical failures. The cloud Pi run proves connectivity only. |
 | 2 | Migration, backup, restore-check, stale-lock recovery, renderer repair, and corrupted-state diagnostics pass destructive checks | Focused recovery/migration/render/setup/CLI/review tests; manual malformed-state check; actual permission-failure audit | **Verified locally.** The actual permission audit committed canonical revision 1 despite `EACCES`; after permissions were restored, `repair-render` preserved the exact state bytes and `doctor` reported the projection current. |
 | 3 | Hostile identifiers, Markdown, sources, paths, timestamps, and visuals cannot corrupt state or notes | Schema, CLI-options, render-safety, source, visual, graph, and protocol-invariant tests in the full suite | **Verified locally** for the defined macOS implementation contract. |
-| 4 | Fresh-clone setup and first session succeed outside the development path | `npm run release-check`, including disposable fresh-path setup and E2E fixtures | **Verified locally.** This is not yet evidence for both supported Node release versions. |
+| 4 | Fresh-clone setup and first session succeed outside the development path | `npm run release-check`, including disposable fresh-path setup and E2E fixtures | **Verified locally** with the complete release check on official Node `v20.20.2` and `v22.23.2` macOS arm64 runtimes. |
 | 5 | Behavioral scenario suite has no critical failure | Three packaged live-host artifacts plus the release validator | **Failed.** The two Pi packages preserve answer leakage, target drift, persistence mismatch, or incomplete-review failures. No artifact currently receives an accepted human verdict. |
-| 6 | Complete suite passes on macOS with Node 20 and 22 | Local runtime and future GitHub Actions matrix | **Unproved.** Local verification used Node 26. The Node 20/22 macOS CI matrix has not been added and run. |
+| 6 | Complete suite passes on macOS with Node 20 and 22 | Local runtime and future GitHub Actions matrix | **Partially verified.** The complete release check passed locally on official Node `v20.20.2` and `v22.23.2` macOS arm64 runtimes. The GitHub Actions matrix has not been added or run, so hosted CI remains unproved. |
 | 7 | Documentation, privacy, recovery, changelog, and verification match the shipped version | Operator documentation and this audit | **Unproved.** Privacy and recovery documentation exist, but an accepted version, changelog entry, final versioned verification record, and CI evidence do not. |
-| 8 | Repository is clean, committed, and has a release tag | Git status, commit history, and tag list | **Unproved.** The release evidence changes are not yet landed in the canonical repository, and no release tag exists. |
+| 8 | Repository is clean, committed, and has a release tag | Git status, commit history, and tag list | **Partially verified.** The canonical release-hardening branch is clean and its current changes are committed. No release tag exists. |
 
 ## Destructive evidence completed locally
 
@@ -40,6 +40,22 @@ smoke test is not treated as release acceptance.
   successful repair at the same revision with identical canonical state bytes;
 - fresh setup, independent CLI lifecycle, first-class review lifecycle, and
   generated-note collision handling.
+
+## Supported-runtime evidence completed locally
+
+Official macOS arm64 archives for Node `v20.20.2` and `v22.23.2` were checked
+against their published `SHASUMS256.txt` entries before use. The complete
+`scripts/release-check.mjs` path then exited `0` under each runtime with:
+
+- 136 of 136 automated tests passing;
+- JavaScript syntax and JSON document checks passing;
+- disposable fresh-path setup passing;
+- 7 of 7 end-to-end learning and review fixtures passing;
+- fresh-path `doctor` reporting `ok`;
+- the final `Release check passed.` receipt.
+
+This proves the supported runtime matrix locally on this macOS arm64 machine.
+It does not prove hosted GitHub Actions execution or another operating system.
 
 ## Live-host decision
 
