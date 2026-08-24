@@ -291,7 +291,14 @@ export function mutateState(root, mutation, { lockTimeoutMs } = {}) {
       status: "stale",
       error: null,
     };
-    const validated = writeStateUnlocked(paths, validateState(next), ownership);
+    const validatedNext = validateState(next);
+    if (Date.parse(validatedNext.updatedAt) < Date.parse(current.updatedAt)) {
+      throw new LearningError(
+        "Event time cannot be earlier than current state time",
+        "NON_MONOTONIC_EVENT_TIME",
+      );
+    }
+    const validated = writeStateUnlocked(paths, validatedNext, ownership);
     return validated;
   });
 }

@@ -212,6 +212,36 @@ test("a due review is claimed, executed across processes, and persisted once", (
   assert.equal(state.reviewCount, 1);
 });
 
+test("an event older than the current durable state is rejected without mutation", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-event-time-"));
+  const due = seedDueReview(root);
+
+  invoke(root, "start-review", [
+    "--id", "review-time-guard",
+    "--review", due.reviewId,
+    "--now", DAY_TWO,
+  ]);
+  const statePath = path.join(root, ".adaptive-learning", "state.json");
+  const before = JSON.parse(fs.readFileSync(statePath, "utf8"));
+
+  const result = invoke(root, "record-assessment", [
+    "--id", "retention-stale-time-a1",
+    "--question-id", "retention-stale-time-q1",
+    "--node", "covectors",
+    "--stage", "retention",
+    "--kind", "retention",
+    "--question", "What does a covector consume and produce?",
+    "--answer", "It consumes and produces vectors.",
+    "--grade", "incorrect",
+    "--evidence", "This otherwise-valid assessment carries an event time older than the current state.",
+    "--mistake-type", "output-type",
+    "--now", DAY_ONE,
+  ], { ok: false });
+
+  assert.match(result.stderr, /event time cannot be earlier than current state time/i);
+  assert.deepEqual(JSON.parse(fs.readFileSync(statePath, "utf8")), before);
+});
+
 test("a selected review can be explicitly deferred with a reason and stable ID", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-defer-"));
   const due = seedDueReview(root);
