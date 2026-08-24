@@ -9,6 +9,7 @@ const GRADES = new Set(["correct", "partial", "incorrect"]);
 const ASSESSMENT_STAGES = new Set(["probe", "teach", "retention"]);
 const CONCEPT_STATUSES = new Set(["unknown", "fragile", "gap", "developing", "strong"]);
 const REVIEW_STATUSES = new Set(["inactive", "scheduled", "claimed", "deferred", "complete"]);
+const REVIEW_ITEM_STATUSES = new Set(["pending", "repair-required", "resolved", "deferred"]);
 const RENDER_STATUSES = new Set(["current", "stale", "failed"]);
 
 function invalid(message, code = "INVALID_STATE") {
@@ -68,6 +69,11 @@ function stateInstant(value, label) {
 function nullableInstant(value, label) {
   if (value === null) return null;
   return stateInstant(value, label);
+}
+
+function nullableText(value, label) {
+  if (value === null) return null;
+  return text(value, label);
 }
 
 function uniqueTextArray(value, label) {
@@ -178,11 +184,47 @@ function validateSession(session, key, globalAssessmentIds, globalSourceIds, glo
   }
 
   text(session.synthesis, `${label}.synthesis`, { allowEmpty: true });
+  if (typeof session.synthesisRequired !== "boolean") {
+    invalid(`${label}.synthesisRequired must be boolean`);
+  }
   array(session.unresolvedGaps, `${label}.unresolvedGaps`).forEach((gap, index) => {
     text(gap, `${label}.unresolvedGaps[${index}]`);
   });
   text(session.topicId, `${label}.topicId`);
   uniqueTextArray(session.conceptIds, `${label}.conceptIds`);
+
+  const reviewIds = new Set();
+  for (const [index, item] of array(session.reviewItems, `${label}.reviewItems`).entries()) {
+    const itemLabel = `${label}.reviewItems[${index}]`;
+    object(item, itemLabel);
+    text(item.reviewId, `${itemLabel}.reviewId`);
+    if (reviewIds.has(item.reviewId)) invalid(`${label}.reviewItems contains duplicate review IDs`);
+    reviewIds.add(item.reviewId);
+    text(item.conceptId, `${itemLabel}.conceptId`);
+    oneOf(item.status, REVIEW_ITEM_STATUSES, `${itemLabel}.status`);
+    if (item.outcomeGrade !== null) oneOf(item.outcomeGrade, GRADES, `${itemLabel}.outcomeGrade`);
+    uniqueTextArray(item.evidenceIds, `${itemLabel}.evidenceIds`);
+    nullableText(item.deferralReason, `${itemLabel}.deferralReason`);
+    nullableInstant(item.deferredUntil, `${itemLabel}.deferredUntil`);
+    if (item.status === "resolved" && (item.outcomeGrade === null || item.evidenceIds.length === 0)) {
+      invalid(`${itemLabel} requires an outcome grade and evidence when resolved`);
+    }
+    if (
+      item.status === "deferred" &&
+      (item.deferralReason === null || item.deferredUntil === null)
+    ) {
+      invalid(`${itemLabel} requires a reason and future time when deferred`);
+    }
+  }
+  if (session.kind === "learn" && session.reviewItems.length !== 0) {
+    invalid(`${label}.reviewItems must be empty for a learning session`);
+  }
+  if (session.kind === "review") {
+    if (session.reviewItems.length === 0) invalid(`${label}.reviewItems is required for a review session`);
+    if (!["review", "complete"].includes(session.phase)) {
+      invalid(`${label}.phase is invalid for a review session`);
+    }
+  }
 }
 
 function validateTopics(state) {
@@ -255,6 +297,23 @@ function validateReviews(state) {
     nullableInstant(review.dueAt, `${label}.dueAt`);
     integer(review.completed, `${label}.completed`);
     oneOf(review.status, REVIEW_STATUSES, `${label}.status`);
+    nullableText(review.claimedBySessionId, `${label}.claimedBySessionId`);
+    nullableInstant(review.claimedAt, `${label}.claimedAt`);
+    nullableText(review.deferredReason, `${label}.deferredReason`);
+    if (review.status === "claimed") {
+      if (review.claimedBySessionId === null || review.claimedAt === null) {
+        invalid(`${label} requires claim ownership and time while claimed`);
+      }
+    } else if (review.claimedBySessionId !== null || review.claimedAt !== null) {
+      invalid(`${label} can only have claim metadata while claimed`);
+    }
+    if (review.status === "deferred") {
+      if (review.dueAt === null || review.deferredReason === null) {
+        invalid(`${label} requires a due time and reason while deferred`);
+      }
+    } else if (review.deferredReason !== null) {
+      invalid(`${label} can only have a deferral reason while deferred`);
+    }
     stateInstant(review.updatedAt, `${label}.updatedAt`);
   }
 }
@@ -274,6 +333,17 @@ export function validateState(value) {
   object(state.concepts, "concepts");
   object(state.reviews, "reviews");
   integer(state.reviewCount, "reviewCount");
+  for (const session of Object.values(state.sessions)) {
+    if (!session || typeof session !== "object" || Array.isArray(session)) continue;
+    if (!("reviewItems" in session)) session.reviewItems = [];
+    if (!("synthesisRequired" in session)) session.synthesisRequired = false;
+  }
+  for (const review of Object.values(state.reviews)) {
+    if (!review || typeof review !== "object" || Array.isArray(review)) continue;
+    if (!("claimedBySessionId" in review)) review.claimedBySessionId = null;
+    if (!("claimedAt" in review)) review.claimedAt = null;
+    if (!("deferredReason" in review)) review.deferredReason = null;
+  }
 
   const assessmentIds = new Map();
   const sourceIds = new Set();
@@ -329,6 +399,42 @@ export function validateState(value) {
       if (assessment.conceptId !== null && !session.conceptIds.includes(assessment.conceptId)) {
         invalid(`sessions.${id} assessment ${assessment.id} references an unbound concept`);
       }
+    }
+    for (const item of session.reviewItems) {
+      const review = state.reviews[item.reviewId];
+      if (!review) invalid(`sessions.${id} references unknown review: ${item.reviewId}`);
+      if (review.conceptId !== item.conceptId) {
+        invalid(`sessions.${id} review item points to the wrong concept: ${item.reviewId}`);
+      }
+      if (!session.conceptIds.includes(item.conceptId)) {
+        invalid(`sessions.${id} review item references an unbound concept: ${item.conceptId}`);
+      }
+      for (const evidenceId of item.evidenceIds) {
+        const assessment = assessmentIds.get(evidenceId);
+        if (!assessment || assessment.conceptId !== item.conceptId || assessment.contaminated) {
+          invalid(`sessions.${id} review item has invalid evidence: ${evidenceId}`);
+        }
+        if (!session.assessments.some((candidate) => candidate.id === evidenceId)) {
+          invalid(`sessions.${id} review item evidence belongs to another session: ${evidenceId}`);
+        }
+      }
+      if (session.phase === "review" && review.claimedBySessionId !== session.id) {
+        invalid(`sessions.${id} does not own its active review claim: ${item.reviewId}`);
+      }
+    }
+  }
+
+  for (const review of Object.values(state.reviews)) {
+    if (review.status !== "claimed") continue;
+    const session = state.sessions[review.claimedBySessionId];
+    if (
+      !session ||
+      state.activeSessionId !== session.id ||
+      session.kind !== "review" ||
+      session.phase !== "review" ||
+      !session.reviewItems.some((item) => item.reviewId === review.id)
+    ) {
+      invalid(`reviews.${review.id} has an invalid active claim`);
     }
   }
 

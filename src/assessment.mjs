@@ -9,6 +9,7 @@ import {
 import { LearningError, requireText } from "./errors.mjs";
 import { nextFrontier } from "./graph.mjs";
 import { updateActiveSession } from "./model.mjs";
+import { recordReviewAssessment } from "./reviews.mjs";
 
 const GRADES = new Set(["correct", "partial", "incorrect"]);
 const KINDS = new Set([
@@ -141,7 +142,14 @@ export function recordAssessment(state, input) {
         } else if (assessment.grade === "incorrect") {
           retry = retryFor(session, assessment);
         }
-        recordConceptAssessment(next, session, concept, assessment, retry);
+        if (session.kind === "review") {
+          recordReviewAssessment(next, session, concept, assessment);
+          recordConceptAssessment(next, session, concept, assessment, retry, {
+            scheduleReview: false,
+          });
+        } else {
+          recordConceptAssessment(next, session, concept, assessment, retry);
+        }
 
         if (
           assessment.stage === "teach" &&
@@ -152,9 +160,6 @@ export function recordAssessment(state, input) {
         ) {
           session.activeStepId = null;
           session.frontier = nextFrontier(session.plan, knowledgeForSession(next, session));
-        }
-        if (assessment.kind === "retention") {
-          next.reviewCount += 1;
         }
       }
 

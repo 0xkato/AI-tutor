@@ -19,6 +19,11 @@ import {
 } from "../src/model.mjs";
 import { renderVault } from "../src/render.mjs";
 import { dueReviews, shouldSynthesize } from "../src/retention.mjs";
+import {
+  closeReviewSession,
+  deferReviewItem,
+  startReviewSession,
+} from "../src/reviews.mjs";
 import { initializeStore, mutateState, readState } from "../src/store.mjs";
 
 const commands = [
@@ -35,6 +40,9 @@ const commands = [
   ["status", "Show the active session"],
   ["context", "Print runner-ready durable context"],
   ["due", "List due retention reviews"],
+  ["start-review", "Claim due items and start a retention review"],
+  ["defer-review", "Explicitly defer one selected review item"],
+  ["close-review", "Close a resolved retention review"],
   ["close", "Close the active session with a synthesis"],
 ];
 
@@ -125,12 +133,19 @@ function statusFor(state) {
     active: session
       ? {
           id: session.id,
+          kind: session.kind,
           topic: session.topic,
           target: session.target,
           phase: session.phase,
           frontier: session.frontier ?? [],
           activeStepId: session.activeStepId ?? null,
           retry: retryList(state, session),
+          synthesisRequired: session.synthesisRequired ?? false,
+          reviewItems: (session.reviewItems ?? []).map((item) => ({
+            reviewId: item.reviewId,
+            conceptId: item.conceptId,
+            status: item.status,
+          })),
         }
       : null,
   };
@@ -201,6 +216,13 @@ function commandResult(command, options, root) {
       now: last(options, "now"),
       });
     }
+    if (command === "start-review") {
+      return startReviewSession(current, {
+        id: last(options, "id"),
+        reviewIds: all(options, "review"),
+        now: last(options, "now"),
+      });
+    }
     if (command === "record-probe") {
       return recordAssessment(current, assessmentInput(options, "probe"));
     }
@@ -251,6 +273,20 @@ function commandResult(command, options, root) {
       description: last(options, "description"),
       verification: last(options, "verification"),
       now: last(options, "now"),
+      });
+    }
+    if (command === "defer-review") {
+      return deferReviewItem(current, {
+        reviewId: last(options, "review"),
+        reason: last(options, "reason"),
+        until: last(options, "until"),
+        now: last(options, "now"),
+      });
+    }
+    if (command === "close-review") {
+      return closeReviewSession(current, {
+        synthesis: last(options, "synthesis"),
+        now: last(options, "now"),
       });
     }
     if (command === "close") {

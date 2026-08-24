@@ -5,6 +5,7 @@ import {
   advanceReview,
   dueReviews,
   shouldSynthesize,
+  synthesisRequiredForSelection,
 } from "../src/retention.mjs";
 import { createInitialState } from "../src/model.mjs";
 
@@ -79,11 +80,33 @@ test("dueReviews returns due nodes in chronological order", () => {
       level: 1,
       dueAt,
       completed: 1,
+      status: "scheduled",
     };
   }
   assert.deepEqual(
     dueReviews(state, { now }).map((item) => item.nodeId),
     ["first", "later"],
+  );
+});
+
+test("a review selection predicts the seventh-review and related-concept synthesis gates", () => {
+  assert.equal(
+    synthesisRequiredForSelection({ reviewCount: 6 }, [{ topicId: "calculus" }]),
+    true,
+  );
+  assert.equal(
+    synthesisRequiredForSelection(
+      { reviewCount: 1 },
+      [{ topicId: "calculus" }, { topicId: "calculus" }, { topicId: "calculus" }],
+    ),
+    true,
+  );
+  assert.equal(
+    synthesisRequiredForSelection(
+      { reviewCount: 1 },
+      [{ topicId: "calculus" }, { topicId: "algebra" }, { topicId: "probability" }],
+    ),
+    false,
   );
 });
 

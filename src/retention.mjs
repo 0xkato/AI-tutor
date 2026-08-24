@@ -41,6 +41,7 @@ export function dueReviews(state, { now } = {}) {
   const cutoff = new Date(now ?? new Date().toISOString()).getTime();
   const due = [];
   for (const review of Object.values(state.reviews ?? {})) {
+    if (!["scheduled", "deferred"].includes(review.status)) continue;
     if (!review.dueAt || new Date(review.dueAt).getTime() > cutoff) continue;
     const concept = state.concepts?.[review.conceptId];
     const topic = state.topics?.[concept?.topicId];
@@ -62,6 +63,21 @@ export function dueReviews(state, { now } = {}) {
       new Date(left.dueAt).getTime() - new Date(right.dueAt).getTime() ||
       left.reviewId.localeCompare(right.reviewId),
   );
+}
+
+export function synthesisRequiredForSelection(state, selected = []) {
+  const selectedCount = selected.length;
+  const crossesSeventhReview =
+    selectedCount > 0 &&
+    Math.floor((state.reviewCount + selectedCount) / 7) > Math.floor(state.reviewCount / 7);
+  if (crossesSeventhReview) return true;
+  const related = new Map();
+  for (const review of selected) {
+    const key = review.topicId || review.topic || review.sessionId;
+    if (!key) continue;
+    related.set(key, (related.get(key) ?? 0) + 1);
+  }
+  return [...related.values()].some((count) => count >= 3);
 }
 
 export function shouldSynthesize(state, due = []) {

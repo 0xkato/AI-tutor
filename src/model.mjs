@@ -94,7 +94,9 @@ export function startSession(state, input) {
     activeStepId: null,
     visuals: [],
     synthesis: "",
+    synthesisRequired: false,
     unresolvedGaps: [],
+    reviewItems: [],
   };
   for (const conceptId of [...new Set(reuseConceptIds)]) {
     bindConceptToSession(next, next.sessions[id], conceptId);

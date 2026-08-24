@@ -28,6 +28,9 @@ test("help lists the complete learning-session lifecycle", () => {
     "status",
     "context",
     "due",
+    "start-review",
+    "defer-review",
+    "close-review",
     "close",
   ]) {
     assert.match(result.stdout, new RegExp(`\\b${command}\\b`));

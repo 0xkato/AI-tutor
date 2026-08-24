@@ -116,6 +116,9 @@ export function createConceptForSession(state, session, { id, nodeId, title, now
     dueAt: null,
     completed: 0,
     status: "inactive",
+    claimedBySessionId: null,
+    claimedAt: null,
+    deferredReason: null,
     updatedAt: createdAt,
   };
   session.conceptIds.push(conceptId);
@@ -172,7 +175,14 @@ export function knowledgeForSession(state, session) {
   );
 }
 
-export function recordConceptAssessment(state, session, concept, assessment, retry) {
+export function recordConceptAssessment(
+  state,
+  session,
+  concept,
+  assessment,
+  retry,
+  { scheduleReview = true } = {},
+) {
   appendUnique(concept.evidenceIds, assessment.id);
   appendUnique(concept.sourceSessionIds, session.id);
   concept.latestGrade = assessment.grade;
@@ -187,7 +197,7 @@ export function recordConceptAssessment(state, session, concept, assessment, ret
     concept.status = "gap";
   }
 
-  if (DURABLE_KINDS.has(assessment.kind)) {
+  if (scheduleReview && DURABLE_KINDS.has(assessment.kind)) {
     const review = state.reviews[concept.reviewId];
     const advanced = advanceReview(review, {
       grade: assessment.grade,

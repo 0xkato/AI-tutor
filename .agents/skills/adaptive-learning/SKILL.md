@@ -59,8 +59,16 @@ The learner supplies the learning target; do not silently replace or broaden it.
 
 ### Retention and closure
 
-- Use due reviews for spaced retention; do not repeat already-demonstrated
-  material merely because it is familiar.
+- Run `due --json` to find available spaced-retention work, then claim explicit
+  items with `start-review`. Listing an item as due does **not** complete it.
+- During a review session, assess only the selected concepts through retention
+  questions. Persist each result, repair misses within the active checkpoint,
+  and require a new durable transfer before treating an item as resolved.
+- If a selected item cannot be validly assessed, use `defer-review` with a
+  concrete reason and future time. Do not silently skip it.
+- Run `close-review` only after every selected item is resolved or explicitly
+  deferred. A review count and next interval advance only through this closed
+  lifecycle, never from merely viewing the queue.
 - Periodically require a whole-system synthesis that reconnects detailed
   mechanisms to the complete model.
 - Close with the learner's demonstrated synthesis, explicit unresolved gaps,
@@ -83,4 +91,3 @@ Record every state change through the CLI immediately after it happens in the
 conversation. Never claim that a probe, source, plan, step, assessment, visual,
 or review was persisted until the command succeeds. If recording fails, keep
 the conversational claim bounded and repair persistence before advancing.
-

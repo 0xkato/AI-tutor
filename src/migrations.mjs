@@ -96,6 +96,9 @@ export function migrateV1ToV2(value) {
         dueAt: knowledge.review.dueAt,
         completed: knowledge.review.completed,
         status: knowledge.review.dueAt ? "scheduled" : "inactive",
+        claimedBySessionId: null,
+        claimedAt: null,
+        deferredReason: null,
         updatedAt: session.updatedAt,
       };
     }
@@ -117,6 +120,8 @@ export function migrateV1ToV2(value) {
       kind: "learn",
       topicId,
       conceptIds,
+      reviewItems: [],
+      synthesisRequired: false,
       plan,
       assessments: session.assessments.map((assessment) => ({
         ...assessment,

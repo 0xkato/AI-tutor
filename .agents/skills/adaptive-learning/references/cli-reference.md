@@ -22,7 +22,58 @@ node bin/learn.mjs due --root <root> --json
 Run `context --json` before probing, resuming, or teaching an active session.
 It returns the durable session, retries, due reviews, and synthesis flag.
 
-## New session and probe
+## Review lifecycle
+
+`due` only lists currently available review IDs. It does not claim, assess, or
+complete them.
+
+```bash
+node bin/learn.mjs due --root <root> --json
+
+node bin/learn.mjs start-review --root <root> \
+  --review <due-review-id> \
+  --review <another-due-review-id>
+
+node bin/learn.mjs record-assessment --root <root> \
+  --question-id retention-q1 --node <selected-node> \
+  --stage retention --kind retention \
+  --question "<fully framed retrieval question>" \
+  --answer "<learner answer>" --grade incorrect \
+  --evidence "<exact retained and missing mechanism>" \
+  --mistake-type "<bounded error type>"
+
+node bin/learn.mjs record-assessment --root <root> \
+  --question-id retention-transfer-q1 --node <selected-node> \
+  --stage retention --kind transfer \
+  --question "<new transfer task after repair>" \
+  --answer "<learner answer>" --grade correct \
+  --evidence "<exact transfer evidence>"
+
+node bin/learn.mjs close-review --root <root> \
+  --synthesis "<what the review established and what changed>"
+```
+
+Repeat `--review` to claim multiple due concepts from the same topic. The claim
+is atomic: the selected items stay unavailable to another session until this
+review closes. Only selected concepts accept retention assessments.
+
+If a selected item cannot be assessed validly, defer it explicitly before
+closing:
+
+```bash
+node bin/learn.mjs defer-review --root <root> \
+  --review <selected-review-id> \
+  --reason "<why valid assessment cannot happen now>" \
+  --until "2026-09-01T09:00:00.000Z"
+```
+
+`close-review` fails until every item is resolved or deferred. A resolved item
+advances its durable review record exactly once, even if repair required
+multiple assessment attempts. Deferral preserves the review count and records
+the reason and next due instant. The session synthesis is audit evidence; it
+does not itself raise concept mastery.
+
+## New learning session and probe
 
 ```bash
 node bin/learn.mjs start --root <root> \
