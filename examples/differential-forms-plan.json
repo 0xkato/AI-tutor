@@ -1,0 +1,29 @@
+{
+  "targetNodeId": "forms",
+  "nodes": [
+    {
+      "id": "vectors",
+      "title": "Vectors"
+    },
+    {
+      "id": "covectors",
+      "title": "Covectors"
+    },
+    {
+      "id": "forms",
+      "title": "Differential forms"
+    }
+  ],
+  "edges": [
+    {
+      "from": "vectors",
+      "to": "covectors",
+      "reason": "Covectors act linearly on vectors"
+    },
+    {
+      "from": "covectors",
+      "to": "forms",
+      "reason": "Differential forms generalize covectors to alternating multilinear measurements"
+    }
+  ]
+}

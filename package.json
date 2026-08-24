@@ -1,0 +1,17 @@
+{
+  "name": "adaptive-learning-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A persistent, chat-first adaptive learning system for Codex and Pi.",
+  "bin": {
+    "adaptive-learn": "./bin/learn.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check bin/learn.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,4 @@
+/.adaptive-learning/
+/vault/
+/node_modules/
+*.log
