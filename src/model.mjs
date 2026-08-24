@@ -3,8 +3,9 @@ import path from "node:path";
 
 import { LearningError, requireText } from "./errors.mjs";
 import { nextFrontier, validatePlan } from "./graph.mjs";
+import { SCHEMA_VERSION } from "./schema.mjs";
 
-export const SCHEMA_VERSION = 1;
+export { SCHEMA_VERSION };
 
 function timestamp(now) {
   return now ?? new Date().toISOString();
@@ -14,13 +15,17 @@ export function createInitialState({ now } = {}) {
   const createdAt = timestamp(now);
   return {
     schemaVersion: SCHEMA_VERSION,
+    revision: 0,
     createdAt,
     updatedAt: createdAt,
     activeSessionId: null,
     settings: { vaultDir: "vault" },
     sessions: {},
     topics: {},
+    concepts: {},
+    reviews: {},
     reviewCount: 0,
+    render: { revision: 0, status: "stale", error: null },
   };
 }
 
@@ -58,7 +63,9 @@ export function startSession(state, input) {
   next.updatedAt = createdAt;
   next.sessions[id] = {
     id,
+    kind: "learn",
     topic,
+    topicId: null,
     target,
     learnerContext: typeof input.context === "string" ? input.context.trim() : "",
     phase: "probe",
@@ -68,6 +75,7 @@ export function startSession(state, input) {
     probeSummary: "",
     assessments: [],
     knowledge: {},
+    conceptIds: [],
     sources: [],
     plan: null,
     frontier: [],
@@ -246,8 +254,15 @@ export function closeSession(state, { synthesis, unresolvedGaps = [], now } = {}
       session.unresolvedGaps = unresolvedGaps.map((gap) => gap.trim());
       session.completedAt = closedAt;
       session.phase = "complete";
-      next.topics[session.topic] = {
-        topic: session.topic,
+      const topicId = session.topicId ?? randomUUID();
+      session.topicId = topicId;
+      const priorTopic = next.topics[topicId];
+      next.topics[topicId] = {
+        id: topicId,
+        name: session.topic,
+        createdAt: priorTopic?.createdAt ?? session.createdAt,
+        sessionIds: [...new Set([...(priorTopic?.sessionIds ?? []), session.id])],
+        conceptIds: [...new Set([...(priorTopic?.conceptIds ?? []), ...session.conceptIds])],
         latestSessionId: session.id,
         updatedAt: closedAt,
       };

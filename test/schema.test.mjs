@@ -1,0 +1,58 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { createInitialState } from "../src/model.mjs";
+import { parseInstant, validateState } from "../src/schema.mjs";
+
+const NOW = "2026-08-24T08:00:00.000Z";
+
+test("parseInstant accepts only canonical ISO instants", () => {
+  assert.equal(parseInstant(NOW, "now"), NOW);
+  for (const value of [
+    "2026-08-24",
+    "2026-08-24T08:00:00Z",
+    "2026-08-24T10:00:00.000+02:00",
+    "not-a-date",
+  ]) {
+    assert.throws(
+      () => parseInstant(value, "now"),
+      (error) => error.code === "INVALID_INSTANT" && /now/.test(error.message),
+    );
+  }
+});
+
+test("validateState accepts and clones a complete version-2 initial state", () => {
+  const state = createInitialState({ now: NOW });
+  const validated = validateState(state);
+
+  assert.deepEqual(validated, state);
+  assert.notEqual(validated, state);
+  assert.equal(validated.schemaVersion, 2);
+});
+
+test("validateState rejects structurally incomplete version-2 state", () => {
+  assert.throws(
+    () => validateState({ schemaVersion: 2, sessions: {} }),
+    (error) => error.code === "INVALID_STATE" && /createdAt/.test(error.message),
+  );
+});
+
+test("validateState rejects an active session reference that does not exist", () => {
+  const state = createInitialState({ now: NOW });
+  state.activeSessionId = "missing";
+
+  assert.throws(
+    () => validateState(state),
+    (error) => error.code === "INVALID_STATE" && /activeSessionId/.test(error.message),
+  );
+});
+
+test("validateState rejects unsupported future versions", () => {
+  const state = createInitialState({ now: NOW });
+  state.schemaVersion = 999;
+
+  assert.throws(
+    () => validateState(state),
+    (error) => error.code === "UNSUPPORTED_SCHEMA",
+  );
+});

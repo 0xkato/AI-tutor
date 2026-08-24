@@ -2,7 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { LearningError } from "./errors.mjs";
-import { createInitialState, SCHEMA_VERSION } from "./model.mjs";
+import { migrateV1ToV2 } from "./migrations.mjs";
+import { createInitialState } from "./model.mjs";
+import { validateState } from "./schema.mjs";
 
 export function pathsFor(root) {
   const dataDir = path.join(path.resolve(root), ".adaptive-learning");
@@ -11,6 +13,7 @@ export function pathsFor(root) {
     state: path.join(dataDir, "state.json"),
     tempState: path.join(dataDir, "state.json.tmp"),
     lock: path.join(dataDir, "state.lock"),
+    backups: path.join(dataDir, "backups"),
   };
 }
 
@@ -35,11 +38,44 @@ function releaseLock(paths, lockFd) {
 }
 
 function writeStateUnlocked(paths, state) {
-  fs.writeFileSync(paths.tempState, `${JSON.stringify(state, null, 2)}\n`, {
+  const validated = validateState(state);
+  fs.writeFileSync(paths.tempState, `${JSON.stringify(validated, null, 2)}\n`, {
     encoding: "utf8",
     mode: 0o600,
   });
   fs.renameSync(paths.tempState, paths.state);
+}
+
+function parseState(paths) {
+  try {
+    return JSON.parse(fs.readFileSync(paths.state, "utf8"));
+  } catch (error) {
+    throw new LearningError(`Could not read learning state: ${error.message}`, "INVALID_STATE");
+  }
+}
+
+function backupVersionOne(paths, state) {
+  fs.mkdirSync(paths.backups, { recursive: true, mode: 0o700 });
+  const stamp = String(state.updatedAt ?? state.createdAt ?? "unknown").replace(/[^0-9A-Za-z]+/g, "-");
+  const destination = path.join(paths.backups, `state-v1-${stamp}.json`);
+  if (!fs.existsSync(destination)) {
+    fs.writeFileSync(destination, `${JSON.stringify(state, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+      flag: "wx",
+    });
+  }
+}
+
+function readStateUnlocked(paths) {
+  const state = parseState(paths);
+  if (state.schemaVersion === 1) {
+    backupVersionOne(paths, state);
+    const migrated = migrateV1ToV2(state);
+    writeStateUnlocked(paths, migrated);
+    return migrated;
+  }
+  return validateState(state);
 }
 
 export function writeState(root, state) {
@@ -47,7 +83,7 @@ export function writeState(root, state) {
   fs.mkdirSync(paths.dataDir, { recursive: true });
   const lockFd = acquireLock(paths.lock);
   try {
-    writeStateUnlocked(paths, state);
+    writeStateUnlocked(paths, validateState(state));
   } finally {
     releaseLock(paths, lockFd);
   }
@@ -60,14 +96,12 @@ export function mutateState(root, mutation, { afterWrite } = {}) {
   fs.mkdirSync(paths.dataDir, { recursive: true });
   const lockFd = acquireLock(paths.lock);
   try {
-    const current = readState(root);
+    const current = readStateUnlocked(paths);
     const next = mutation(current);
-    if (!next || next.schemaVersion !== SCHEMA_VERSION) {
-      throw new LearningError("Mutation returned invalid learning state", "INVALID_STATE");
-    }
-    writeStateUnlocked(paths, next);
-    if (afterWrite) afterWrite(next);
-    return next;
+    const validated = validateState(next);
+    writeStateUnlocked(paths, validated);
+    if (afterWrite) afterWrite(validated);
+    return validated;
   } finally {
     releaseLock(paths, lockFd);
   }
@@ -78,19 +112,14 @@ export function readState(root) {
   if (!fs.existsSync(paths.state)) {
     throw new LearningError("Learning state is not initialized", "STATE_NOT_INITIALIZED");
   }
-  let state;
+  const state = parseState(paths);
+  if (state.schemaVersion !== 1) return validateState(state);
+  const lockFd = acquireLock(paths.lock);
   try {
-    state = JSON.parse(fs.readFileSync(paths.state, "utf8"));
-  } catch (error) {
-    throw new LearningError(`Could not read learning state: ${error.message}`, "INVALID_STATE");
+    return readStateUnlocked(paths);
+  } finally {
+    releaseLock(paths, lockFd);
   }
-  if (state.schemaVersion !== SCHEMA_VERSION) {
-    throw new LearningError(
-      `Unsupported state schema version: ${state.schemaVersion}`,
-      "UNSUPPORTED_SCHEMA",
-    );
-  }
-  return state;
 }
 
 export function initializeStore(root, { now } = {}) {
@@ -99,7 +128,7 @@ export function initializeStore(root, { now } = {}) {
   fs.mkdirSync(paths.dataDir, { recursive: true });
   const lockFd = acquireLock(paths.lock);
   try {
-    if (fs.existsSync(paths.state)) return readState(root);
+    if (fs.existsSync(paths.state)) return readStateUnlocked(paths);
     const state = createInitialState({ now });
     writeStateUnlocked(paths, state);
     return state;
