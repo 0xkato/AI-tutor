@@ -184,6 +184,12 @@ const OPTION_DESCRIPTIONS = {
   synthesis: "Whole-system synthesis",
   gap: "Unresolved gap (repeatable)",
 };
+const COMMAND_OPTION_DESCRIPTIONS = {
+  "record-admitted-gap": {
+    statement: "Learner's exact admitted-gap statement",
+    evidence: "Evidence locating the admitted knowledge gap",
+  },
+};
 
 function help() {
   const lines = [
@@ -217,7 +223,9 @@ function commandHelp(command) {
     ...optionNames.map((name) => {
       const repeatable = REPEATABLE_OPTIONS[command]?.has(name) ?? false;
       const suffix = BOOLEAN_OPTIONS.has(name) ? "" : ` <value>${repeatable ? " ..." : ""}`;
-      return `  --${name}${suffix}`.padEnd(30) + OPTION_DESCRIPTIONS[name];
+      const optionDescription =
+        COMMAND_OPTION_DESCRIPTIONS[command]?.[name] ?? OPTION_DESCRIPTIONS[name];
+      return `  --${name}${suffix}`.padEnd(30) + optionDescription;
     }),
   ];
   return `${lines.join("\n")}\n`;

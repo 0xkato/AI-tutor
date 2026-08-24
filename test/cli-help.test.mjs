@@ -74,6 +74,20 @@ test("version and command-specific help are available without reading state", ()
   assert.doesNotMatch(commandHelp.stdout, /--source-class/);
 });
 
+test("admitted-gap help describes ungraded learner evidence without undefined text", () => {
+  const commandHelp = spawnSync(
+    process.execPath,
+    [cli, "record-admitted-gap", "--help"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+
+  assert.equal(commandHelp.status, 0, commandHelp.stderr);
+  assert.match(commandHelp.stdout, /--statement <value>\s+Learner's exact admitted-gap statement/);
+  assert.match(commandHelp.stdout, /--evidence <value>\s+Evidence locating the admitted knowledge gap/);
+  assert.doesNotMatch(commandHelp.stdout, /undefined/);
+  assert.doesNotMatch(commandHelp.stdout, /Exact assessment evidence/);
+});
+
 test("commands reject unknown options and duplicate scalar options", () => {
   const root = path.join(repoRoot, ".does-not-need-to-exist");
   const unknown = spawnSync(process.execPath, [cli, "status", "--root", root, "--bogus", "x"], {
