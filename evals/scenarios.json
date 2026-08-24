@@ -1,0 +1,211 @@
+{
+  "formatVersion": 1,
+  "suiteVersion": "1.0.0",
+  "acceptance": {
+    "minimumDimensionScore": 2,
+    "minimumAverageScore": 3,
+    "requireAllDeterministicChecks": true,
+    "requireHumanPass": true,
+    "allowCriticalFailures": false
+  },
+  "scenarios": [
+    {
+      "id": "expert-edge",
+      "version": 1,
+      "title": "Expert learner with one narrow missing dependency",
+      "learnerProfile": "The learner understands APIs and databases but has not connected pre-insert checks to concurrency safety.",
+      "target": "Explain why a database uniqueness constraint, rather than a pre-insert read alone, makes idempotent creation race-safe.",
+      "setup": "The learner gives an otherwise strong explanation that omits simultaneous requests.",
+      "requiredBehaviors": [
+        "Preserve the narrow target instead of reteaching database fundamentals.",
+        "Locate atomic uniqueness enforcement as the first missing dependency.",
+        "Use a new concurrent-request transfer case before concluding understanding."
+      ],
+      "criticalFailures": [
+        "Changes the target to general database design.",
+        "Claims a read-before-write check is race-safe without atomic enforcement.",
+        "Treats polished terminology as transfer evidence."
+      ]
+    },
+    {
+      "id": "novice-branches",
+      "version": 1,
+      "title": "Novice learner with several prerequisite branches",
+      "learnerProfile": "The learner can use a web application but cannot yet place client, server, request, response, and database roles.",
+      "target": "Explain how a browser action becomes a durable database change and returns a visible response.",
+      "setup": "The initial probe reveals missing client-server and persistence concepts on separate branches.",
+      "requiredBehaviors": [
+        "Build an explicit dependency graph with both missing branches.",
+        "Teach only the current frontier rather than dumping the full stack.",
+        "Finish with an end-to-end synthesis after the branches connect."
+      ],
+      "criticalFailures": [
+        "Assumes advanced infrastructure knowledge the learner did not demonstrate.",
+        "Loses the overall target through isolated terminology questions.",
+        "Marks mastery without an unfamiliar end-to-end reconstruction."
+      ]
+    },
+    {
+      "id": "admitted-gap",
+      "version": 1,
+      "title": "Admitted knowledge gap",
+      "learnerProfile": "The learner explicitly says the local-gradient mechanism is not understood and asks to learn it.",
+      "target": "Understand why subtracting a gradient is a local loss-decreasing direction for a differentiable scalar loss.",
+      "setup": "The learner names the exact gap before any assessment question is asked.",
+      "requiredBehaviors": [
+        "Teach the named mechanism before testing it.",
+        "Keep local direction, finite step size, and global minimum claims separate.",
+        "Use a new transfer function after teaching rather than requesting repetition."
+      ],
+      "criticalFailures": [
+        "Quizzes the admitted gap before teaching it.",
+        "Claims every finite negative-gradient step must reduce loss.",
+        "Uses a revealed example as evidence of understanding."
+      ]
+    },
+    {
+      "id": "ambiguous-target",
+      "version": 1,
+      "title": "Ambiguous learner target",
+      "learnerProfile": "The learner asks to learn transformers without specifying the desired capability or boundary.",
+      "target": "Learn transformers.",
+      "setup": "No application, depth, prior knowledge, or intended output is supplied.",
+      "requiredBehaviors": [
+        "Ask one bounded open clarification before creating a plan.",
+        "Persist the clarified learner-owned target without silently replacing it.",
+        "Avoid steering the learner with a menu of presumed goals."
+      ],
+      "criticalFailures": [
+        "Begins teaching under an invented target.",
+        "Treats a broad topic label as a verified learning objective.",
+        "Asks several overlapping clarification questions at once."
+      ]
+    },
+    {
+      "id": "misconception",
+      "version": 1,
+      "title": "Misconception requiring downward probing",
+      "learnerProfile": "The learner believes an HTTP success response necessarily proves the intended data is durably stored.",
+      "target": "Distinguish request success, application acknowledgement, and durable state change.",
+      "setup": "The learner confidently supplies the misconception during the probe.",
+      "requiredBehaviors": [
+        "Identify the exact incorrect causal link without grading unrelated knowledge.",
+        "Probe the first prerequisite beneath that link.",
+        "Test the repaired model with a response-before-commit failure case."
+      ],
+      "criticalFailures": [
+        "Validates the misconception because the terminology sounds plausible.",
+        "Corrects the answer without locating the missing causal dependency.",
+        "Treats an arithmetic or wording slip as the conceptual error."
+      ]
+    },
+    {
+      "id": "retry-repair-transfer",
+      "version": 1,
+      "title": "First miss, second miss, repair, and new transfer",
+      "learnerProfile": "The learner gives two genuine incorrect attempts at separating process memory from durable storage.",
+      "target": "Explain what survives a process crash and why durable storage is required.",
+      "setup": "The first and second attempts fail for the same causal reason.",
+      "requiredBehaviors": [
+        "On the first miss, identify the error without revealing the answer.",
+        "After the second miss, teach the missing mechanism compactly.",
+        "Assess only a new crash-recovery transfer case after teaching."
+      ],
+      "criticalFailures": [
+        "Reveals the answer after the first miss.",
+        "Uses the contaminated original question as post-teaching evidence.",
+        "Skips the transfer check and records understanding from repetition."
+      ]
+    },
+    {
+      "id": "contamination",
+      "version": 1,
+      "title": "Host-exposed answer contamination",
+      "learnerProfile": "The learner is answering a conditional-probability question when the host accidentally gives the decisive step.",
+      "target": "Explain how a row of transition counts becomes a next-token probability distribution.",
+      "setup": "The transcript includes one explicitly leaked answer.",
+      "requiredBehaviors": [
+        "Mark the exposed question as contaminated immediately.",
+        "Exclude its response and assessment from knowledge evidence.",
+        "Use a genuinely new transfer problem later."
+      ],
+      "criticalFailures": [
+        "Counts the contaminated answer as retention or mastery evidence.",
+        "Repairs and re-asks the same exposed question as if it were clean.",
+        "Removes the contamination record from the durable artifact."
+      ]
+    },
+    {
+      "id": "conflicting-source",
+      "version": 1,
+      "title": "Conflicting or insufficient sources",
+      "learnerProfile": "The learner needs a current technical claim, but the available sources disagree or do not directly support it.",
+      "target": "Determine the supported behavior while keeping source disagreement and uncertainty visible.",
+      "setup": "At least two source records make incompatible claims and neither can be silently preferred.",
+      "requiredBehaviors": [
+        "Discuss source quality and conflict before teaching a conclusion.",
+        "Label unresolved uncertainty rather than manufacturing consensus.",
+        "Persist claim-level source support and the remaining gap."
+      ],
+      "criticalFailures": [
+        "Marks an unverified source as verified.",
+        "Presents an inference as source-backed fact.",
+        "Hides the conflict from the learner or source ledger."
+      ]
+    },
+    {
+      "id": "context-resume",
+      "version": 1,
+      "title": "Resume after context loss",
+      "learnerProfile": "A session is interrupted after a verified plan and one unresolved teaching step.",
+      "target": "Explain how an idempotent job request survives retries without duplicate durable work.",
+      "setup": "The host process restarts and must reconstruct the exact target, frontier, retry state, and evidence from disk.",
+      "requiredBehaviors": [
+        "Read durable context before asking the learner to repeat anything.",
+        "Resume the unresolved step without duplicating evidence or changing the target.",
+        "Keep state and rendered-note revisions aligned after continuation."
+      ],
+      "criticalFailures": [
+        "Requires the learner to reconstruct context already stored.",
+        "Creates a second active session or duplicate assessment.",
+        "Continues from stale rendered notes instead of canonical state."
+      ]
+    },
+    {
+      "id": "retention-regression",
+      "version": 1,
+      "title": "Retention regression and later recovery",
+      "learnerProfile": "A previously correct concept is due for review and the learner now gives a partial answer.",
+      "target": "Recover the causal model for gradient accumulation through shared graph branches.",
+      "setup": "The review must regress the schedule, repair the gap, and later record a clean unfamiliar transfer.",
+      "requiredBehaviors": [
+        "Grade the current answer from current evidence rather than prior mastery.",
+        "Regress the retention schedule without erasing historical evidence.",
+        "Require a later new transfer before advancing again."
+      ],
+      "criticalFailures": [
+        "Preserves a strong schedule despite current failed evidence.",
+        "Deletes the earlier successful evidence when regression occurs.",
+        "Advances the schedule using a contaminated repair question."
+      ]
+    },
+    {
+      "id": "cross-topic-reuse",
+      "version": 1,
+      "title": "Reuse prior evidence across a related target",
+      "learnerProfile": "The learner starts a related target after demonstrating idempotent upload creation in an earlier topic.",
+      "target": "Apply prior idempotency evidence to scan-job creation without assuming the new system is already mastered.",
+      "setup": "The new plan should reuse one demonstrated concept and probe the new execution-specific dependencies.",
+      "requiredBehaviors": [
+        "Explicitly identify which prior concept evidence is being reused.",
+        "Keep prior evidence separate from new-target mastery.",
+        "Probe and persist the additional dependencies introduced by scan execution."
+      ],
+      "criticalFailures": [
+        "Copies prior mastery wholesale to the new target.",
+        "Ignores strong prior evidence and needlessly reteaches it.",
+        "Binds a concept to a conflicting topic identity."
+      ]
+    }
+  ]
+}
