@@ -15,9 +15,9 @@ live-host evidence is recorded in
 
 Current local evidence includes:
 
-- 136 automated tests and the repository release-check path;
+- 137 automated tests and the repository release-check path;
 - complete release checks on official Node `v20.20.2` and `v22.23.2` macOS
-  arm64 runtimes, including 136 of 136 automated tests, 7 of 7 end-to-end
+  arm64 runtimes, including 137 of 137 automated tests, 7 of 7 end-to-end
   fixtures, fresh-path setup, syntax and JSON checks, and a healthy fresh-path
   `doctor` result under each runtime;
 - destructive coverage for migration, corrupt and future state, backup and
@@ -33,8 +33,9 @@ Those facts do not satisfy the release definition of done. The Codex artifact
 is pending because its original final state bytes were not retained. Both
 local Pi behavioral artifacts contain critical failures. The cloud Pi run was
 only a connectivity smoke test. The supported Node 20/22 matrix is now verified
-locally on macOS arm64, but the hosted GitHub Actions matrix has not been added
-or run. Accepted human verdicts, changelog/version discipline, clean release
+locally on macOS arm64. The uncached GitHub Actions workflow is present and
+contract-tested, but this repository has no GitHub remote, so it has not run in
+hosted CI. Accepted human verdicts, changelog/version discipline, clean release
 commit, and release tag are still unproved or absent.
 
 No production-ready, Pi-support, cross-host, or tagged-release claim is made.

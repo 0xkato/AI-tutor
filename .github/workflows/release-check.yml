@@ -1,0 +1,33 @@
+name: Release check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-check:
+    name: Node ${{ matrix.node-version }} on macOS
+    runs-on: macos-14
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["20.x", "22.x"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Select Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Record runtime
+        run: node --version
+      - name: Run complete release check
+        run: npm run release-check
+      - name: Confirm checks left the repository unchanged
+        run: git diff --exit-code

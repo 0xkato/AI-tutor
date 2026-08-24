@@ -22,7 +22,7 @@ smoke test is not treated as release acceptance.
 | 3 | Hostile identifiers, Markdown, sources, paths, timestamps, and visuals cannot corrupt state or notes | Schema, CLI-options, render-safety, source, visual, graph, and protocol-invariant tests in the full suite | **Verified locally** for the defined macOS implementation contract. |
 | 4 | Fresh-clone setup and first session succeed outside the development path | `npm run release-check`, including disposable fresh-path setup and E2E fixtures | **Verified locally** with the complete release check on official Node `v20.20.2` and `v22.23.2` macOS arm64 runtimes. |
 | 5 | Behavioral scenario suite has no critical failure | Three packaged live-host artifacts plus the release validator | **Failed.** The two Pi packages preserve answer leakage, target drift, persistence mismatch, or incomplete-review failures. No artifact currently receives an accepted human verdict. |
-| 6 | Complete suite passes on macOS with Node 20 and 22 | Local runtime and future GitHub Actions matrix | **Partially verified.** The complete release check passed locally on official Node `v20.20.2` and `v22.23.2` macOS arm64 runtimes. The GitHub Actions matrix has not been added or run, so hosted CI remains unproved. |
+| 6 | Complete suite passes on macOS with Node 20 and 22 | Local runtime and GitHub Actions matrix | **Partially verified.** The complete release check passed locally on official Node `v20.20.2` and `v22.23.2` macOS arm64 runtimes. The uncached macOS workflow is committed and contract-tested, but it cannot produce hosted evidence until this local repository has a GitHub remote and the workflow runs there. |
 | 7 | Documentation, privacy, recovery, changelog, and verification match the shipped version | Operator documentation and this audit | **Unproved.** Privacy and recovery documentation exist, but an accepted version, changelog entry, final versioned verification record, and CI evidence do not. |
 | 8 | Repository is clean, committed, and has a release tag | Git status, commit history, and tag list | **Partially verified.** The canonical release-hardening branch is clean and its current changes are committed. No release tag exists. |
 
@@ -47,7 +47,7 @@ Official macOS arm64 archives for Node `v20.20.2` and `v22.23.2` were checked
 against their published `SHASUMS256.txt` entries before use. The complete
 `scripts/release-check.mjs` path then exited `0` under each runtime with:
 
-- 136 of 136 automated tests passing;
+- 137 of 137 automated tests passing;
 - JavaScript syntax and JSON document checks passing;
 - disposable fresh-path setup passing;
 - 7 of 7 end-to-end learning and review fixtures passing;
@@ -83,7 +83,8 @@ without that flag.
    scoped protocol rule, then rerun from a fresh root.
 4. Obtain independent human `pass` verdicts and validate the accepted packages
    without `--allow-failed`.
-5. Add and run the uncached macOS Node 20/22 CI matrix.
+5. Create or attach the intended GitHub remote, then run the committed uncached
+   macOS Node 20/22 CI matrix and retain the hosted receipts.
 6. Only after live acceptance, choose the hardened prerelease version, add the
    changelog and exact version record, rerun the full destructive audit, land a
    clean commit, and create the annotated tag.
