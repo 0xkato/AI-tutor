@@ -90,10 +90,10 @@ test("complete adaptive session persists evidence, retry state, review, and Obsi
     "--node", "covectors",
     "--stage", "teach",
     "--kind", "transfer",
-    "--question", "Describe a different linear price-sensitivity measurement.",
+    "--question", "Describe a new linear displacement-measuring object.",
     "--answer", "It consumes a vector, produces a scalar, and preserves linear combinations.",
     "--grade", "correct",
-    "--evidence", "On the bounded retry, transferred the input-output types and linearity to a new measurement.",
+    "--evidence", "On the bounded retry, corrected the input-output types and preserved linearity for the same object.",
     "--now", at,
   ]);
   fs.mkdirSync(path.join(root, "vault", "Assets"), { recursive: true });

@@ -54,6 +54,7 @@ test("skill corpus preserves the complete adaptive-learning behavior", () => {
     ["checkpoint gate", /checkpoint.*before advancing/i],
     ["exact grades", /exactly.*Correct.*Partial.*Incorrect/is],
     ["bounded retry", /first genuine miss.*do not reveal.*answer.*retry/is],
+    ["stable retry identity", /retry.*reuse.*exact persisted question.*kind/is],
     ["clarification safety", /clarification.*only.*missing term.*same question/is],
     ["contamination discard", /contaminated.*discard.*evidence/is],
     ["new transfer", /new transfer (question|task)/i],

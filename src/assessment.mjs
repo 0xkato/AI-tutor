@@ -134,6 +134,29 @@ function validateStageForSession(session, assessment) {
   }
 }
 
+function validateRetryIdentity(session, concept, assessment) {
+  if (concept?.retry?.status !== "retry-required") return;
+
+  const original = session.assessments.find(
+    (item) =>
+      !item.contaminated &&
+      item.nodeId === assessment.nodeId &&
+      item.questionId === concept.retry.questionId,
+  );
+  if (!original) {
+    throw new LearningError(
+      `Retry ${concept.retry.questionId} has no persisted original assessment`,
+      "INVALID_STATE",
+    );
+  }
+  if (assessment.question !== original.question || assessment.kind !== original.kind) {
+    throw new LearningError(
+      `Retry ${concept.retry.questionId} must preserve its original question and kind`,
+      "RETRY_IDENTITY_MISMATCH",
+    );
+  }
+}
+
 function transitionRetry(current, assessment, { durableRequired = false } = {}) {
   if (!current) {
     if (["partial", "incorrect"].includes(assessment.grade)) {
@@ -259,6 +282,7 @@ export function recordAssessment(state, input) {
       assessment.conceptId = concept?.id ?? null;
 
       if (!assessment.contaminated) {
+        validateRetryIdentity(session, concept, assessment);
         const retry = transitionRetry(concept.retry, assessment, {
           durableRequired: assessment.stage !== "probe",
         });

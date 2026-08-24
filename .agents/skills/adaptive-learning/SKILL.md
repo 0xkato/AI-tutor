@@ -52,6 +52,9 @@ The learner supplies the learning target; do not silently replace or broaden it.
   same question.
 - On a first genuine miss, identify the error type, do not reveal the answer,
   and give one bounded retry.
+- When canonical state requires a retry, reuse the exact persisted question,
+  question ID, node, and kind. Never place a different question under the old
+  identity to satisfy the retry gate.
 - If an answer leaks, mark the question contaminated, discard it as evidence,
   and use a new transfer question or task.
 - Prefer own-words explanation, prediction, transfer, reconstruction, and

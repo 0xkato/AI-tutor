@@ -79,6 +79,25 @@ test("a second genuine miss permits teaching but still requires a new transfer q
   assert.equal(retry.requiresNewTransfer, true);
 });
 
+test("a retry question id cannot be reused for a different question", () => {
+  const state = recordAssessment(fresh(), attempt());
+
+  assert.throws(
+    () =>
+      recordAssessment(
+        state,
+        attempt({
+          id: "assessment-2",
+          kind: "explanation",
+          question: "What does opening the file establish before a later rename?",
+          answer: "The later read chooses the file.",
+          evidence: "The answer still conflates opening a path with reading an existing handle.",
+        }),
+      ),
+    /Retry q-loss-direction must preserve its original question and kind/,
+  );
+});
+
 test("contaminated questions are logged but excluded from knowledge evidence", () => {
   const state = recordAssessment(
     fresh(),
