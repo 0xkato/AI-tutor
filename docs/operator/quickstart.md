@@ -1,11 +1,16 @@
 # Quickstart
 
-## Supported first release
+## Candidate first release
 
-The qualified release environment is macOS with Node.js 20 or 22, current
-Codex project skills, current Pi project extensions, and optional Obsidian.
-Setup rejects Node versions below 20. Newer versions can run, but they are not
-part of the qualified release matrix until CI covers them.
+The locally qualified engine environment is macOS with Node.js 20 or 22,
+current Codex project skills, and optional Obsidian. Setup rejects Node
+versions below 20. Newer versions can run, but they are not part of the
+qualified release matrix until CI covers them.
+
+Pi adapter discovery and command behavior are verified locally, but Pi is not
+yet release-qualified. A fresh live Pi behavioral run, independent human pass,
+and accepted artifact are still required before this document may describe Pi
+as supported.
 
 Pi and Obsidian are optional for a Codex-only learning session. Their project
 files are still verified so switching hosts later uses the same durable state.
@@ -49,7 +54,11 @@ example:
 `AGENTS.md` routes the request into the shared adaptive-learning skill. The
 skill reads or initializes durable state before probing.
 
-## Start in Pi
+## Exercise the Pi integration candidate
+
+Until the live-host acceptance record reports an accepted Pi artifact, treat
+these commands as integration-testing instructions rather than a support
+claim.
 
 Launch Pi from the repository root, then use:
 
