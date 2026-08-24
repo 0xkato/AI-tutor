@@ -15,9 +15,9 @@ live-host evidence is recorded in
 
 Current local evidence includes:
 
-- 137 automated tests and the repository release-check path;
+- 142 automated tests and the repository release-check path;
 - complete release checks on official Node `v20.20.2` and `v22.23.2` macOS
-  arm64 runtimes, including 137 of 137 automated tests, 7 of 7 end-to-end
+  arm64 runtimes, including 142 of 142 automated tests, 7 of 7 end-to-end
   fixtures, fresh-path setup, syntax and JSON checks, and a healthy fresh-path
   `doctor` result under each runtime;
 - destructive coverage for migration, corrupt and future state, backup and

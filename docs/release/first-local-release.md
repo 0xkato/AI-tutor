@@ -47,7 +47,7 @@ Official macOS arm64 archives for Node `v20.20.2` and `v22.23.2` were checked
 against their published `SHASUMS256.txt` entries before use. The complete
 `scripts/release-check.mjs` path then exited `0` under each runtime with:
 
-- 137 of 137 automated tests passing;
+- 142 of 142 automated tests passing;
 - JavaScript syntax and JSON document checks passing;
 - disposable fresh-path setup passing;
 - 7 of 7 end-to-end learning and review fixtures passing;
@@ -76,7 +76,9 @@ without that flag.
 ## Required path before a release tag
 
 1. Run a fresh Codex scenario and retain the original final state bytes before
-   any later host mutates the root.
+   any later host mutates the root. Use the tested exclusive
+   `scripts/package-eval-artifact.mjs` capture path immediately after session
+   closure rather than manually copying evidence later.
 2. After explicit founder approval for the described data egress, run a fresh
    cloud Pi behavioral scenario on a disposable root.
 3. Repair any critical behavioral failure with a regression test or narrowly

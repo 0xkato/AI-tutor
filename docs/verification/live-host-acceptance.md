@@ -76,7 +76,10 @@ packaged, independently reviewed, and accepted.
 ## Remaining acceptance work
 
 1. Run a fresh Codex scenario while preserving the final live state bytes before
-   any later mutation.
+   any later mutation. Use `scripts/package-eval-artifact.mjs` immediately after
+   closure; the command now refuses overwrite, freezes the four required files,
+   records their hashes in `artifact.json` and `capture.json`, and validates the
+   pending package before publishing it.
 2. Obtain explicit data-egress approval, then run the cloud Pi behavioral
    scenario on a fresh disposable root.
 3. Package each run with hashes, canonical state, transcript, source ledger,

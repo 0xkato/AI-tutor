@@ -10,10 +10,27 @@ catalog and rubric are fixed before a live run begins.
 2. Use a fresh learning root unless the scenario explicitly requires prior
    durable evidence.
 3. Preserve the complete host/learner transcript without rewriting mistakes.
-4. Copy the final canonical state, the source ledger used in the conversation,
-   and the relevant generated learning note into one artifact directory.
-5. Record byte counts and SHA-256 hashes for those four evidence files in
-   `artifact.json`.
+4. Immediately after the host closes the session, prepare `artifact-draft.json`
+   with the run metadata and pending rubric, but without a `files` field.
+5. Freeze the transcript, final canonical state, source ledger, and relevant
+   generated learning note in a new artifact directory with the packaging
+   command below. Do this before any later host or review opens the same root.
+   The command refuses overwrite, copies each source byte-for-byte, records
+   byte counts and SHA-256 hashes, and structurally validates the pending
+   package before publishing the directory.
+
+   ```bash
+   node scripts/package-eval-artifact.mjs \
+     --draft artifact-draft.json \
+     --output artifacts/evals/<run> \
+     --transcript <live-transcript.md> \
+     --state <learning-root>/.adaptive-learning/state.json \
+     --source-ledger <source-ledger.json> \
+     --rendered-note <learning-root>/vault/Sessions/<session-note.md>
+   ```
+
+   Keep the generated `capture.json` with the package. It is the immutable
+   capture receipt for the four evidence files.
 6. Score all nine rubric dimensions with evidence pointers, record every
    deterministic check, and mark every contaminated question as excluded.
 7. Set the verdict to `pending` while packaging, then have a human reviewer
@@ -41,6 +58,10 @@ Evidence files must be regular files inside the artifact directory and must
 match the recorded size and SHA-256. Keep failed artifacts; never overwrite
 them with a rerun. Evaluation fixtures should use non-sensitive learning data.
 Do not commit private learner material or credentials.
+
+The evidence sources supplied to the packaging command must be real files, not
+symlinks. The output parent must already exist, and the named output directory
+must not exist. A later run always receives a new directory name.
 
 ## Acceptance boundary
 
