@@ -1,6 +1,6 @@
 import { LearningError } from "./errors.mjs";
 import { validatePlan } from "./graph.mjs";
-import { safeRelativeVaultPath, validateSourceReference } from "./inputs.mjs";
+import { safeRelativeVaultPath, safeVaultDir, validateSourceReference } from "./inputs.mjs";
 
 export const SCHEMA_VERSION = 2;
 
@@ -494,7 +494,11 @@ export function validateState(value) {
   integer(state.revision, "revision");
   if (state.activeSessionId !== null) text(state.activeSessionId, "activeSessionId");
   object(state.settings, "settings");
-  text(state.settings.vaultDir, "settings.vaultDir");
+  try {
+    safeVaultDir(state.settings.vaultDir, "settings.vaultDir");
+  } catch (error) {
+    invalid(error.message);
+  }
   object(state.sessions, "sessions");
   object(state.concepts, "concepts");
   object(state.reviews, "reviews");

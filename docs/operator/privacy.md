@@ -17,8 +17,10 @@ portable export.
 ## What does not leave through this engine
 
 The deterministic engine performs no telemetry, analytics, source fetching,
-model API calls, or network uploads. It stores no API keys, authentication
-tokens, or model credentials.
+model API calls, or network uploads. It does not require or provide dedicated
+storage for API keys, authentication tokens, or model credentials. It cannot
+recognize and remove a secret that a learner types into an ordinary text field;
+that text becomes part of the local learning record.
 
 Codex and Pi are separate hosts. Their model requests, conversation retention,
 account settings, and provider telemetry are governed by those products, not
@@ -38,8 +40,9 @@ host account security, and repository sharing remain operator responsibilities.
 
 ## Sensitive learning material
 
-Do not attach secrets merely because storage is local. Source references,
-answers, and visuals may be copied into backups, exports, terminal output,
-Obsidian, or host conversations. Review an export before sharing it.
+Do not enter or attach secrets merely because storage is local. Source
+references, answers, evidence, context, and visuals may be copied into backups,
+exports, terminal output, Obsidian, or host conversations. Review an export
+before sharing it.
 
 Deletion instructions are in [Recovery, backup, and export](recovery.md).

@@ -72,6 +72,20 @@ test("CLI failures preserve state and return structured error text", () => {
   assert.equal(fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"), before);
 });
 
+test("init rejects an unsafe vault directory before creating canonical state", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-cli-invalid-vault-"));
+  const result = spawnSync(
+    process.execPath,
+    [cli, "init", "--vault-dir", "../outside", "--root", root],
+    { cwd: repository, encoding: "utf8" },
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /\[INVALID_VAULT\].*vault directory/i);
+  assert.equal(fs.existsSync(path.join(root, ".adaptive-learning", "state.json")), false);
+  assert.equal(fs.existsSync(path.join(path.dirname(root), "outside")), false);
+});
+
 test("an admitted gap can complete diagnosis without creating a false assessment or retry", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-admitted-gap-"));
   run(root, "init", "--now", "2026-08-24T12:59:00.000Z");

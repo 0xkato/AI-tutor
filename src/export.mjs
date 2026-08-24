@@ -47,11 +47,22 @@ function writeFile(root, relativePath, contents) {
 }
 
 function readRegularFile(file, label) {
-  const stat = fs.lstatSync(file);
-  if (stat.isSymbolicLink() || !stat.isFile()) {
-    throw new LearningError(`${label} must be a regular file`, "INVALID_EXPORT_SOURCE");
+  const flags = fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0);
+  let fd;
+  try {
+    fd = fs.openSync(file, flags);
+  } catch (error) {
+    throw new LearningError(`${label} must be a regular non-symlink file: ${error.message}`, "INVALID_EXPORT_SOURCE");
   }
-  return fs.readFileSync(file);
+  try {
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile()) {
+      throw new LearningError(`${label} must be a regular file`, "INVALID_EXPORT_SOURCE");
+    }
+    return fs.readFileSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 function collectFiles(root, state, manifest) {
@@ -99,7 +110,11 @@ function collectFiles(root, state, manifest) {
     }
     const relativePath = `${manifest.vaultDir}/${visual.path}`;
     const source = path.join(path.resolve(root), ...relativePath.split("/"));
-    add(relativePath, readRegularFile(source, `Visual ${visual.path}`), "verified-visual");
+    const contents = readRegularFile(source, `Visual ${visual.path}`);
+    if (contents.length !== visual.bytes || sha256(contents) !== visual.sha256) {
+      throw new LearningError(`Verified visual changed during export: ${visual.path}`, "VISUAL_IDENTITY_CHANGED");
+    }
+    add(relativePath, contents, "verified-visual");
   }
   return [...files.values()].sort((left, right) => left.path.localeCompare(right.path));
 }

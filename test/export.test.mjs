@@ -6,6 +6,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
+import { exportLearnerRecord } from "../src/export.mjs";
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(repoRoot, "bin", "learn.mjs");
 const now = "2026-08-24T12:00:00.000Z";
@@ -52,7 +54,8 @@ test("export creates a deterministic portable record with generated notes and ve
 
   const visual = path.join(root, "vault", "Assets", "diagram.svg");
   fs.mkdirSync(path.dirname(visual), { recursive: true });
-  fs.writeFileSync(visual, "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>\n");
+  const originalVisual = "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>\n";
+  fs.writeFileSync(visual, originalVisual);
   const addVisual = run(root, "add-visual", [
     "--id",
     "visual-1",
@@ -102,6 +105,81 @@ test("export creates a deterministic portable record with generated notes and ve
   const duplicate = run(root, "export", ["--output", first]);
   assert.notEqual(duplicate.status, 0);
   assert.match(duplicate.stderr, /already exists/i);
+});
+
+test("export refuses a verified visual swapped to a symlink between inspection and copy", (t) => {
+  if (process.platform === "win32") t.skip("symlink permissions differ on Windows");
+  const root = tempRoot("adaptive-learn-export-race-source-");
+  assert.equal(run(root, "init", ["--now", now]).status, 0);
+  assert.equal(
+    run(root, "start", [
+      "--id", "session-1",
+      "--topic-id", "topic-1",
+      "--topic", "Race-safe export",
+      "--target", "Never copy a swapped visual",
+      "--now", now,
+    ]).status,
+    0,
+  );
+
+  const visual = path.join(root, "vault", "Assets", "diagram.svg");
+  fs.mkdirSync(path.dirname(visual), { recursive: true });
+  fs.writeFileSync(visual, "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>\n");
+  assert.equal(
+    run(root, "add-visual", [
+      "--id", "visual-1",
+      "--path", "Assets/diagram.svg",
+      "--description", "Verified diagram",
+      "--verification", "Opened and inspected locally.",
+      "--now", now,
+    ]).status,
+    0,
+  );
+  const replacement = path.join(root, "replacement.svg");
+  fs.writeFileSync(replacement, "<svg><text>must never be exported</text></svg>\n");
+  const output = path.join(tempRoot("adaptive-learn-export-race-out-"), "record");
+
+  const originalLstatSync = fs.lstatSync;
+  const originalOpenSync = fs.openSync;
+  let visualLstatCount = 0;
+  let visualOpenCount = 0;
+  let swapped = false;
+  const swap = () => {
+    if (swapped) return;
+    fs.unlinkSync(visual);
+    fs.symlinkSync(replacement, visual);
+    swapped = true;
+  };
+  fs.lstatSync = function instrumentedLstat(file, ...args) {
+    const stat = originalLstatSync.call(fs, file, ...args);
+    if (path.resolve(file) === visual && ++visualLstatCount === 2) swap();
+    return stat;
+  };
+  fs.openSync = function instrumentedOpen(file, ...args) {
+    if (path.resolve(file) === visual && ++visualOpenCount === 2) swap();
+    return originalOpenSync.call(fs, file, ...args);
+  };
+
+  try {
+    let rejected = false;
+    try {
+      exportLearnerRecord(root, output);
+    } catch (error) {
+      assert.match(error.message, /regular file|symlink|changed/i);
+      rejected = true;
+    }
+    if (rejected) {
+      assert.equal(fs.existsSync(output), false);
+    } else {
+      assert.equal(
+        fs.readFileSync(path.join(output, "vault", "Assets", "diagram.svg"), "utf8"),
+        originalVisual,
+      );
+    }
+  } finally {
+    fs.lstatSync = originalLstatSync;
+    fs.openSync = originalOpenSync;
+  }
 });
 
 test("backup and restore check validate a snapshot without changing canonical state", () => {

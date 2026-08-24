@@ -109,7 +109,10 @@ skill's `references/cli-reference.md`.
 - The complete read-modify-write cycle and vault rendering are serialized, so
   concurrent Codex/Pi processes cannot silently overwrite one another.
 - Visual paths must remain inside the vault and require recorded inspection.
-- The engine stores no model API keys or network credentials.
+- The engine requires no model API keys or network credentials and provides no
+  dedicated credential storage. Secrets entered as ordinary learning text are
+  still persisted and can appear in backups, exports, Obsidian, and host
+  conversations.
 - The engine sends no telemetry and performs no source fetching.
 
 ## Operate and recover

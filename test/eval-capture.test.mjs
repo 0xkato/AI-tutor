@@ -162,6 +162,48 @@ test("packaging rejects invalid or linked source evidence before creating output
   assert.equal(fs.existsSync(linked.output), false);
 });
 
+test("packaging refuses a source swapped to a symlink between inspection and open", (t) => {
+  if (process.platform === "win32") t.skip("symlink permissions differ on Windows");
+  const input = fixture();
+  const transcript = path.resolve(input.evidence.transcript);
+  const replacement = path.join(input.root, "replacement-transcript.md");
+  fs.writeFileSync(replacement, "# Replacement\n\nMust never be captured.\n");
+
+  const originalLstatSync = fs.lstatSync;
+  const originalOpenSync = fs.openSync;
+  let swapped = false;
+  const swap = () => {
+    if (swapped) return;
+    fs.unlinkSync(transcript);
+    fs.symlinkSync(replacement, transcript);
+    swapped = true;
+  };
+  fs.lstatSync = function instrumentedLstat(file, ...args) {
+    const stat = originalLstatSync.call(fs, file, ...args);
+    if (path.resolve(file) === transcript) swap();
+    return stat;
+  };
+  fs.openSync = function instrumentedOpen(file, ...args) {
+    if (path.resolve(file) === transcript) swap();
+    return originalOpenSync.call(fs, file, ...args);
+  };
+
+  try {
+    assert.throws(
+      () => packageEvalArtifact({
+        outputDirectory: input.output,
+        draft: input.draft,
+        evidence: input.evidence,
+      }),
+      (error) => error.code === "INVALID_EVAL_SOURCE",
+    );
+    assert.equal(fs.existsSync(input.output), false);
+  } finally {
+    fs.lstatSync = originalLstatSync;
+    fs.openSync = originalOpenSync;
+  }
+});
+
 test("packaging command freezes the documented evidence arguments", () => {
   const input = fixture();
   const run = spawnSync(

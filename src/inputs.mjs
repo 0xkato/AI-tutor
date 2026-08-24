@@ -35,6 +35,22 @@ export function safeIdentifier(value, label = "identifier") {
   return safeSingleLine(value, label, { maxLength: 256 });
 }
 
+export function safeVaultDir(value, label = "vault directory") {
+  const vaultDir = safeSingleLine(value, label, { maxLength: 1_024 });
+  const normalized = path.posix.normalize(vaultDir);
+  if (
+    vaultDir.includes("\\") ||
+    path.posix.isAbsolute(vaultDir) ||
+    normalized === "." ||
+    normalized === ".." ||
+    normalized.startsWith("../") ||
+    normalized !== vaultDir
+  ) {
+    inputError(`${label} must be a normalized relative path inside the learning root`, "INVALID_VAULT");
+  }
+  return vaultDir;
+}
+
 export function safeRelativeVaultPath(value) {
   const visualPath = safeSingleLine(value, "visual path", { maxLength: 1_024 }).replace(/\\/g, "/");
   const normalized = path.posix.normalize(visualPath);

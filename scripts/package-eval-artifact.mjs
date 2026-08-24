@@ -31,16 +31,25 @@ function digest(contents) {
 
 function readRegularFile(file, label) {
   const resolved = path.resolve(file);
-  let stat;
+  const flags = fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0);
+  let handle;
   try {
-    stat = fs.lstatSync(resolved);
+    handle = fs.openSync(resolved, flags);
   } catch (error) {
     fail(`${label} could not be read: ${error.message}`, "INVALID_EVAL_SOURCE");
   }
-  if (!stat.isFile() || stat.isSymbolicLink()) {
-    fail(`${label} must be a regular, non-symlink file`, "INVALID_EVAL_SOURCE");
+  try {
+    const stat = fs.fstatSync(handle);
+    if (!stat.isFile()) {
+      fail(`${label} must be a regular, non-symlink file`, "INVALID_EVAL_SOURCE");
+    }
+    return fs.readFileSync(handle);
+  } catch (error) {
+    if (error instanceof EvalCaptureError) throw error;
+    fail(`${label} could not be read: ${error.message}`, "INVALID_EVAL_SOURCE");
+  } finally {
+    fs.closeSync(handle);
   }
-  return fs.readFileSync(resolved);
 }
 
 function validateEvidence(contents) {

@@ -15,14 +15,15 @@ live-host evidence is recorded in
 
 Current local evidence includes:
 
-- 142 automated tests and the repository release-check path;
+- 146 automated tests and the repository release-check path;
 - complete release checks on official Node `v20.20.2` and `v22.23.2` macOS
-  arm64 runtimes, including 142 of 142 automated tests, 7 of 7 end-to-end
+  arm64 runtimes, including 146 of 146 automated tests, 7 of 7 end-to-end
   fixtures, fresh-path setup, syntax and JSON checks, and a healthy fresh-path
   `doctor` result under each runtime;
 - destructive coverage for migration, corrupt and future state, backup and
   restore-check, stale locks, renderer recovery, render-target safety, setup,
-  CLI lifecycle, and review lifecycle;
+  CLI lifecycle, review lifecycle, pre-initialization vault validation, and
+  symlink-swap races during export and live-evidence capture;
 - an actual `EACCES` renderer failure in which canonical revision 1 committed,
   `repair-render` returned revision 1 without changing canonical state bytes,
   and `doctor` reported a current projection afterward;

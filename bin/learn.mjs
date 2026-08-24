@@ -9,7 +9,7 @@ import { knowledgeForSession } from "../src/concepts.mjs";
 import { doctor } from "../src/doctor.mjs";
 import { LearningError } from "../src/errors.mjs";
 import { exportLearnerRecord } from "../src/export.mjs";
-import { inspectVisual } from "../src/inputs.mjs";
+import { inspectVisual, safeVaultDir } from "../src/inputs.mjs";
 import {
   addSource,
   addVisual,
@@ -356,8 +356,9 @@ function readJsonFile(file) {
 
 function commandResult(command, options, root) {
   if (command === "init") {
+    const requestedVaultDir = last(options, "vault-dir");
+    const vaultDir = requestedVaultDir === undefined ? null : safeVaultDir(requestedVaultDir);
     const initial = initializeStore(root, { now: last(options, "now") });
-    const vaultDir = last(options, "vault-dir");
     if (vaultDir && vaultDir !== initial.settings.vaultDir) {
       const outcome = commitAndRender(root, (current) => {
         const next = structuredClone(current);

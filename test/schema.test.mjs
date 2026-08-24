@@ -56,6 +56,18 @@ test("validateState rejects structurally incomplete version-2 state", () => {
   );
 });
 
+test("validateState rejects unsafe vault directories", () => {
+  for (const vaultDir of ["/tmp/vault", "../vault", ".", "nested/../vault", "nested\\vault"]) {
+    const state = createInitialState({ now: NOW });
+    state.settings.vaultDir = vaultDir;
+
+    assert.throws(
+      () => validateState(state),
+      (error) => error.code === "INVALID_STATE" && /settings\.vaultDir/.test(error.message),
+    );
+  }
+});
+
 test("validateState rejects an active session reference that does not exist", () => {
   const state = createInitialState({ now: NOW });
   state.activeSessionId = "missing";
