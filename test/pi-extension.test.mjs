@@ -163,8 +163,47 @@ test("status and due review commands expose durable state without shell interpol
     path.join(repository, ".pi", "extensions", "adaptive-learning.js"),
     "utf8",
   );
-  assert.match(source, /spawnSync\(process\.execPath, \[cliPath, command, \.\.\.args/);
-  assert.doesNotMatch(source, /shell\s*:\s*true|execSync|import\s*\{[^}]*\bexec\b/);
+  assert.match(source, /spawn\(executable, \[selectedCliPath, command, \.\.\.args/);
+  assert.doesNotMatch(source, /spawnSync|shell\s*:\s*true|execSync|import\s*\{[^}]*\bexec\b/);
+});
+
+test("command handlers await asynchronous CLI state before dispatching the skill", async () => {
+  const h = harness({
+    status: async () => ({ active: null }),
+    init: async () => ({ active: null }),
+    start: async () => ({
+      active: { topic: "Vectors", target: "Explain vector addition causally", phase: "probe" },
+    }),
+  });
+
+  await h.commands.get("teach").handler("Vectors :: Explain vector addition causally", h.ctx);
+
+  assert.deepEqual(h.calls.map((call) => call.command), ["status", "init", "start"]);
+  assert.equal(h.messages.length, 1);
+  assert.match(h.messages[0].message, /Explain vector addition causally/);
+});
+
+test("committed state render failures are surfaced as repair warnings", async () => {
+  const h = harness({
+    status: async () => {
+      const error = new Error(
+        "State revision 7 was committed, but Obsidian rendering failed. Run repair-render before continuing.",
+      );
+      error.code = "RENDER_FAILED";
+      error.stateCommitted = true;
+      error.stateRevision = 7;
+      error.repair = { command: "repair-render", root: h.ctx.cwd };
+      throw error;
+    },
+  });
+
+  await h.commands.get("teach").handler("Vectors", h.ctx);
+
+  assert.equal(h.notifications.length, 1);
+  assert.equal(h.notifications[0].level, "warning");
+  assert.match(h.notifications[0].message, /revision 7 was committed/i);
+  assert.match(h.notifications[0].message, /repair-render/i);
+  assert.equal(h.messages.length, 0);
 });
 
 test("commands fail safely when idle state or retention work is missing", async () => {
@@ -182,20 +221,20 @@ test("commands fail safely when idle state or retention work is missing", async 
   assert.equal(busy.calls.length, 0);
 });
 
-test("Pi adapter's real runner creates and resumes canonical CLI state", () => {
+test("Pi adapter's real runner creates and resumes canonical CLI state", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-pi-"));
-  assert.throws(
-    () => runAdaptiveLearningCli("status", [], root),
+  await assert.rejects(
+    runAdaptiveLearningCli("status", [], root),
     (error) => error.code === "STATE_NOT_INITIALIZED",
   );
 
-  runAdaptiveLearningCli("init", [], root);
-  runAdaptiveLearningCli(
+  await runAdaptiveLearningCli("init", [], root);
+  await runAdaptiveLearningCli(
     "start",
     ["--topic", "Vectors", "--target", "Explain vector addition causally"],
     root,
   );
-  const status = runAdaptiveLearningCli("status", [], root);
+  const status = await runAdaptiveLearningCli("status", [], root);
 
   assert.equal(status.active.topic, "Vectors");
   assert.equal(status.active.target, "Explain vector addition causally");
