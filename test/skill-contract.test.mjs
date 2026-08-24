@@ -65,8 +65,24 @@ test("skill corpus preserves the complete adaptive-learning behavior", () => {
     ["new transfer", /new transfer (question|task)/i],
     ["retention schedule", /spaced retention|due review/i],
     ["executable review lifecycle", /start-review[\s\S]*close-review/i],
+    [
+      "review question persisted before answer",
+      /start-review-checkpoint[\s\S]*persist[\s\S]*question ID[\s\S]*question text[\s\S]*kind[\s\S]*before[\s\S]*learner answer/i,
+    ],
+    [
+      "repair transfer question persisted before answer",
+      /start-review-checkpoint[\s\S]*question-id retention-transfer-q1[\s\S]*kind transfer[\s\S]*record-assessment[\s\S]*question-id retention-transfer-q1/i,
+    ],
+    [
+      "contaminated review replacement is persisted before answer",
+      /If a review answer is contaminated[\s\S]*start-review-checkpoint[\s\S]*new question ID[\s\S]*before.*answer/i,
+    ],
     ["due listing is not completion", /Listing an item as due does \*\*not\*\* complete it/i],
     ["explicit review deferral", /defer-review[\s\S]*concrete reason/i],
+    [
+      "review deferral cannot strand a checkpoint",
+      /defer-review[\s\S]*before starting a review checkpoint[\s\S]*cannot be deferred while.*checkpoint.*active/i,
+    ],
     ["whole-system synthesis", /whole-system synthesis/i],
     ["assessed synthesis lifecycle", /start-synthesis[\s\S]*record-synthesis[\s\S]*(close-review|close)/i],
     ["synthesis cannot be arbitrary close prose", /close.*derives.*synthesis.*clean correct\s+assessment/is],
@@ -77,4 +93,18 @@ test("skill corpus preserves the complete adaptive-learning behavior", () => {
   for (const [label, pattern] of contracts) requires(corpus, label, pattern);
 
   assert.doesNotMatch(corpus, /ask the learner to approve each source/i);
+});
+
+test("review CLI example preserves checkpoint identity through retry and repair", () => {
+  const cliReference = read("references/cli-reference.md");
+
+  assert.match(
+    cliReference,
+    /start-review-checkpoint[\s\S]*?question-id retention-q1[\s\S]*?node <selected-node>[\s\S]*?kind retention[\s\S]*?question "<fully framed retrieval question>"[\s\S]*?record-assessment[\s\S]*?question-id retention-q1 --node <selected-node>[\s\S]*?kind retention[\s\S]*?question "<fully framed retrieval question>"/i,
+  );
+  assert.equal(
+    cliReference.match(/--question-id retention-q1\b/g)?.length,
+    3,
+    "The review example must persist one checkpoint and record both attempts under its exact identity",
+  );
 });

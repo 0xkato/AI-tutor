@@ -96,8 +96,9 @@ The full lifecycle is `init`, `start`, `record-probe` or
 `record-admitted-gap`, `finish-probe`,
 `add-source`, `set-plan`, `begin-teach`, `record-step`, `record-assessment`,
 `start-synthesis`, `record-synthesis`, `add-visual`, `status`, `context`, `due`,
-`start-review`, `defer-review`, `close-review`, and `close`. Teaching and
-synthesis question identities are persisted before answers are accepted.
+`start-review`, `start-review-checkpoint`, `defer-review`, `close-review`, and
+`close`. Teaching, review, and synthesis question identities are persisted
+before answers are accepted.
 Operational commands are `doctor`, `backup`, `restore --check`,
 `repair-render`, and `export`. Complete learning examples are in the shared
 skill's `references/cli-reference.md`.

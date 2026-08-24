@@ -73,9 +73,11 @@ The learner supplies the learning target; do not silently replace or broaden it.
 
 - Run `due --json` to find available spaced-retention work, then claim explicit
   items with `start-review`. Listing an item as due does **not** complete it.
-- During a review session, assess only the selected concepts through retention
-  questions. Persist each result, repair misses within the active checkpoint,
-  and require a new durable transfer before treating an item as resolved.
+- During a review session, assess only the selected concepts. Before showing a
+  retention question, run `start-review-checkpoint` to persist its question ID,
+  question text, and kind before the learner answer. Only then record the
+  assessment. Repair misses within that active checkpoint and require a new
+  durable transfer checkpoint before treating an item as resolved.
 - If a selected item cannot be validly assessed, use `defer-review` with a
   concrete reason and future time. Do not silently skip it.
 - Run `close-review` only after every selected item is resolved or explicitly

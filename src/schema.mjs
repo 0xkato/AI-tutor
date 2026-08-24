@@ -305,6 +305,7 @@ function validateSession(
     }
   }
   if (
+    session.kind === "learn" &&
     session.activeStepId === null &&
     session.checkpoint !== null &&
     session.checkpoint.status !== "resolved"
@@ -379,6 +380,9 @@ function validateSession(
     invalid(`${label}.reviewItems must be empty for a learning session`);
   }
   if (session.kind === "review") {
+    if (session.activeStepId !== null || session.steps.length !== 0) {
+      invalid(`${label} cannot contain teaching steps during a review session`);
+    }
     if (session.admittedGaps.length !== 0) {
       invalid(`${label}.admittedGaps must be empty for a review session`);
     }
@@ -557,6 +561,25 @@ export function validateState(value) {
         invalid(`sessions.${id} references a concept from another topic: ${conceptId}`);
       }
     }
+    if (session.checkpoint) {
+      const checkpointConcept = session.conceptIds
+        .map((conceptId) => state.concepts[conceptId])
+        .find((concept) => concept?.key === session.checkpoint.nodeId);
+      if (!checkpointConcept) {
+        invalid(`sessions.${id}.checkpoint is not bound to a session concept`);
+      }
+      if (
+        session.kind === "review" &&
+        !session.reviewItems.some((item) => item.conceptId === checkpointConcept.id)
+      ) {
+        invalid(`sessions.${id}.checkpoint does not match a selected review item`);
+      }
+      if (session.kind === "review") {
+        text(session.checkpoint.questionId, `sessions.${id}.checkpoint.questionId`);
+        text(session.checkpoint.question, `sessions.${id}.checkpoint.question`);
+        text(session.checkpoint.kind, `sessions.${id}.checkpoint.kind`);
+      }
+    }
     for (const gap of session.admittedGaps) {
       const concept = state.concepts[gap.conceptId];
       if (
@@ -597,11 +620,19 @@ export function validateState(value) {
     }
     if (session.checkpoint?.resolvedEvidenceId) {
       const assessment = assessmentIds.get(session.checkpoint.resolvedEvidenceId);
+      const checkpointConcept = session.conceptIds
+        .map((conceptId) => state.concepts[conceptId])
+        .find((concept) => concept?.key === session.checkpoint.nodeId);
       if (
         !assessment ||
         assessment.contaminated ||
         assessment.grade !== "correct" ||
         assessment.nodeId !== session.checkpoint.nodeId ||
+        assessment.conceptId !== checkpointConcept?.id ||
+        assessment.questionId !== session.checkpoint.questionId ||
+        assessment.question !== session.checkpoint.question ||
+        assessment.kind !== session.checkpoint.kind ||
+        assessment.stage !== (session.kind === "review" ? "retention" : "teach") ||
         !session.assessments.some((candidate) => candidate.id === assessment.id)
       ) {
         invalid(`sessions.${id}.checkpoint has invalid resolved evidence`);

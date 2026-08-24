@@ -157,6 +157,48 @@ function validateRetryIdentity(session, concept, assessment) {
   }
 }
 
+function validateCheckpointIdentity(session, assessment) {
+  if (session.kind !== "review") return;
+  const checkpoint = session.checkpoint;
+  if (!checkpoint) {
+    throw new LearningError(
+      "Retention assessment has no persisted review checkpoint",
+      "INVALID_CHECKPOINT",
+    );
+  }
+  if (["resolved", "new-transfer-required"].includes(checkpoint.status)) {
+    throw new LearningError(
+      `Review checkpoint ${checkpoint.questionId} cannot accept an answer while ${checkpoint.status}`,
+      "INVALID_CHECKPOINT",
+    );
+  }
+  if (
+    assessment.nodeId !== checkpoint.nodeId ||
+    assessment.questionId !== checkpoint.questionId ||
+    assessment.question !== checkpoint.question ||
+    assessment.kind !== checkpoint.kind
+  ) {
+    throw new LearningError(
+      `Review answer must preserve checkpoint question ${checkpoint.questionId} exactly`,
+      "CHECKPOINT_IDENTITY_MISMATCH",
+    );
+  }
+  const questionWasContaminated = session.assessments.some(
+    (item) =>
+      item.contaminated &&
+      item.nodeId === checkpoint.nodeId &&
+      item.questionId === checkpoint.questionId &&
+      item.question === checkpoint.question &&
+      item.kind === checkpoint.kind,
+  );
+  if (!assessment.contaminated && questionWasContaminated) {
+    throw new LearningError(
+      `Review checkpoint ${checkpoint.questionId} is contaminated and requires a new checkpoint`,
+      "CONTAMINATED_QUESTION",
+    );
+  }
+}
+
 function transitionRetry(current, assessment, { durableRequired = false } = {}) {
   if (!current) {
     if (["partial", "incorrect"].includes(assessment.grade)) {
@@ -270,7 +312,6 @@ export function recordAssessment(state, input) {
           );
         }
       }
-
       const pendingConcept = unresolvedRetry(next, session);
       if (pendingConcept && pendingConcept.key !== assessment.nodeId) {
         throw new LearningError(
@@ -294,6 +335,7 @@ export function recordAssessment(state, input) {
         );
       }
       assessment.conceptId = concept?.id ?? null;
+      validateCheckpointIdentity(session, assessment);
 
       if (!assessment.contaminated) {
         validateRetryIdentity(session, concept, assessment);
@@ -305,6 +347,7 @@ export function recordAssessment(state, input) {
           recordConceptAssessment(next, session, concept, assessment, retry, {
             scheduleReview: false,
           });
+          updateTeachingCheckpoint(session, assessment, retry);
         } else {
           recordConceptAssessment(next, session, concept, assessment, retry);
         }

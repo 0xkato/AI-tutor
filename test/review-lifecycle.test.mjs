@@ -148,6 +148,119 @@ test("a due review is claimed, executed across processes, and persisted once", (
   ], { ok: false });
   assert.match(earlyClose.stderr, /review items must be resolved or deferred/i);
 
+  const beforeMissingCheckpoint = fs.readFileSync(
+    path.join(root, ".adaptive-learning", "state.json"),
+    "utf8",
+  );
+  const missingCheckpoint = invoke(root, "record-assessment", [
+    "--id", "retention-without-checkpoint-a1",
+    "--question-id", "retention-without-checkpoint-q1",
+    "--node", "covectors",
+    "--stage", "retention",
+    "--kind", "retention",
+    "--question", "What does a covector consume and produce?",
+    "--answer", "It consumes a vector and produces a scalar.",
+    "--grade", "correct",
+    "--evidence", "A valid answer cannot count unless its question was persisted first.",
+    "--now", "2026-08-25T08:01:30.000Z",
+  ], { ok: false });
+  assert.match(missingCheckpoint.stderr, /no persisted review checkpoint/i);
+  assert.equal(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+    beforeMissingCheckpoint,
+  );
+
+  invoke(root, "start-review-checkpoint", [
+    "--question-id", "retention-q1",
+    "--node", "covectors",
+    "--kind", "retention",
+    "--question", "What does a covector consume and produce?",
+    "--now", "2026-08-25T08:02:00.000Z",
+  ]);
+  const checkpointed = JSON.parse(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+  );
+  assert.equal(checkpointed.sessions["review-s1"].assessments.length, 0);
+  assert.equal(checkpointed.sessions["review-s1"].reviewItems[0].status, "pending");
+  assert.equal(checkpointed.concepts[due.conceptId].retry, null);
+  assert.deepEqual(checkpointed.sessions["review-s1"].checkpoint, {
+    status: "awaiting-answer",
+    nodeId: "covectors",
+    questionId: "retention-q1",
+    question: "What does a covector consume and produce?",
+    kind: "retention",
+    priorQuestionId: null,
+    attempts: 0,
+    resolvedEvidenceId: null,
+    mistakeType: "",
+  });
+  status = JSON.parse(invoke(root, "status", ["--json"]).stdout);
+  assert.deepEqual(status.active.checkpoint, checkpointed.sessions["review-s1"].checkpoint);
+
+  const beforeActiveDeferral = fs.readFileSync(
+    path.join(root, ".adaptive-learning", "state.json"),
+    "utf8",
+  );
+  const activeDeferral = invoke(root, "defer-review", [
+    "--review", due.reviewId,
+    "--reason", "This must not strand the persisted checkpoint or retry state.",
+    "--until", "2026-08-26T08:00:00.000Z",
+    "--now", "2026-08-25T08:02:10.000Z",
+  ], { ok: false });
+  assert.match(activeDeferral.stderr, /cannot be deferred while.*checkpoint.*active/i);
+  assert.equal(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+    beforeActiveDeferral,
+  );
+
+  const checkpointStatePath = path.join(root, ".adaptive-learning", "state.json");
+  const beforeInvalidBinding = fs.readFileSync(checkpointStatePath, "utf8");
+  const invalidBindingState = JSON.parse(beforeInvalidBinding);
+  invalidBindingState.sessions["review-s1"].checkpoint.nodeId = "vectors";
+  fs.writeFileSync(checkpointStatePath, `${JSON.stringify(invalidBindingState, null, 2)}\n`);
+  const invalidBinding = invoke(root, "status", ["--json"], { ok: false });
+  assert.match(invalidBinding.stderr, /checkpoint.*session concept/i);
+  fs.writeFileSync(checkpointStatePath, beforeInvalidBinding);
+
+  const beforeSecondCheckpoint = fs.readFileSync(
+    path.join(root, ".adaptive-learning", "state.json"),
+    "utf8",
+  );
+  const secondCheckpoint = invoke(root, "start-review-checkpoint", [
+    "--question-id", "retention-q2",
+    "--node", "covectors",
+    "--kind", "transfer",
+    "--question", "What does a linear price sensitivity consume and produce?",
+    "--now", "2026-08-25T08:02:30.000Z",
+  ], { ok: false });
+  assert.match(secondCheckpoint.stderr, /checkpoint.*retention-q1.*resolved.*another checkpoint/i);
+  assert.equal(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+    beforeSecondCheckpoint,
+  );
+
+  const beforeMismatch = fs.readFileSync(
+    path.join(root, ".adaptive-learning", "state.json"),
+    "utf8",
+  );
+  const mismatch = invoke(root, "record-assessment", [
+    "--id", "retention-mismatch-a1",
+    "--question-id", "retention-q1",
+    "--node", "covectors",
+    "--stage", "retention",
+    "--kind", "retention",
+    "--question", "What does a covector output?",
+    "--answer", "It outputs a scalar.",
+    "--grade", "correct",
+    "--evidence", "The answer is correct but does not preserve the persisted question text.",
+    "--now", "2026-08-25T08:03:00.000Z",
+  ], { ok: false });
+  assert.match(mismatch.stderr, /preserve.*checkpoint question.*retention-q1.*exactly/i);
+  assert.equal(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+    beforeMismatch,
+  );
+
   invoke(root, "record-assessment", [
     "--id", "retention-a1",
     "--question-id", "retention-q1",
@@ -176,6 +289,31 @@ test("a due review is claimed, executed across processes, and persisted once", (
     "--evidence", "The bounded retry repeated the same incorrect vector-output model.",
     "--mistake-type", "output-type",
     "--now", "2026-08-25T08:07:00.000Z",
+  ]);
+
+  const beforeReusedRepair = fs.readFileSync(
+    path.join(root, ".adaptive-learning", "state.json"),
+    "utf8",
+  );
+  const reusedRepair = invoke(root, "start-review-checkpoint", [
+    "--question-id", "retention-q1",
+    "--node", "covectors",
+    "--kind", "transfer",
+    "--question", "Apply the same idea to a price sensitivity.",
+    "--now", "2026-08-25T08:07:30.000Z",
+  ], { ok: false });
+  assert.match(reusedRepair.stderr, /new transfer question.*retention-q1/i);
+  assert.equal(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+    beforeReusedRepair,
+  );
+
+  invoke(root, "start-review-checkpoint", [
+    "--question-id", "retention-transfer-q1",
+    "--node", "covectors",
+    "--kind", "transfer",
+    "--question", "In a new pricing example, what must a linear sensitivity consume and produce?",
+    "--now", "2026-08-25T08:08:00.000Z",
   ]);
 
   invoke(root, "record-assessment", [
@@ -210,6 +348,17 @@ test("a due review is claimed, executed across processes, and persisted once", (
   assert.equal(review.status, "scheduled");
   assert.equal(review.claimedBySessionId, null);
   assert.equal(state.reviewCount, 1);
+
+  const beforeInvalidResolution = fs.readFileSync(checkpointStatePath, "utf8");
+  const invalidResolutionState = JSON.parse(beforeInvalidResolution);
+  invalidResolutionState.sessions["review-s1"].checkpoint.question =
+    "A different question was substituted after the assessment.";
+  fs.writeFileSync(
+    checkpointStatePath,
+    `${JSON.stringify(invalidResolutionState, null, 2)}\n`,
+  );
+  const invalidResolution = invoke(root, "status", ["--json"], { ok: false });
+  assert.match(invalidResolution.stderr, /checkpoint has invalid resolved evidence/i);
 });
 
 test("an event older than the current durable state is rejected without mutation", () => {
@@ -220,6 +369,13 @@ test("an event older than the current durable state is rejected without mutation
     "--id", "review-time-guard",
     "--review", due.reviewId,
     "--now", DAY_TWO,
+  ]);
+  invoke(root, "start-review-checkpoint", [
+    "--question-id", "retention-stale-time-q1",
+    "--node", "covectors",
+    "--kind", "retention",
+    "--question", "What does a covector consume and produce?",
+    "--now", "2026-08-25T08:01:00.000Z",
   ]);
   const statePath = path.join(root, ".adaptive-learning", "state.json");
   const before = JSON.parse(fs.readFileSync(statePath, "utf8"));
@@ -281,6 +437,165 @@ test("a selected review can be explicitly deferred with a reason and stable ID",
   );
 });
 
+test("a contaminated review question can be replaced without creating evidence", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-contaminated-review-"));
+  const due = seedDueReview(root);
+
+  invoke(root, "start-review", [
+    "--id", "review-contaminated",
+    "--review", due.reviewId,
+    "--now", DAY_TWO,
+  ]);
+  invoke(root, "start-review-checkpoint", [
+    "--question-id", "retention-contaminated-q1",
+    "--node", "covectors",
+    "--kind", "retention",
+    "--question", "What does a covector consume and produce?",
+    "--now", "2026-08-25T08:01:00.000Z",
+  ]);
+  invoke(root, "record-assessment", [
+    "--id", "retention-contaminated-a1",
+    "--question-id", "retention-contaminated-q1",
+    "--node", "covectors",
+    "--stage", "retention",
+    "--kind", "retention",
+    "--question", "What does a covector consume and produce?",
+    "--answer", "The answer was exposed before this response.",
+    "--grade", "correct",
+    "--evidence", "The answer exposure invalidates this response as learning evidence.",
+    "--contaminated",
+    "--now", "2026-08-25T08:02:00.000Z",
+  ]);
+
+  const beforeReusingContaminatedQuestion = fs.readFileSync(
+    path.join(root, ".adaptive-learning", "state.json"),
+    "utf8",
+  );
+  const reusedContaminatedQuestion = invoke(root, "record-assessment", [
+    "--id", "retention-contaminated-a2",
+    "--question-id", "retention-contaminated-q1",
+    "--node", "covectors",
+    "--stage", "retention",
+    "--kind", "retention",
+    "--question", "What does a covector consume and produce?",
+    "--answer", "It consumes a vector and produces a scalar.",
+    "--grade", "correct",
+    "--evidence", "This answer cannot count because the persisted question was already contaminated.",
+    "--now", "2026-08-25T08:02:30.000Z",
+  ], { ok: false });
+  assert.match(reusedContaminatedQuestion.stderr, /contaminated.*new.*checkpoint/i);
+  assert.equal(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+    beforeReusingContaminatedQuestion,
+  );
+
+  invoke(root, "start-review-checkpoint", [
+    "--question-id", "retention-clean-transfer-q1",
+    "--node", "covectors",
+    "--kind", "transfer",
+    "--question", "In a pricing example, what must a linear sensitivity consume and produce?",
+    "--now", "2026-08-25T08:03:00.000Z",
+  ]);
+
+  const state = JSON.parse(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+  );
+  const session = state.sessions["review-contaminated"];
+  assert.equal(session.assessments.length, 1);
+  assert.equal(session.assessments[0].contaminated, true);
+  assert.equal(session.reviewItems[0].status, "pending");
+  assert.deepEqual(session.reviewItems[0].evidenceIds, []);
+  assert.equal(state.concepts[due.conceptId].retry, null);
+  assert.deepEqual(session.checkpoint, {
+    status: "awaiting-answer",
+    nodeId: "covectors",
+    questionId: "retention-clean-transfer-q1",
+    question: "In a pricing example, what must a linear sensitivity consume and produce?",
+    kind: "transfer",
+    priorQuestionId: "retention-contaminated-q1",
+    attempts: 0,
+    resolvedEvidenceId: null,
+    mistakeType: "",
+  });
+});
+
+test("a contaminated bounded retry can move to a new transfer checkpoint", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-contaminated-retry-"));
+  const due = seedDueReview(root);
+
+  invoke(root, "start-review", [
+    "--id", "review-contaminated-retry",
+    "--review", due.reviewId,
+    "--now", DAY_TWO,
+  ]);
+  invoke(root, "start-review-checkpoint", [
+    "--question-id", "retention-contaminated-retry-q1",
+    "--node", "covectors",
+    "--kind", "retention",
+    "--question", "What does a covector consume and produce?",
+    "--now", "2026-08-25T08:01:00.000Z",
+  ]);
+  invoke(root, "record-assessment", [
+    "--id", "retention-contaminated-retry-a1",
+    "--question-id", "retention-contaminated-retry-q1",
+    "--node", "covectors",
+    "--stage", "retention",
+    "--kind", "retention",
+    "--question", "What does a covector consume and produce?",
+    "--answer", "It consumes a scalar and produces a vector.",
+    "--grade", "incorrect",
+    "--evidence", "The answer reversed the covector input and output types.",
+    "--mistake-type", "type-direction",
+    "--now", "2026-08-25T08:02:00.000Z",
+  ]);
+  invoke(root, "record-assessment", [
+    "--id", "retention-contaminated-retry-a2",
+    "--question-id", "retention-contaminated-retry-q1",
+    "--node", "covectors",
+    "--stage", "retention",
+    "--kind", "retention",
+    "--question", "What does a covector consume and produce?",
+    "--answer", "The retry answer was exposed before the learner could respond.",
+    "--grade", "correct",
+    "--evidence", "The exposed retry is retained only as a contaminated audit record.",
+    "--contaminated",
+    "--now", "2026-08-25T08:03:00.000Z",
+  ]);
+
+  invoke(root, "start-review-checkpoint", [
+    "--question-id", "retention-after-contamination-q1",
+    "--node", "covectors",
+    "--kind", "transfer",
+    "--question", "In a pricing example, what must a linear sensitivity consume and produce?",
+    "--now", "2026-08-25T08:04:00.000Z",
+  ]);
+  invoke(root, "record-assessment", [
+    "--id", "retention-after-contamination-a1",
+    "--question-id", "retention-after-contamination-q1",
+    "--node", "covectors",
+    "--stage", "retention",
+    "--kind", "transfer",
+    "--question", "In a pricing example, what must a linear sensitivity consume and produce?",
+    "--answer", "It consumes a displacement vector and produces the scalar price change.",
+    "--grade", "correct",
+    "--evidence", "The new transfer correctly preserved the input and output types.",
+    "--now", "2026-08-25T08:05:00.000Z",
+  ]);
+
+  const state = JSON.parse(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+  );
+  const session = state.sessions["review-contaminated-retry"];
+  assert.equal(session.reviewItems[0].status, "resolved");
+  assert.deepEqual(session.reviewItems[0].evidenceIds, [
+    "retention-contaminated-retry-a1",
+    "retention-after-contamination-a1",
+  ]);
+  assert.equal(state.concepts[due.conceptId].retry, null);
+  assert.equal(session.checkpoint.status, "resolved");
+  assert.equal(session.checkpoint.priorQuestionId, "retention-contaminated-retry-q1");
+});
+
 test("a required review synthesis is assessed before the review can close", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-review-synthesis-"));
   const due = seedDueReview(root, { reviewCount: 6 });
@@ -289,6 +604,13 @@ test("a required review synthesis is assessed before the review can close", () =
     "--id", "review-synthesis",
     "--review", due.reviewId,
     "--now", DAY_TWO,
+  ]);
+  invoke(root, "start-review-checkpoint", [
+    "--question-id", "retention-synthesis-q1",
+    "--node", "covectors",
+    "--kind", "retention",
+    "--question", "What structure does a covector preserve while producing what output?",
+    "--now", "2026-08-25T08:02:00.000Z",
   ]);
   invoke(root, "record-assessment", [
     "--id", "retention-synthesis-a1",

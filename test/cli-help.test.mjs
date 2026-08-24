@@ -36,12 +36,29 @@ test("help lists the complete learning-session lifecycle", () => {
     "context",
     "due",
     "start-review",
+    "start-review-checkpoint",
     "defer-review",
     "close-review",
     "close",
   ]) {
     assert.match(result.stdout, new RegExp(`\\b${command}\\b`));
   }
+});
+
+test("review-checkpoint help makes the pre-answer persistence contract explicit", () => {
+  const commandHelp = spawnSync(
+    process.execPath,
+    [cli, "start-review-checkpoint", "--help"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+
+  assert.equal(commandHelp.status, 0, commandHelp.stderr);
+  assert.match(commandHelp.stdout, /persist.*retention question.*before.*learner answer/i);
+  assert.match(commandHelp.stdout, /--question-id <value>\s+Stable review question identifier/);
+  assert.match(commandHelp.stdout, /--node <value>\s+Selected review concept node identifier/);
+  assert.match(commandHelp.stdout, /--kind <value>\s+Retention or transfer question kind/);
+  assert.match(commandHelp.stdout, /--question <value>\s+Exact question shown to the learner/);
+  assert.doesNotMatch(commandHelp.stdout, /undefined/);
 });
 
 test("unknown commands fail with a useful error", () => {

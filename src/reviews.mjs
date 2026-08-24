@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 
-import { bindConceptToSession, registerTopic } from "./concepts.mjs";
+import {
+  bindConceptToSession,
+  conceptForNode,
+  registerTopic,
+} from "./concepts.mjs";
 import { LearningError, requireText } from "./errors.mjs";
+import { safeIdentifier, safeSingleLine, safeText } from "./inputs.mjs";
 import { updateActiveSession } from "./model.mjs";
 import {
   advanceReview,
@@ -17,6 +22,13 @@ const RESOLUTION_KINDS = new Set([
   "synthesis",
   "retention",
 ]);
+const REVIEW_CHECKPOINT_KINDS = new Set([
+  "retention",
+  "transfer",
+  "reconstruction",
+  "debugging",
+]);
+const REVIEW_REPAIR_KINDS = new Set(["transfer", "reconstruction", "debugging"]);
 
 function instant(now) {
   return parseInstant(now ?? new Date().toISOString(), "now");
@@ -129,6 +141,114 @@ export function reviewItemForConcept(session, conceptId) {
   return session.reviewItems.find((item) => item.conceptId === conceptId) ?? null;
 }
 
+export function startReviewCheckpoint(state, input = {}) {
+  const nodeId = safeIdentifier(input.nodeId, "nodeId");
+  const questionId = safeIdentifier(input.questionId, "checkpoint question ID");
+  const kind = safeSingleLine(input.kind, "checkpoint kind", { maxLength: 64 });
+  if (!REVIEW_CHECKPOINT_KINDS.has(kind)) {
+    throw new LearningError(`Unknown review checkpoint kind: ${kind}`, "INVALID_KIND");
+  }
+  const question = safeText(input.question, "checkpoint question");
+  const openedAt = instant(input.now);
+
+  return updateActiveSession(
+    state,
+    (session, next) => {
+      if (session.kind !== "review" || session.phase !== "review") {
+        throw new LearningError(
+          "Review checkpoints require an active review session",
+          "INVALID_PHASE",
+        );
+      }
+      const concept = conceptForNode(next, session, nodeId);
+      const item = reviewItemForConcept(session, concept.id);
+      if (!item) {
+        throw new LearningError(
+          `Concept is not selected for this review: ${concept.id}`,
+          "REVIEW_CONCEPT_NOT_SELECTED",
+        );
+      }
+      if (["resolved", "deferred"].includes(item.status)) {
+        throw new LearningError(`Review item is already ${item.status}`, "REVIEW_ITEM_CLOSED");
+      }
+
+      const current = session.checkpoint;
+      const retry = concept.retry;
+      const replacingRepair =
+        current?.status === "new-transfer-required" &&
+        retry?.status === "new-transfer-required" &&
+        current.nodeId === nodeId;
+      const replacingContaminated =
+        ["awaiting-answer", "retry-required"].includes(current?.status) &&
+        current.nodeId === nodeId &&
+        session.assessments.some(
+          (assessment) =>
+            assessment.contaminated &&
+            assessment.nodeId === current.nodeId &&
+            assessment.questionId === current.questionId &&
+            assessment.question === current.question &&
+            assessment.kind === current.kind,
+        );
+      const replacingCheckpoint = replacingRepair || replacingContaminated;
+
+      if (current && current.status !== "resolved" && !replacingCheckpoint) {
+        throw new LearningError(
+          `Review checkpoint ${current.questionId} must be resolved before another checkpoint`,
+          "CHECKPOINT_UNRESOLVED",
+        );
+      }
+      if (retry && !replacingRepair && !replacingContaminated) {
+        throw new LearningError(
+          `A required checkpoint for ${concept.key} must be resolved before another checkpoint`,
+          "RETRY_REQUIRED",
+        );
+      }
+
+      const priorQuestionId = replacingCheckpoint
+        ? current.priorQuestionId ?? current.questionId
+        : null;
+      if (replacingCheckpoint) {
+        if (questionId === priorQuestionId) {
+          throw new LearningError(
+            `A new transfer question is required after ${priorQuestionId}`,
+            "NEW_TRANSFER_REQUIRED",
+          );
+        }
+        if (!REVIEW_REPAIR_KINDS.has(kind)) {
+          throw new LearningError(
+            "Review repair requires a new durable transfer checkpoint",
+            "NEW_TRANSFER_REQUIRED",
+          );
+        }
+      }
+
+      if (replacingContaminated && retry) {
+        Object.assign(retry, {
+          status: "new-transfer-required",
+          questionId: current.questionId,
+          required: false,
+          answerMayBeTaught: true,
+          requiresNewTransfer: true,
+          priorQuestionId: current.questionId,
+        });
+      }
+
+      session.checkpoint = {
+        status: "awaiting-answer",
+        nodeId,
+        questionId,
+        question,
+        kind,
+        priorQuestionId,
+        attempts: 0,
+        resolvedEvidenceId: null,
+        mistakeType: "",
+      };
+    },
+    { now: openedAt },
+  );
+}
+
 export function recordReviewAssessment(state, session, concept, assessment) {
   if (session.kind !== "review" || session.phase !== "review") {
     throw new LearningError("Retention assessments require an active review session", "INVALID_PHASE");
@@ -165,7 +285,7 @@ export function deferReviewItem(state, { reviewId, reason, until, now } = {}) {
   const deferralReason = requireText(reason, "deferral reason");
   return updateActiveSession(
     state,
-    (session) => {
+    (session, next) => {
       if (session.kind !== "review" || session.phase !== "review") {
         throw new LearningError("Deferral requires an active review session", "INVALID_PHASE");
       }
@@ -175,6 +295,17 @@ export function deferReviewItem(state, { reviewId, reason, until, now } = {}) {
       }
       if (["resolved", "deferred"].includes(item.status)) {
         throw new LearningError(`Review item is already ${item.status}`, "REVIEW_ITEM_CLOSED");
+      }
+      const concept = next.concepts[item.conceptId];
+      const checkpointIsActive =
+        session.checkpoint &&
+        session.checkpoint.nodeId === concept?.key &&
+        session.checkpoint.status !== "resolved";
+      if (checkpointIsActive || concept?.retry) {
+        throw new LearningError(
+          "A review item cannot be deferred while its checkpoint or retry is active",
+          "CHECKPOINT_UNRESOLVED",
+        );
       }
       item.status = "deferred";
       item.deferralReason = deferralReason;

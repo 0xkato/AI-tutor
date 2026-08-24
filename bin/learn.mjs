@@ -27,6 +27,7 @@ import { dueReviews, shouldSynthesize } from "../src/retention.mjs";
 import {
   closeReviewSession,
   deferReviewItem,
+  startReviewCheckpoint,
   startReviewSession,
 } from "../src/reviews.mjs";
 import { initializeStore, readState } from "../src/store.mjs";
@@ -61,6 +62,7 @@ const commands = [
   ["context", "Print runner-ready durable context"],
   ["due", "List due retention reviews"],
   ["start-review", "Claim due items and start a retention review"],
+  ["start-review-checkpoint", "Persist a retention question before the learner answer"],
   ["defer-review", "Explicitly defer one selected review item"],
   ["close-review", "Close a resolved retention review"],
   ["close", "Close the active session from resolved synthesis evidence"],
@@ -131,6 +133,7 @@ const COMMAND_OPTIONS = {
   context: [],
   due: [],
   "start-review": ["id", "review"],
+  "start-review-checkpoint": ["question-id", "node", "kind", "question"],
   "defer-review": ["review", "reason", "until"],
   "close-review": ["synthesis"],
   close: ["gap"],
@@ -188,6 +191,12 @@ const COMMAND_OPTION_DESCRIPTIONS = {
   "record-admitted-gap": {
     statement: "Learner's exact admitted-gap statement",
     evidence: "Evidence locating the admitted knowledge gap",
+  },
+  "start-review-checkpoint": {
+    "question-id": "Stable review question identifier",
+    node: "Selected review concept node identifier",
+    kind: "Retention or transfer question kind",
+    question: "Exact question shown to the learner",
   },
 };
 
@@ -321,6 +330,7 @@ function statusFor(state) {
             conceptId: item.conceptId,
             status: item.status,
           })),
+          checkpoint: session.checkpoint ?? null,
         }
       : null,
   };
@@ -426,6 +436,15 @@ function commandResult(command, options, root) {
       return startReviewSession(current, {
         id: last(options, "id"),
         reviewIds: all(options, "review"),
+        now: last(options, "now"),
+      });
+    }
+    if (command === "start-review-checkpoint") {
+      return startReviewCheckpoint(current, {
+        questionId: last(options, "question-id"),
+        nodeId: last(options, "node"),
+        kind: last(options, "kind"),
+        question: last(options, "question"),
         now: last(options, "now"),
       });
     }

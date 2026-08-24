@@ -34,6 +34,12 @@ node bin/learn.mjs start-review --root <root> \
   --review <due-review-id> \
   --review <another-due-review-id>
 
+node bin/learn.mjs start-review-checkpoint --root <root> \
+  --question-id retention-q1 \
+  --node <selected-node> \
+  --kind retention \
+  --question "<fully framed retrieval question>"
+
 node bin/learn.mjs record-assessment --root <root> \
   --question-id retention-q1 --node <selected-node> \
   --stage retention --kind retention \
@@ -41,6 +47,22 @@ node bin/learn.mjs record-assessment --root <root> \
   --answer "<learner answer>" --grade incorrect \
   --evidence "<exact retained and missing mechanism>" \
   --mistake-type "<bounded error type>"
+
+# The bounded retry preserves the exact checkpoint identity and question.
+node bin/learn.mjs record-assessment --root <root> \
+  --question-id retention-q1 --node <selected-node> \
+  --stage retention --kind retention \
+  --question "<fully framed retrieval question>" \
+  --answer "<learner retry answer>" --grade incorrect \
+  --evidence "<exact retained and still-missing mechanism>" \
+  --mistake-type "<bounded error type>"
+
+# After repair, persist the new transfer checkpoint before showing it.
+node bin/learn.mjs start-review-checkpoint --root <root> \
+  --question-id retention-transfer-q1 \
+  --node <selected-node> \
+  --kind transfer \
+  --question "<new transfer task after repair>"
 
 node bin/learn.mjs record-assessment --root <root> \
   --question-id retention-transfer-q1 --node <selected-node> \
@@ -56,9 +78,17 @@ node bin/learn.mjs close-review --root <root> \
 Repeat `--review` to claim multiple due concepts from the same topic. The claim
 is atomic: the selected items stay unavailable to another session until this
 review closes. Only selected concepts accept retention assessments.
+`start-review-checkpoint` must persist the exact question identity before the
+learner answer; `record-assessment` rejects review evidence without that
+checkpoint or with changed question text, node, ID, or kind.
+If a review answer is contaminated, it remains audit-only and does not change
+the review item, concept evidence, retry, or checkpoint. Replace that discarded
+question with `start-review-checkpoint`, using a new question ID and a durable
+transfer kind, and persist the replacement before accepting the next answer.
 
-If a selected item cannot be assessed validly, defer it explicitly before
-closing:
+If a selected item cannot be assessed validly, use `defer-review` before starting a review checkpoint.
+It cannot be deferred while its checkpoint or retry is active; resume that
+checkpoint, or replace it after contamination, before closing:
 
 ```bash
 node bin/learn.mjs defer-review --root <root> \

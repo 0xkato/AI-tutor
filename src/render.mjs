@@ -132,6 +132,24 @@ export function renderSessionNote(state, session) {
     lines.push("No teaching steps recorded.", "");
   }
 
+  if (session.checkpoint) {
+    const checkpoint = session.checkpoint;
+    lines.push(
+      session.kind === "review" ? "## Active review checkpoint" : "## Active learning checkpoint",
+      "",
+      `- **Status:** ${listValue(titleCase(checkpoint.status.replaceAll("-", " ")))}`,
+      `- **Node:** ${inlineCode(checkpoint.nodeId)}`,
+      `- **Question ID:** ${inlineCode(checkpoint.questionId)}`,
+      `- **Kind:** ${listValue(checkpoint.kind)}`,
+      `- **Question:** ${listValue(checkpoint.question)}`,
+      `- **Attempts:** ${listValue(checkpoint.attempts)}`,
+      `- **Prior question ID:** ${checkpoint.priorQuestionId ? inlineCode(checkpoint.priorQuestionId) : "None"}`,
+      `- **Resolved evidence:** ${checkpoint.resolvedEvidenceId ? inlineCode(checkpoint.resolvedEvidenceId) : "None"}`,
+      `- **Mistake type:** ${listValue(checkpoint.mistakeType || "None")}`,
+      "",
+    );
+  }
+
   lines.push("## Assessments", "");
   if (session.assessments?.length) {
     for (const assessment of session.assessments) {

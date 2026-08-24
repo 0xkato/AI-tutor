@@ -178,6 +178,50 @@ test("renderSessionNote exposes an unfinished synthesis checkpoint for recovery"
   }
 });
 
+test("renderSessionNote exposes the active review question before any answer", () => {
+  const reviewing = structuredClone(state.sessions.s1);
+  reviewing.kind = "review";
+  reviewing.phase = "review";
+  reviewing.assessments = [];
+  reviewing.steps = [];
+  reviewing.activeStepId = null;
+  reviewing.checkpoint = {
+    status: "awaiting-answer",
+    nodeId: "vectors",
+    questionId: "review-vectors-q1",
+    question: "In a new navigation example, what must a displacement measurement consume and produce?",
+    kind: "transfer",
+    priorQuestionId: null,
+    attempts: 0,
+    resolvedEvidenceId: null,
+    mistakeType: "",
+  };
+  reviewing.reviewItems = [
+    {
+      reviewId: "review-1",
+      conceptId: "concept-1",
+      status: "pending",
+      outcomeGrade: null,
+      evidenceIds: [],
+      deferralReason: null,
+      deferredUntil: null,
+    },
+  ];
+
+  const note = renderSessionNote(state, reviewing);
+  for (const expected of [
+    "Active review checkpoint",
+    "Awaiting answer",
+    "review-vectors-q1",
+    "navigation example",
+    "Kind:** transfer",
+    "Node:** `vectors`",
+    "No assessments recorded",
+  ]) {
+    assert.match(note, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+});
+
 test("renderVault writes home, session, topic, and review notes", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-vault-"));
   renderVault(root, state);
