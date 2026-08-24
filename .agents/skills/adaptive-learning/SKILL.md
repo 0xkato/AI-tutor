@@ -58,6 +58,13 @@ The learner supplies the learning target; do not silently replace or broaden it.
   same question.
 - On a first genuine miss, identify the error type, do not reveal the answer,
   and give one bounded retry.
+- First-miss feedback may identify where the learner's reasoning broke and its
+  error type. It must not state the correct outcome, expected mechanism,
+  correct value, corrective steps, or replacement answer wording.
+- After receiving a substantive answer, run `record-assessment` with the exact
+  persisted question and learner answer. Continue only after that command
+  succeeds, and only then send the assessment feedback. If persistence fails,
+  report that failure without presenting a grade or advancing the lesson.
 - When canonical state requires a retry, reuse the exact persisted question,
   question ID, node, and kind. Never place a different question under the old
   identity to satisfy the retry gate.
@@ -73,8 +80,11 @@ The learner supplies the learning target; do not silently replace or broaden it.
 
 - Run `due --json` to find available spaced-retention work, then claim explicit
   items with `start-review`. Listing an item as due does **not** complete it.
-- During a review session, assess only the selected concepts. Before showing a
-  retention question, run `start-review-checkpoint` to persist its question ID,
+- During a review session, assess only the selected concepts. Before running
+  `start-review-checkpoint`, compare the candidate question with the selected
+  concept's title, knowledge summary, and source-supported causal mechanism.
+  Reject any question that can be answered without that selected mechanism or
+  that merely shares a broad topic label. Then persist its question ID,
   question text, and kind before the learner answer. Only then record the
   assessment. Repair misses within that active checkpoint and require a new
   durable transfer checkpoint before treating an item as resolved.

@@ -59,6 +59,14 @@ test("skill corpus preserves the complete adaptive-learning behavior", () => {
     ["checkpoint identity before answer", /persist.*question ID.*question text.*kind.*before.*answer/is],
     ["exact grades", /exactly.*Correct.*Partial.*Incorrect/is],
     ["bounded retry", /first genuine miss.*do not reveal.*answer.*retry/is],
+    [
+      "first-miss feedback excludes the expected mechanism",
+      /first[- ]miss feedback[\s\S]*must not state[\s\S]*(correct outcome|expected mechanism)[\s\S]*correct value/i,
+    ],
+    [
+      "assessment persists before conversational feedback",
+      /record-assessment[\s\S]*succeeds[\s\S]*before[\s\S]*(send|show|present).*assessment feedback/i,
+    ],
     ["stable retry identity", /retry.*reuse.*exact persisted question.*kind/is],
     ["clarification safety", /clarification.*only.*missing term.*same question/is],
     ["contamination discard", /contaminated.*discard.*evidence/is],
@@ -68,6 +76,10 @@ test("skill corpus preserves the complete adaptive-learning behavior", () => {
     [
       "review question persisted before answer",
       /start-review-checkpoint[\s\S]*persist[\s\S]*question ID[\s\S]*question text[\s\S]*kind[\s\S]*before[\s\S]*learner answer/i,
+    ],
+    [
+      "review question must match the selected concept before persistence",
+      /before[\s\S]*start-review-checkpoint[\s\S]*(compare|verify)[\s\S]*question[\s\S]*selected concept[\s\S]*(causal mechanism|knowledge summary)/i,
     ],
     [
       "repair transfer question persisted before answer",

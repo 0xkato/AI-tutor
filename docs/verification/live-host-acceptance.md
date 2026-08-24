@@ -42,6 +42,22 @@ evidence:
 These packages are useful regression records. They do not support Pi release
 acceptance.
 
+The preserved failures were traced against the shared host contract before a
+rerun. The deterministic engine correctly rejected mismatched checkpoint
+identity and incomplete review state, but semantic question-to-concept alignment
+and conversational ordering remain host responsibilities. The shared skill now
+requires three explicit preconditions for the rerun:
+
+- a retention question must require the selected concept's causal mechanism,
+  not merely share its broad topic;
+- `record-assessment` must succeed before assessment feedback is shown;
+- first-miss feedback must omit the correct outcome, expected mechanism,
+  correct value, corrective steps, and replacement answer wording.
+
+The skill-contract regression and complete local release check pass with these
+rules. That is repair evidence, not live-host acceptance; only a fresh Pi run
+can show whether the host follows them.
+
 A separate cloud Pi smoke session proved that the Pi runtime could invoke an
 OpenAI Codex-subscription model and execute a real tool call. The session is
 stored at:

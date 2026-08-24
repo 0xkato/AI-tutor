@@ -77,6 +77,20 @@ type, do not reveal the answer, and offer a bounded retry. After a second miss
 or direct request, teach the missing mechanism. Afterwards, require a new
 transfer question rather than repetition.
 
+First-miss feedback must not state the correct outcome, expected mechanism,
+correct value, corrective steps, or replacement answer wording. It may name
+only the location of the break and a bounded error type. Before sending any
+assessment feedback, persist the exact question, exact learner answer, grade,
+evidence, and mistake type with `record-assessment`. Send the feedback only
+after `record-assessment` succeeds; a persistence failure blocks the grade and
+the next conversational step.
+
+For retention, before running `start-review-checkpoint`, compare the candidate
+question with the selected concept's title, knowledge summary, and causal
+mechanism. A new scenario is valid only when solving it requires that same
+mechanism. Topic overlap alone is not enough; reject a question that substitutes
+a neighboring mechanism.
+
 If the assistant exposed an answer or steered the learner to it, mark the
 question contaminated. Discard contaminated work as evidence even when the
 learner's final words are correct.

@@ -81,6 +81,11 @@ review closes. Only selected concepts accept retention assessments.
 `start-review-checkpoint` must persist the exact question identity before the
 learner answer; `record-assessment` rejects review evidence without that
 checkpoint or with changed question text, node, ID, or kind.
+Before `start-review-checkpoint`, compare the question with the selected
+concept's title, knowledge summary, and causal mechanism. After the learner
+answers, run `record-assessment` with the exact answer and wait for success
+before showing the grade or assessment feedback. If the command fails, do not
+send the grade or advance the review.
 If a review answer is contaminated, it remains audit-only and does not change
 the review item, concept evidence, retry, or checkpoint. Replace that discarded
 question with `start-review-checkpoint`, using a new question ID and a durable
