@@ -10,6 +10,13 @@ const ASSESSMENT_STAGES = new Set(["probe", "teach", "retention"]);
 const CONCEPT_STATUSES = new Set(["unknown", "fragile", "gap", "developing", "strong"]);
 const REVIEW_STATUSES = new Set(["inactive", "scheduled", "claimed", "deferred", "complete"]);
 const REVIEW_ITEM_STATUSES = new Set(["pending", "repair-required", "resolved", "deferred"]);
+const RETRY_STATUSES = new Set(["retry-required", "new-transfer-required"]);
+const CHECKPOINT_STATUSES = new Set([
+  "awaiting-answer",
+  "retry-required",
+  "new-transfer-required",
+  "resolved",
+]);
 const RENDER_STATUSES = new Set(["current", "stale", "failed"]);
 
 function invalid(message, code = "INVALID_STATE") {
@@ -85,7 +92,15 @@ function uniqueTextArray(value, label) {
 function validateRetry(retry, label) {
   if (retry === null) return;
   object(retry, label);
+  if (!("status" in retry)) {
+    retry.status = retry.requiresNewTransfer ? "new-transfer-required" : "retry-required";
+  }
+  if (!("priorQuestionId" in retry)) {
+    retry.priorQuestionId = retry.requiresNewTransfer ? retry.questionId : null;
+  }
+  oneOf(retry.status, RETRY_STATUSES, `${label}.status`);
   text(retry.questionId, `${label}.questionId`);
+  nullableText(retry.priorQuestionId, `${label}.priorQuestionId`);
   integer(retry.attempts, `${label}.attempts`);
   if (typeof retry.required !== "boolean") invalid(`${label}.required must be boolean`);
   if (typeof retry.answerMayBeTaught !== "boolean") {
@@ -95,6 +110,43 @@ function validateRetry(retry, label) {
     invalid(`${label}.requiresNewTransfer must be boolean`);
   }
   text(retry.mistakeType, `${label}.mistakeType`, { allowEmpty: true });
+  if (retry.status === "retry-required") {
+    if (!retry.required || retry.requiresNewTransfer || retry.answerMayBeTaught) {
+      invalid(`${label} has inconsistent retry-required flags`);
+    }
+  }
+  if (retry.status === "new-transfer-required") {
+    if (retry.required || !retry.requiresNewTransfer || retry.priorQuestionId === null) {
+      invalid(`${label} has inconsistent new-transfer-required flags`);
+    }
+  }
+}
+
+function validateCheckpoint(checkpoint, label) {
+  if (checkpoint === null) return;
+  object(checkpoint, label);
+  oneOf(checkpoint.status, CHECKPOINT_STATUSES, `${label}.status`);
+  text(checkpoint.nodeId, `${label}.nodeId`);
+  nullableText(checkpoint.questionId, `${label}.questionId`);
+  nullableText(checkpoint.priorQuestionId, `${label}.priorQuestionId`);
+  integer(checkpoint.attempts, `${label}.attempts`);
+  nullableText(checkpoint.resolvedEvidenceId, `${label}.resolvedEvidenceId`);
+  text(checkpoint.mistakeType, `${label}.mistakeType`, { allowEmpty: true });
+  if (checkpoint.status === "awaiting-answer" && checkpoint.resolvedEvidenceId !== null) {
+    invalid(`${label} cannot have resolved evidence while awaiting an answer`);
+  }
+  if (checkpoint.status === "retry-required" && checkpoint.questionId === null) {
+    invalid(`${label}.questionId is required for a retry`);
+  }
+  if (
+    checkpoint.status === "new-transfer-required" &&
+    (checkpoint.questionId === null || checkpoint.priorQuestionId === null)
+  ) {
+    invalid(`${label} requires the prior question before a new transfer`);
+  }
+  if (checkpoint.status === "resolved" && checkpoint.resolvedEvidenceId === null) {
+    invalid(`${label}.resolvedEvidenceId is required when resolved`);
+  }
 }
 
 function validateAssessment(item, label, globalAssessmentIds) {
@@ -169,6 +221,23 @@ function validateSession(session, key, globalAssessmentIds, globalSourceIds, glo
   }
   if (session.activeStepId !== null && !stepIds.has(session.activeStepId)) {
     invalid(`${label}.activeStepId references an unknown step`);
+  }
+  validateCheckpoint(session.checkpoint, `${label}.checkpoint`);
+  if (session.activeStepId !== null) {
+    const activeStep = session.steps.find((step) => step.id === session.activeStepId);
+    if (!session.checkpoint || session.checkpoint.status === "resolved") {
+      invalid(`${label}.activeStepId requires an unresolved checkpoint`);
+    }
+    if (session.checkpoint.nodeId !== activeStep.nodeId) {
+      invalid(`${label}.checkpoint must match the active step node`);
+    }
+  }
+  if (
+    session.activeStepId === null &&
+    session.checkpoint !== null &&
+    session.checkpoint.status !== "resolved"
+  ) {
+    invalid(`${label}.checkpoint cannot remain unresolved without an active step`);
   }
 
   for (const [index, visual] of array(session.visuals, `${label}.visuals`).entries()) {
@@ -337,6 +406,7 @@ export function validateState(value) {
     if (!session || typeof session !== "object" || Array.isArray(session)) continue;
     if (!("reviewItems" in session)) session.reviewItems = [];
     if (!("synthesisRequired" in session)) session.synthesisRequired = false;
+    if (!("checkpoint" in session)) session.checkpoint = null;
   }
   for (const review of Object.values(state.reviews)) {
     if (!review || typeof review !== "object" || Array.isArray(review)) continue;
@@ -398,6 +468,18 @@ export function validateState(value) {
       }
       if (assessment.conceptId !== null && !session.conceptIds.includes(assessment.conceptId)) {
         invalid(`sessions.${id} assessment ${assessment.id} references an unbound concept`);
+      }
+    }
+    if (session.checkpoint?.resolvedEvidenceId) {
+      const assessment = assessmentIds.get(session.checkpoint.resolvedEvidenceId);
+      if (
+        !assessment ||
+        assessment.contaminated ||
+        assessment.grade !== "correct" ||
+        assessment.nodeId !== session.checkpoint.nodeId ||
+        !session.assessments.some((candidate) => candidate.id === assessment.id)
+      ) {
+        invalid(`sessions.${id}.checkpoint has invalid resolved evidence`);
       }
     }
     for (const item of session.reviewItems) {

@@ -122,6 +122,7 @@ export function migrateV1ToV2(value) {
       conceptIds,
       reviewItems: [],
       synthesisRequired: false,
+      checkpoint: null,
       plan,
       assessments: session.assessments.map((assessment) => ({
         ...assessment,

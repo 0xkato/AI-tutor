@@ -6,7 +6,15 @@ import test from "node:test";
 
 import { recordAssessment } from "../src/assessment.mjs";
 import { conceptForNode } from "../src/concepts.mjs";
-import { closeSession, createInitialState, getActiveSession, startSession } from "../src/model.mjs";
+import {
+  beginTeach,
+  closeSession,
+  createInitialState,
+  finishProbe,
+  getActiveSession,
+  setPlan,
+  startSession,
+} from "../src/model.mjs";
 import { renderVault } from "../src/render.mjs";
 
 const NOW = "2026-08-24T08:00:00.000Z";
@@ -40,6 +48,36 @@ function assess(state, overrides = {}) {
   });
 }
 
+function closeValidSession(state, now) {
+  let next = state;
+  const sessionId = getActiveSession(next).id;
+  if (getActiveSession(next).assessments.length === 0) {
+    next = assess(next, {
+      id: `${sessionId}-close-probe`,
+      questionId: `${sessionId}-close-question`,
+      now,
+    });
+  }
+  next = finishProbe(next, {
+    summary: "The opening probe is complete and the remaining target is explicit.",
+    now,
+  });
+  const targetNodeId = `${sessionId}-remaining-target`;
+  next = setPlan(next, {
+    plan: {
+      targetNodeId,
+      nodes: [{ id: targetNodeId, title: "Remaining target" }],
+      edges: [],
+    },
+    now,
+  });
+  next = beginTeach(next, { now });
+  return closeSession(next, {
+    synthesis: "Gradient descent uses local slope evidence to choose an update direction.",
+    now,
+  });
+}
+
 test("an assessment creates learner-level concept evidence instead of session knowledge", () => {
   const state = assess(start());
   const session = getActiveSession(state);
@@ -57,10 +95,7 @@ test("a later session explicitly reuses prior concept evidence", () => {
   const firstSession = getActiveSession(state);
   const concept = conceptForNode(state, firstSession, "gradient-direction");
   const topicId = firstSession.topicId;
-  state = closeSession(state, {
-    synthesis: "Gradient descent uses local slope evidence to choose an update direction.",
-    now: NOW,
-  });
+  state = closeValidSession(state, NOW);
   state = start(state, {
     id: "s2",
     target: "Understand momentum",
@@ -79,10 +114,7 @@ test("new evidence in a later session appends to the reused concept", () => {
   const firstSession = getActiveSession(state);
   const concept = conceptForNode(state, firstSession, "gradient-direction");
   const topicId = firstSession.topicId;
-  state = closeSession(state, {
-    synthesis: "Gradient descent uses local slope evidence to choose an update direction.",
-    now: NOW,
-  });
+  state = closeValidSession(state, NOW);
   state = start(state, {
     id: "s2",
     target: "Apply gradient direction again",
@@ -98,10 +130,7 @@ test("new evidence in a later session appends to the reused concept", () => {
 
 test("reusing a topic identity with a conflicting name is rejected", () => {
   let state = start(undefined, { topicId: "topic-fixed" });
-  state = closeSession(state, {
-    synthesis: "Gradient descent uses local slope evidence to choose an update direction.",
-    now: NOW,
-  });
+  state = closeValidSession(state, NOW);
 
   assert.throws(
     () =>
@@ -119,10 +148,7 @@ test("a concept cannot be reused under a different topic identity", () => {
   let state = assess(start());
   const firstSession = getActiveSession(state);
   const concept = conceptForNode(state, firstSession, "gradient-direction");
-  state = closeSession(state, {
-    synthesis: "Gradient descent uses local slope evidence to choose an update direction.",
-    now: NOW,
-  });
+  state = closeValidSession(state, NOW);
 
   assert.throws(
     () =>
@@ -138,9 +164,9 @@ test("a concept cannot be reused under a different topic identity", () => {
 
 test("topic notes use identity suffixes so colliding slugs do not overwrite", () => {
   let state = start(undefined, { id: "s1", topic: "C++" });
-  state = closeSession(state, { synthesis: "First exact topic identity.", now: NOW });
+  state = closeValidSession(state, NOW);
   state = start(state, { id: "s2", topic: "C--", now: LATER });
-  state = closeSession(state, { synthesis: "Second exact topic identity.", now: LATER });
+  state = closeValidSession(state, LATER);
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-concepts-"));
 
   renderVault(root, state);

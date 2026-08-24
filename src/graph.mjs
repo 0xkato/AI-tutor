@@ -89,6 +89,25 @@ export function validatePlan(value) {
   if (orderUnchecked(plan).length !== plan.nodes.length) {
     throw new LearningError("dependency cycle", "INVALID_PLAN");
   }
+  const prerequisites = new Map(plan.nodes.map((node) => [node.id, []]));
+  for (const edge of plan.edges) prerequisites.get(edge.to).push(edge.from);
+  const reachesTarget = new Set([plan.targetNodeId]);
+  const pending = [plan.targetNodeId];
+  while (pending.length > 0) {
+    const nodeId = pending.pop();
+    for (const prerequisite of prerequisites.get(nodeId)) {
+      if (reachesTarget.has(prerequisite)) continue;
+      reachesTarget.add(prerequisite);
+      pending.push(prerequisite);
+    }
+  }
+  const surplus = plan.nodes.find((node) => !reachesTarget.has(node.id));
+  if (surplus) {
+    throw new LearningError(
+      `${surplus.id} does not lead to target ${plan.targetNodeId}`,
+      "INVALID_PLAN",
+    );
+  }
   return plan;
 }
 

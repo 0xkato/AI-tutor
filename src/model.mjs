@@ -92,6 +92,7 @@ export function startSession(state, input) {
     frontier: [],
     steps: [],
     activeStepId: null,
+    checkpoint: null,
     visuals: [],
     synthesis: "",
     synthesisRequired: false,
@@ -108,7 +109,7 @@ export function finishProbe(state, { summary, now } = {}) {
   const probeSummary = requireText(summary, "probe summary");
   return updateActiveSession(
     state,
-    (session) => {
+    (session, next) => {
       if (session.phase !== "probe") {
         throw new LearningError(`Cannot finish probe during ${session.phase}`, "INVALID_PHASE");
       }
@@ -119,6 +120,15 @@ export function finishProbe(state, { summary, now } = {}) {
         throw new LearningError(
           "Probe requires at least one uncontaminated probe",
           "INSUFFICIENT_PROBE_EVIDENCE",
+        );
+      }
+      const unresolvedRetry = session.conceptIds
+        .map((conceptId) => next.concepts[conceptId])
+        .find((concept) => concept?.retry);
+      if (unresolvedRetry) {
+        throw new LearningError(
+          `Probe checkpoint for ${unresolvedRetry.key} must be resolved before planning`,
+          "RETRY_REQUIRED",
         );
       }
       session.probeSummary = probeSummary;
@@ -197,9 +207,18 @@ export function recordStep(state, input) {
   };
   return updateActiveSession(
     state,
-    (session) => {
+    (session, next) => {
       if (session.phase !== "teach") {
         throw new LearningError(`Cannot record a teaching step during ${session.phase}`, "INVALID_PHASE");
+      }
+      const unresolvedRetry = session.conceptIds
+        .map((conceptId) => next.concepts[conceptId])
+        .find((concept) => concept?.retry);
+      if (unresolvedRetry) {
+        throw new LearningError(
+          `A required checkpoint for ${unresolvedRetry.key} must be resolved before another step`,
+          "RETRY_REQUIRED",
+        );
       }
       if (session.activeStepId) {
         throw new LearningError("The current checkpoint must be resolved before another step", "STEP_UNRESOLVED");
@@ -215,6 +234,15 @@ export function recordStep(state, input) {
       }
       session.steps.push(step);
       session.activeStepId = step.id;
+      session.checkpoint = {
+        status: "awaiting-answer",
+        nodeId: step.nodeId,
+        questionId: null,
+        priorQuestionId: null,
+        attempts: 0,
+        resolvedEvidenceId: null,
+        mistakeType: "",
+      };
     },
     { now: step.createdAt },
   );
@@ -263,8 +291,26 @@ export function closeSession(state, { synthesis, unresolvedGaps = [], now } = {}
   return updateActiveSession(
     state,
     (session, next) => {
+      if (session.kind !== "learn") {
+        throw new LearningError("Review sessions must use close-review", "INVALID_SESSION_KIND");
+      }
+      if (session.phase !== "teach") {
+        throw new LearningError(
+          `Cannot close a learning session during ${session.phase}`,
+          "INVALID_PHASE",
+        );
+      }
       if (session.activeStepId) {
         throw new LearningError("The current checkpoint must be resolved before closing", "STEP_UNRESOLVED");
+      }
+      const unresolvedRetry = session.conceptIds
+        .map((conceptId) => next.concepts[conceptId])
+        .find((concept) => concept?.retry);
+      if (unresolvedRetry) {
+        throw new LearningError(
+          `A required checkpoint for ${unresolvedRetry.key} must be resolved before closing`,
+          "RETRY_REQUIRED",
+        );
       }
       session.synthesis = conclusion;
       session.unresolvedGaps = unresolvedGaps.map((gap) => gap.trim());

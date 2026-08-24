@@ -12,10 +12,18 @@ import { updateActiveSession } from "./model.mjs";
 import { recordReviewAssessment } from "./reviews.mjs";
 
 const GRADES = new Set(["correct", "partial", "incorrect"]);
+const STAGES = new Set(["probe", "teach", "retention"]);
 const KINDS = new Set([
   "multiple-choice",
   "explanation",
   "prediction",
+  "transfer",
+  "reconstruction",
+  "debugging",
+  "synthesis",
+  "retention",
+]);
+const DURABLE_KINDS = new Set([
   "transfer",
   "reconstruction",
   "debugging",
@@ -63,32 +71,148 @@ function validate(input) {
   };
 }
 
-function retryFor(session, assessment) {
-  const previousMisses = session.assessments.filter(
-    (item) =>
-      !item.contaminated &&
-      item.questionId === assessment.questionId &&
-      item.grade === "incorrect",
-  ).length;
-  const attempts = previousMisses + 1;
-  if (attempts === 1) {
-    return {
-      questionId: assessment.questionId,
-      attempts,
-      required: true,
-      answerMayBeTaught: false,
-      requiresNewTransfer: false,
-      mistakeType: assessment.mistakeType,
-    };
-  }
+function retryRequired(assessment, attempts = 1) {
   return {
+    status: "retry-required",
+    questionId: assessment.questionId,
+    attempts,
+    required: true,
+    answerMayBeTaught: false,
+    requiresNewTransfer: false,
+    priorQuestionId: null,
+    mistakeType: assessment.mistakeType,
+  };
+}
+
+function newTransferRequired(assessment, { attempts, answerMayBeTaught }) {
+  return {
+    status: "new-transfer-required",
     questionId: assessment.questionId,
     attempts,
     required: false,
-    answerMayBeTaught: true,
+    answerMayBeTaught,
     requiresNewTransfer: true,
+    priorQuestionId: assessment.questionId,
     mistakeType: assessment.mistakeType,
   };
+}
+
+function unresolvedRetry(state, session) {
+  const pending = session.conceptIds
+    .map((conceptId) => state.concepts[conceptId])
+    .filter((concept) => concept?.retry);
+  if (pending.length > 1) {
+    throw new LearningError("Multiple unresolved retries make the session ambiguous", "INVALID_STATE");
+  }
+  return pending[0] ?? null;
+}
+
+function validateStageForSession(session, assessment) {
+  if (!STAGES.has(assessment.stage)) {
+    throw new LearningError(`Unknown assessment stage: ${assessment.stage}`, "INVALID_STAGE");
+  }
+  if (session.kind === "review") {
+    if (session.phase !== "review" || assessment.stage !== "retention") {
+      throw new LearningError(
+        "Review sessions accept only retention assessments",
+        "INVALID_STAGE",
+      );
+    }
+    return;
+  }
+  if (assessment.stage === "retention") {
+    throw new LearningError(
+      "Retention assessments require an active review session",
+      "INVALID_STAGE",
+    );
+  }
+  if (assessment.stage === "probe" && session.phase !== "probe") {
+    throw new LearningError("Probe assessments require the probe phase", "INVALID_PHASE");
+  }
+  if (assessment.stage === "teach" && session.phase !== "teach") {
+    throw new LearningError("Teaching assessments require the teaching phase", "INVALID_PHASE");
+  }
+}
+
+function transitionRetry(current, assessment, { durableRequired = false } = {}) {
+  if (!current) {
+    if (["partial", "incorrect"].includes(assessment.grade)) {
+      return retryRequired(assessment);
+    }
+    if (durableRequired && !DURABLE_KINDS.has(assessment.kind)) {
+      return newTransferRequired(assessment, {
+        attempts: 0,
+        answerMayBeTaught: false,
+      });
+    }
+    return null;
+  }
+
+  const status = current.status ??
+    (current.requiresNewTransfer ? "new-transfer-required" : "retry-required");
+  if (status === "retry-required") {
+    if (assessment.questionId !== current.questionId) {
+      throw new LearningError(
+        `Retry question ${current.questionId} must be resolved before ${assessment.questionId}`,
+        "RETRY_REQUIRED",
+      );
+    }
+    if (assessment.grade === "correct") {
+      if (durableRequired && !DURABLE_KINDS.has(assessment.kind)) {
+        return newTransferRequired(assessment, {
+          attempts: current.attempts,
+          answerMayBeTaught: false,
+        });
+      }
+      return null;
+    }
+    return newTransferRequired(assessment, {
+      attempts: current.attempts + 1,
+      answerMayBeTaught: true,
+    });
+  }
+
+  const priorQuestionId = current.priorQuestionId ?? current.questionId;
+  if (assessment.questionId === priorQuestionId) {
+    throw new LearningError(
+      `A new transfer question is required after ${priorQuestionId}`,
+      "NEW_TRANSFER_REQUIRED",
+    );
+  }
+  if (!DURABLE_KINDS.has(assessment.kind)) {
+    throw new LearningError(
+      "The repair must be checked with a new durable transfer question",
+      "NEW_TRANSFER_REQUIRED",
+    );
+  }
+  if (assessment.grade === "correct") return null;
+  return retryRequired(assessment);
+}
+
+function updateTeachingCheckpoint(session, assessment, retry) {
+  const checkpoint = session.checkpoint;
+  if (!checkpoint || checkpoint.nodeId !== assessment.nodeId) {
+    throw new LearningError("Teaching assessment has no matching checkpoint", "INVALID_CHECKPOINT");
+  }
+  if (retry) {
+    Object.assign(checkpoint, {
+      status: retry.status,
+      questionId: retry.questionId,
+      priorQuestionId: retry.priorQuestionId,
+      attempts: retry.attempts,
+      resolvedEvidenceId: null,
+      mistakeType: retry.mistakeType,
+    });
+    return false;
+  }
+  Object.assign(checkpoint, {
+    status: "resolved",
+    questionId: assessment.questionId,
+    attempts: Math.max(checkpoint.attempts, 1),
+    resolvedEvidenceId: assessment.id,
+    mistakeType: "",
+  });
+  return true;
 }
 
 export function recordAssessment(state, input) {
@@ -99,9 +223,7 @@ export function recordAssessment(state, input) {
       if (session.assessments.some((item) => item.id === assessment.id)) {
         throw new LearningError(`Assessment already exists: ${assessment.id}`, "DUPLICATE_ASSESSMENT");
       }
-      if (assessment.stage === "probe" && session.phase !== "probe") {
-        throw new LearningError("Probe assessments require the probe phase", "INVALID_PHASE");
-      }
+      validateStageForSession(session, assessment);
       if (assessment.stage === "teach") {
         if (session.phase !== "teach" || !session.activeStepId) {
           throw new LearningError("Teaching assessments require an active teaching step", "INVALID_PHASE");
@@ -110,6 +232,14 @@ export function recordAssessment(state, input) {
         if (step.nodeId !== assessment.nodeId) {
           throw new LearningError("Assessment node must match the active teaching step", "NODE_MISMATCH");
         }
+      }
+
+      const pendingConcept = unresolvedRetry(next, session);
+      if (pendingConcept && pendingConcept.key !== assessment.nodeId) {
+        throw new LearningError(
+          `Retry ${pendingConcept.key} before assessing ${assessment.nodeId}`,
+          "RETRY_REQUIRED",
+        );
       }
 
       let concept = conceptForNode(next, session, assessment.nodeId, { required: false });
@@ -129,19 +259,9 @@ export function recordAssessment(state, input) {
       assessment.conceptId = concept?.id ?? null;
 
       if (!assessment.contaminated) {
-        let retry = null;
-        if (assessment.grade === "partial") {
-          retry = {
-            questionId: assessment.questionId,
-            attempts: 1,
-            required: true,
-            answerMayBeTaught: false,
-            requiresNewTransfer: false,
-            mistakeType: assessment.mistakeType,
-          };
-        } else if (assessment.grade === "incorrect") {
-          retry = retryFor(session, assessment);
-        }
+        const retry = transitionRetry(concept.retry, assessment, {
+          durableRequired: assessment.stage !== "probe",
+        });
         if (session.kind === "review") {
           recordReviewAssessment(next, session, concept, assessment);
           recordConceptAssessment(next, session, concept, assessment, retry, {
@@ -151,15 +271,12 @@ export function recordAssessment(state, input) {
           recordConceptAssessment(next, session, concept, assessment, retry);
         }
 
-        if (
-          assessment.stage === "teach" &&
-          assessment.grade === "correct" &&
-          ["transfer", "reconstruction", "debugging", "synthesis", "retention"].includes(
-            assessment.kind,
-          )
-        ) {
-          session.activeStepId = null;
-          session.frontier = nextFrontier(session.plan, knowledgeForSession(next, session));
+        if (assessment.stage === "teach") {
+          const resolved = updateTeachingCheckpoint(session, assessment, retry);
+          if (resolved) {
+            session.activeStepId = null;
+            session.frontier = nextFrontier(session.plan, knowledgeForSession(next, session));
+          }
         }
       }
 

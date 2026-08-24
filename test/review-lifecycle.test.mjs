@@ -137,6 +137,20 @@ test("a due review is claimed, executed across processes, and persisted once", (
 
   invoke(root, "record-assessment", [
     "--id", "retention-a2",
+    "--question-id", "retention-q1",
+    "--node", "covectors",
+    "--stage", "retention",
+    "--kind", "retention",
+    "--question", "What does a covector consume and produce?",
+    "--answer", "It still consumes and produces vectors.",
+    "--grade", "incorrect",
+    "--evidence", "The bounded retry repeated the same incorrect vector-output model.",
+    "--mistake-type", "output-type",
+    "--now", "2026-08-25T08:07:00.000Z",
+  ]);
+
+  invoke(root, "record-assessment", [
+    "--id", "retention-a3",
     "--question-id", "retention-transfer-q1",
     "--node", "covectors",
     "--stage", "retention",
@@ -160,7 +174,7 @@ test("a due review is claimed, executed across processes, and persisted once", (
   const review = state.reviews[due.reviewId];
   assert.equal(reviewSession.phase, "complete");
   assert.equal(reviewSession.reviewItems[0].status, "resolved");
-  assert.deepEqual(concept.evidenceIds.slice(-2), ["retention-a1", "retention-a2"]);
+  assert.deepEqual(concept.evidenceIds.slice(-3), ["retention-a1", "retention-a2", "retention-a3"]);
   assert.equal(review.completed, 2, "the review item is completed once, not once per attempt");
   assert.equal(review.level, 0, "the initial failed recall prevents an interval promotion");
   assert.equal(review.dueAt, "2026-08-26T08:15:00.000Z");

@@ -49,6 +49,18 @@ test("validatePlan rejects dependency cycles", () => {
   assert.throws(() => validatePlan(value), /dependency cycle/);
 });
 
+test("validatePlan rejects a disconnected node that cannot lead to the target", () => {
+  const value = plan({
+    nodes: [
+      { id: "vectors", title: "Vectors" },
+      { id: "covectors", title: "Covectors" },
+      { id: "forms", title: "Differential forms" },
+      { id: "surplus", title: "Unrelated surplus" },
+    ],
+  });
+  assert.throws(() => validatePlan(value), /surplus.*does not lead to.*forms/i);
+});
+
 test("topologicalOrder is stable and prerequisite-first", () => {
   assert.deepEqual(topologicalOrder(plan()), ["vectors", "covectors", "forms"]);
 });

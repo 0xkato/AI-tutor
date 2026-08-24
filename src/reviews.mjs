@@ -91,6 +91,7 @@ export function startReviewSession(state, { id, reviewIds, now } = {}) {
     frontier: [],
     steps: [],
     activeStepId: null,
+    checkpoint: null,
     visuals: [],
     synthesis: "",
     synthesisRequired: synthesisRequiredForSelection(next, selected),
