@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
+import {
+  bindConceptToSession,
+  bindPlanConcepts,
+  knowledgeForSession,
+  registerTopic,
+} from "./concepts.mjs";
 import { LearningError, requireText } from "./errors.mjs";
 import { nextFrontier, validatePlan } from "./graph.mjs";
 import { SCHEMA_VERSION } from "./schema.mjs";
@@ -59,13 +65,19 @@ export function startSession(state, input) {
   }
   const createdAt = timestamp(input.now);
   const next = structuredClone(state);
+  const topicId = input.topicId ?? randomUUID();
+  registerTopic(next, { id: topicId, name: topic, sessionId: id, now: createdAt });
+  const reuseConceptIds = input.reuseConceptIds ?? [];
+  if (!Array.isArray(reuseConceptIds)) {
+    throw new LearningError("reuseConceptIds must be an array", "INVALID_CONCEPT_IDS");
+  }
   next.activeSessionId = id;
   next.updatedAt = createdAt;
   next.sessions[id] = {
     id,
     kind: "learn",
     topic,
-    topicId: null,
+    topicId,
     target,
     learnerContext: typeof input.context === "string" ? input.context.trim() : "",
     phase: "probe",
@@ -74,7 +86,6 @@ export function startSession(state, input) {
     completedAt: null,
     probeSummary: "",
     assessments: [],
-    knowledge: {},
     conceptIds: [],
     sources: [],
     plan: null,
@@ -85,6 +96,9 @@ export function startSession(state, input) {
     synthesis: "",
     unresolvedGaps: [],
   };
+  for (const conceptId of [...new Set(reuseConceptIds)]) {
+    bindConceptToSession(next, next.sessions[id], conceptId);
+  }
   return next;
 }
 
@@ -116,12 +130,12 @@ export function setPlan(state, { plan, now } = {}) {
   const checked = validatePlan(plan);
   return updateActiveSession(
     state,
-    (session) => {
+    (session, next) => {
       if (session.phase !== "plan") {
         throw new LearningError(`Cannot set a plan during ${session.phase}`, "INVALID_PHASE");
       }
-      session.plan = checked;
-      session.frontier = nextFrontier(checked, session.knowledge);
+      session.plan = bindPlanConcepts(next, session, checked, { now });
+      session.frontier = nextFrontier(session.plan, knowledgeForSession(next, session));
     },
     { now },
   );
@@ -130,14 +144,14 @@ export function setPlan(state, { plan, now } = {}) {
 export function beginTeach(state, { now } = {}) {
   return updateActiveSession(
     state,
-    (session) => {
+    (session, next) => {
       if (session.phase !== "plan") {
         throw new LearningError(`Cannot begin teaching during ${session.phase}`, "INVALID_PHASE");
       }
       if (!session.plan) {
         throw new LearningError("Teaching requires a valid dependency plan", "PLAN_REQUIRED");
       }
-      session.frontier = nextFrontier(session.plan, session.knowledge);
+      session.frontier = nextFrontier(session.plan, knowledgeForSession(next, session));
       if (session.frontier.length === 0) {
         throw new LearningError("The dependency plan has no teachable frontier", "NO_FRONTIER");
       }
@@ -254,18 +268,10 @@ export function closeSession(state, { synthesis, unresolvedGaps = [], now } = {}
       session.unresolvedGaps = unresolvedGaps.map((gap) => gap.trim());
       session.completedAt = closedAt;
       session.phase = "complete";
-      const topicId = session.topicId ?? randomUUID();
-      session.topicId = topicId;
-      const priorTopic = next.topics[topicId];
-      next.topics[topicId] = {
-        id: topicId,
-        name: session.topic,
-        createdAt: priorTopic?.createdAt ?? session.createdAt,
-        sessionIds: [...new Set([...(priorTopic?.sessionIds ?? []), session.id])],
-        conceptIds: [...new Set([...(priorTopic?.conceptIds ?? []), ...session.conceptIds])],
-        latestSessionId: session.id,
-        updatedAt: closedAt,
-      };
+      const topic = next.topics[session.topicId];
+      if (!topic) throw new LearningError("Session topic does not exist", "UNKNOWN_TOPIC");
+      topic.latestSessionId = session.id;
+      topic.updatedAt = closedAt;
       next.activeSessionId = null;
     },
     { now: closedAt },

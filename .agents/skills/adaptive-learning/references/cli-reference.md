@@ -40,6 +40,22 @@ node bin/learn.mjs finish-probe --root <root> \
   --summary "<demonstrated foundations and bounded gaps>"
 ```
 
+Omit identity flags for a genuinely new topic. To continue an existing topic,
+reuse its exact topic and concept identities from canonical state:
+
+```bash
+node bin/learn.mjs start --root <root> \
+  --topic "Differential forms" \
+  --topic-id <existing-topic-id> \
+  --reuse-concept <concept-id> \
+  --reuse-concept <another-concept-id> \
+  --target "Extend the prior model to exterior derivatives"
+```
+
+Repeated `--reuse-concept` flags are explicit: the runner must not infer
+identity from similar titles. A concept cannot be rebound under a different
+topic identity.
+
 Valid assessment kinds are `multiple-choice`, `explanation`, `prediction`,
 `transfer`, `reconstruction`, `debugging`, `synthesis`, and `retention`.
 Grades are lowercase CLI values: `correct`, `partial`, or `incorrect`. Add
@@ -94,4 +110,3 @@ node bin/learn.mjs close --root <root> \
 Repeat `--gap` for multiple gaps. Successful mutations atomically update JSON
 and regenerate the derived Obsidian notes. If the command fails, do not advance
 the conversation as though persistence succeeded.
-

@@ -10,7 +10,9 @@ import { renderSessionNote, renderVault, slugify } from "../src/render.mjs";
 const state = createInitialState({ now: "2026-08-24T08:00:00.000Z" });
 state.sessions.s1 = {
   id: "s1",
+  kind: "learn",
   topic: "Differential Forms",
+  topicId: "topic-1",
   target: "Build a causal introduction",
   learnerContext: "Knows basic calculus",
   phase: "teach",
@@ -18,24 +20,33 @@ state.sessions.s1 = {
   updatedAt: "2026-08-24T09:00:00.000Z",
   completedAt: null,
   probeSummary: "Vectors are understood; covectors are the edge.",
-  knowledge: { vectors: { status: "developing", review: { level: 1, dueAt: "2026-08-25T08:00:00.000Z" } } },
+  conceptIds: ["concept-1"],
   assessments: [
     {
       id: "a1",
+      questionId: "q1",
       nodeId: "vectors",
+      conceptId: "concept-1",
+      stage: "teach",
       kind: "explanation",
+      question: "What operations define a vector?",
+      answer: "Vector addition and scalar multiplication.",
       grade: "correct",
       evidence: "Explained vector addition and scalar multiplication causally.",
+      mistakeType: "",
       contaminated: false,
+      createdAt: "2026-08-24T09:00:00.000Z",
     },
   ],
   sources: [
     {
+      id: "source-1",
       title: "Primary reference",
       url: "https://example.test/reference",
       sourceClass: "primary",
       supports: "Definition of a covector",
       verification: "Checked the definition against a second textbook.",
+      createdAt: "2026-08-24T08:30:00.000Z",
     },
   ],
   plan: {
@@ -46,6 +57,7 @@ state.sessions.s1 = {
     ],
     edges: [{ from: "vectors", to: "forms", reason: "Generalization" }],
   },
+  frontier: ["forms"],
   steps: [
     {
       id: "step-1",
@@ -54,19 +66,55 @@ state.sessions.s1 = {
       motivation: "We need an object that measures a directed displacement.",
       explanation: "A covector accepts a vector and returns a scalar.",
       checkpointQuestion: "What does a covector consume and produce?",
+      createdAt: "2026-08-24T08:45:00.000Z",
     },
   ],
+  activeStepId: "step-1",
   visuals: [
     {
+      id: "visual-1",
       path: "Assets/covector.svg",
       description: "Level sets and a vector",
       verification: "Labels and orientation inspected against the explanation.",
+      createdAt: "2026-08-24T08:50:00.000Z",
     },
   ],
   synthesis: "",
   unresolvedGaps: [],
 };
 state.activeSessionId = "s1";
+state.topics["topic-1"] = {
+  id: "topic-1",
+  name: "Differential Forms",
+  createdAt: "2026-08-24T08:00:00.000Z",
+  updatedAt: "2026-08-24T09:00:00.000Z",
+  latestSessionId: "s1",
+  sessionIds: ["s1"],
+  conceptIds: ["concept-1"],
+};
+state.concepts["concept-1"] = {
+  id: "concept-1",
+  topicId: "topic-1",
+  key: "vectors",
+  title: "Vectors",
+  status: "developing",
+  latestGrade: "correct",
+  evidenceIds: ["a1"],
+  retry: null,
+  reviewId: "review-1",
+  sourceSessionIds: ["s1"],
+  createdAt: "2026-08-24T08:00:00.000Z",
+  updatedAt: "2026-08-24T09:00:00.000Z",
+};
+state.reviews["review-1"] = {
+  id: "review-1",
+  conceptId: "concept-1",
+  level: 1,
+  dueAt: "2026-08-25T08:00:00.000Z",
+  completed: 1,
+  status: "scheduled",
+  updatedAt: "2026-08-24T09:00:00.000Z",
+};
 
 test("slugify prevents path traversal and produces stable note names", () => {
   assert.equal(slugify("../Differential Forms"), "differential-forms");
@@ -74,7 +122,7 @@ test("slugify prevents path traversal and produces stable note names", () => {
 });
 
 test("renderSessionNote contains the complete inspectable learning record", () => {
-  const note = renderSessionNote(state.sessions.s1);
+  const note = renderSessionNote(state, state.sessions.s1);
   for (const expected of [
     "# Differential Forms",
     "Build a causal introduction",
@@ -98,7 +146,13 @@ test("renderVault writes home, session, topic, and review notes", () => {
   const vault = path.join(root, "vault");
   assert.equal(fs.existsSync(path.join(vault, "Home.md")), true);
   assert.equal(fs.existsSync(path.join(vault, "Sessions", "differential-forms-s1.md")), true);
-  assert.equal(fs.existsSync(path.join(vault, "Topics", "differential-forms.md")), true);
+  const topicFiles = fs.readdirSync(path.join(vault, "Topics"));
+  assert.equal(topicFiles.length, 1);
+  assert.match(topicFiles[0], /^differential-forms-[a-f0-9]{20}\.md$/);
   assert.equal(fs.existsSync(path.join(vault, "Reviews.md")), true);
   assert.match(fs.readFileSync(path.join(vault, "Home.md"), "utf8"), /Differential Forms/);
+  assert.match(
+    fs.readFileSync(path.join(vault, "Topics", topicFiles[0]), "utf8"),
+    /Evidence history/,
+  );
 });

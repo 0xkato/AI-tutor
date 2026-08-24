@@ -76,13 +76,6 @@ function uniqueTextArray(value, label) {
   return items;
 }
 
-function validateReviewShape(review, label) {
-  object(review, label);
-  integer(review.level, `${label}.level`);
-  nullableInstant(review.dueAt, `${label}.dueAt`);
-  integer(review.completed, `${label}.completed`);
-}
-
 function validateRetry(retry, label) {
   if (retry === null) return;
   object(retry, label);
@@ -102,9 +95,10 @@ function validateAssessment(item, label, globalAssessmentIds) {
   object(item, label);
   text(item.id, `${label}.id`);
   if (globalAssessmentIds.has(item.id)) invalid(`duplicate assessment ID: ${item.id}`);
-  globalAssessmentIds.add(item.id);
+  globalAssessmentIds.set(item.id, item);
   text(item.questionId, `${label}.questionId`);
   text(item.nodeId, `${label}.nodeId`);
+  if (item.conceptId !== null) text(item.conceptId, `${label}.conceptId`);
   oneOf(item.stage, ASSESSMENT_STAGES, `${label}.stage`);
   text(item.kind, `${label}.kind`);
   text(item.question, `${label}.question`);
@@ -114,24 +108,6 @@ function validateAssessment(item, label, globalAssessmentIds) {
   text(item.mistakeType, `${label}.mistakeType`, { allowEmpty: true });
   if (typeof item.contaminated !== "boolean") invalid(`${label}.contaminated must be boolean`);
   stateInstant(item.createdAt, `${label}.createdAt`);
-}
-
-function validateKnowledge(knowledge, label, sessionAssessmentIds) {
-  object(knowledge, label);
-  for (const [nodeId, entry] of Object.entries(knowledge)) {
-    object(entry, `${label}.${nodeId}`);
-    if (entry.nodeId !== nodeId) invalid(`${label}.${nodeId}.nodeId must match its key`);
-    oneOf(entry.status, CONCEPT_STATUSES, `${label}.${nodeId}.status`);
-    const evidence = uniqueTextArray(entry.evidence, `${label}.${nodeId}.evidence`);
-    for (const evidenceId of evidence) {
-      if (!sessionAssessmentIds.has(evidenceId)) {
-        invalid(`${label}.${nodeId}.evidence references unknown assessment: ${evidenceId}`);
-      }
-    }
-    if (entry.latestGrade !== null) oneOf(entry.latestGrade, GRADES, `${label}.${nodeId}.latestGrade`);
-    validateRetry(entry.retry, `${label}.${nodeId}.retry`);
-    validateReviewShape(entry.review, `${label}.${nodeId}.review`);
-  }
 }
 
 function validateSession(session, key, globalAssessmentIds, globalSourceIds, globalVisualIds) {
@@ -154,12 +130,9 @@ function validateSession(session, key, globalAssessmentIds, globalSourceIds, glo
   }
   text(session.probeSummary, `${label}.probeSummary`, { allowEmpty: true });
 
-  const sessionAssessmentIds = new Set();
   for (const [index, assessment] of array(session.assessments, `${label}.assessments`).entries()) {
     validateAssessment(assessment, `${label}.assessments[${index}]`, globalAssessmentIds);
-    sessionAssessmentIds.add(assessment.id);
   }
-  validateKnowledge(session.knowledge ?? {}, `${label}.knowledge`, sessionAssessmentIds);
 
   for (const [index, source] of array(session.sources, `${label}.sources`).entries()) {
     const sourceLabel = `${label}.sources[${index}]`;
@@ -208,7 +181,7 @@ function validateSession(session, key, globalAssessmentIds, globalSourceIds, glo
   array(session.unresolvedGaps, `${label}.unresolvedGaps`).forEach((gap, index) => {
     text(gap, `${label}.unresolvedGaps[${index}]`);
   });
-  if (session.topicId !== null) text(session.topicId, `${label}.topicId`);
+  text(session.topicId, `${label}.topicId`);
   uniqueTextArray(session.conceptIds, `${label}.conceptIds`);
 }
 
@@ -222,9 +195,15 @@ function validateTopics(state) {
     stateInstant(topic.updatedAt, `${label}.updatedAt`);
     for (const sessionId of uniqueTextArray(topic.sessionIds, `${label}.sessionIds`)) {
       if (!state.sessions[sessionId]) invalid(`${label} references unknown session: ${sessionId}`);
+      if (state.sessions[sessionId].topicId !== id) {
+        invalid(`${label} contains a session assigned to a different topic: ${sessionId}`);
+      }
     }
     for (const conceptId of uniqueTextArray(topic.conceptIds, `${label}.conceptIds`)) {
       if (!state.concepts[conceptId]) invalid(`${label} references unknown concept: ${conceptId}`);
+      if (state.concepts[conceptId].topicId !== id) {
+        invalid(`${label} contains a concept assigned to a different topic: ${conceptId}`);
+      }
     }
     if (topic.latestSessionId !== null && !state.sessions[topic.latestSessionId]) {
       invalid(`${label}.latestSessionId references an unknown session`);
@@ -249,10 +228,16 @@ function validateConcepts(state, allAssessmentIds) {
     }
     for (const sessionId of uniqueTextArray(concept.sourceSessionIds, `${label}.sourceSessionIds`)) {
       if (!state.sessions[sessionId]) invalid(`${label} references unknown session: ${sessionId}`);
+      if (!state.sessions[sessionId].conceptIds.includes(id)) {
+        invalid(`${label} is not bound by source session: ${sessionId}`);
+      }
     }
     validateRetry(concept.retry, `${label}.retry`);
     if (concept.reviewId !== null && !state.reviews[concept.reviewId]) {
       invalid(`${label}.reviewId references an unknown review`);
+    }
+    if (concept.reviewId !== null && state.reviews[concept.reviewId].conceptId !== id) {
+      invalid(`${label}.reviewId points to a review for another concept`);
     }
   }
 }
@@ -263,6 +248,9 @@ function validateReviews(state) {
     object(review, label);
     if (review.id !== id) invalid(`${label}.id must match its key`);
     if (!state.concepts[review.conceptId]) invalid(`${label}.conceptId references an unknown concept`);
+    if (state.concepts[review.conceptId]?.reviewId !== id) {
+      invalid(`${label} is not the canonical review for its concept`);
+    }
     integer(review.level, `${label}.level`);
     nullableInstant(review.dueAt, `${label}.dueAt`);
     integer(review.completed, `${label}.completed`);
@@ -287,7 +275,7 @@ export function validateState(value) {
   object(state.reviews, "reviews");
   integer(state.reviewCount, "reviewCount");
 
-  const assessmentIds = new Set();
+  const assessmentIds = new Map();
   const sourceIds = new Set();
   const visualIds = new Set();
   for (const [id, session] of Object.entries(state.sessions)) {
@@ -310,11 +298,46 @@ export function validateState(value) {
   if (state.render.error !== null) text(state.render.error, "render.error");
 
   for (const [id, session] of Object.entries(state.sessions)) {
-    if (session.topicId !== null && !state.topics[session.topicId]) {
+    if (!state.topics[session.topicId]) {
       invalid(`sessions.${id}.topicId references an unknown topic`);
+    }
+    if (!state.topics[session.topicId].sessionIds.includes(id)) {
+      invalid(`sessions.${id} is not registered with its topic`);
     }
     for (const conceptId of session.conceptIds) {
       if (!state.concepts[conceptId]) invalid(`sessions.${id} references unknown concept: ${conceptId}`);
+      if (state.concepts[conceptId]?.topicId !== session.topicId) {
+        invalid(`sessions.${id} references a concept from another topic: ${conceptId}`);
+      }
+    }
+    if (session.plan) {
+      for (const node of session.plan.nodes) {
+        text(node.conceptId, `sessions.${id}.plan node ${node.id}.conceptId`);
+        const concept = state.concepts[node.conceptId];
+        if (!concept || !session.conceptIds.includes(node.conceptId) || concept.key !== node.id) {
+          invalid(`sessions.${id}.plan node ${node.id} has an invalid concept binding`);
+        }
+      }
+    }
+    for (const assessment of session.assessments) {
+      if (!assessment.contaminated && assessment.conceptId === null) {
+        invalid(`sessions.${id} assessment ${assessment.id} requires a conceptId`);
+      }
+      if (assessment.conceptId !== null && !state.concepts[assessment.conceptId]) {
+        invalid(`sessions.${id} assessment ${assessment.id} references an unknown concept`);
+      }
+      if (assessment.conceptId !== null && !session.conceptIds.includes(assessment.conceptId)) {
+        invalid(`sessions.${id} assessment ${assessment.id} references an unbound concept`);
+      }
+    }
+  }
+
+  for (const concept of Object.values(state.concepts)) {
+    for (const evidenceId of concept.evidenceIds) {
+      const assessment = assessmentIds.get(evidenceId);
+      if (assessment.contaminated || assessment.conceptId !== concept.id) {
+        invalid(`concepts.${concept.id} has invalid evidence relationship: ${evidenceId}`);
+      }
     }
   }
 

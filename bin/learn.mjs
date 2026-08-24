@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { recordAssessment } from "../src/assessment.mjs";
+import { knowledgeForSession } from "../src/concepts.mjs";
 import { LearningError } from "../src/errors.mjs";
 import {
   addSource,
@@ -108,8 +109,9 @@ function assessmentInput(options, stage) {
   };
 }
 
-function retryList(session) {
-  return Object.values(session?.knowledge ?? {})
+function retryList(state, session) {
+  if (!session) return [];
+  return Object.values(knowledgeForSession(state, session))
     .map((entry) => entry.retry)
     .filter(Boolean);
 }
@@ -128,7 +130,7 @@ function statusFor(state) {
           phase: session.phase,
           frontier: session.frontier ?? [],
           activeStepId: session.activeStepId ?? null,
-          retry: retryList(session),
+          retry: retryList(state, session),
         }
       : null,
   };
@@ -181,7 +183,7 @@ function commandResult(command, options, root) {
     const reviews = dueReviews(state, { now: last(options, "now") });
     return {
       session,
-      retry: retryList(session),
+      retry: retryList(state, session),
       dueReviews: reviews,
       synthesisDue: shouldSynthesize(state, reviews),
     };
@@ -194,6 +196,8 @@ function commandResult(command, options, root) {
       topic: last(options, "topic"),
       target: last(options, "target"),
       context: last(options, "context"),
+      topicId: last(options, "topic-id"),
+      reuseConceptIds: all(options, "reuse-concept"),
       now: last(options, "now"),
       });
     }

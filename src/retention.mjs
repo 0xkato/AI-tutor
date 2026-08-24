@@ -40,26 +40,27 @@ export function advanceReview(current = {}, evidence) {
 export function dueReviews(state, { now } = {}) {
   const cutoff = new Date(now ?? new Date().toISOString()).getTime();
   const due = [];
-  for (const session of Object.values(state.sessions ?? {})) {
-    for (const [nodeId, knowledge] of Object.entries(session.knowledge ?? {})) {
-      const dueAt = knowledge.review?.dueAt;
-      if (dueAt && new Date(dueAt).getTime() <= cutoff) {
-        due.push({
-          sessionId: session.id,
-          topic: session.topic,
-          nodeId,
-          status: knowledge.status,
-          dueAt,
-          level: knowledge.review.level ?? 0,
-        });
-      }
-    }
+  for (const review of Object.values(state.reviews ?? {})) {
+    if (!review.dueAt || new Date(review.dueAt).getTime() > cutoff) continue;
+    const concept = state.concepts?.[review.conceptId];
+    const topic = state.topics?.[concept?.topicId];
+    if (!concept || !topic) continue;
+    due.push({
+      reviewId: review.id,
+      conceptId: concept.id,
+      sessionId: concept.sourceSessionIds.at(-1) ?? null,
+      topicId: topic.id,
+      topic: topic.name,
+      nodeId: concept.key,
+      status: concept.status,
+      dueAt: review.dueAt,
+      level: review.level,
+    });
   }
   return due.sort(
     (left, right) =>
       new Date(left.dueAt).getTime() - new Date(right.dueAt).getTime() ||
-      left.sessionId.localeCompare(right.sessionId) ||
-      left.nodeId.localeCompare(right.nodeId),
+      left.reviewId.localeCompare(right.reviewId),
   );
 }
 
@@ -67,7 +68,7 @@ export function shouldSynthesize(state, due = []) {
   if (state.reviewCount > 0 && state.reviewCount % 7 === 0) return true;
   const related = new Map();
   for (const review of due) {
-    const key = review.topic || review.sessionId;
+    const key = review.topicId || review.topic || review.sessionId;
     if (!key) continue;
     related.set(key, (related.get(key) ?? 0) + 1);
   }

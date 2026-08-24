@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -32,7 +33,19 @@ function sessionName(session) {
   return `${slugify(session.topic)}-${slugify(session.id)}`;
 }
 
-export function renderSessionNote(session) {
+function stableSuffix(value) {
+  return createHash("sha256").update(String(value)).digest("hex").slice(0, 20);
+}
+
+function topicName(topic) {
+  return `${slugify(topic.name)}-${stableSuffix(topic.id)}`;
+}
+
+function conceptsForSession(state, session) {
+  return (session.conceptIds ?? []).map((id) => state.concepts?.[id]).filter(Boolean);
+}
+
+export function renderSessionNote(state, session) {
   const lines = [
     `# ${heading(session.topic)}`,
     "",
@@ -114,11 +127,12 @@ export function renderSessionNote(session) {
   }
 
   lines.push("## Retention", "");
-  const knowledge = Object.entries(session.knowledge ?? {});
-  if (knowledge.length) {
-    for (const [nodeId, entry] of knowledge) {
+  const concepts = conceptsForSession(state, session);
+  if (concepts.length) {
+    for (const concept of concepts) {
+      const review = state.reviews?.[concept.reviewId];
       lines.push(
-        `- **${heading(nodeId)}:** ${entry.status ?? "unknown"}; level ${entry.review?.level ?? 0}; due ${entry.review?.dueAt ?? "not scheduled"}`,
+        `- **${heading(concept.title)}:** ${concept.status}; level ${review?.level ?? 0}; due ${review?.dueAt ?? "not scheduled"}`,
       );
     }
   } else {
@@ -171,37 +185,84 @@ function renderHome(state) {
   ].join("\n");
 }
 
-function renderTopic(topic, sessions) {
-  return [
-    `# ${heading(topic)}`,
+function renderTopic(state, topic) {
+  const sessions = topic.sessionIds.map((id) => state.sessions[id]).filter(Boolean);
+  const concepts = topic.conceptIds.map((id) => state.concepts[id]).filter(Boolean);
+  const assessments = new Map(
+    Object.values(state.sessions).flatMap((session) =>
+      session.assessments.map((assessment) => [assessment.id, { assessment, session }]),
+    ),
+  );
+  const lines = [
+    `# ${heading(topic.name)}`,
+    "",
+    `- **Topic ID:** \`${topic.id}\``,
     "",
     "## Session history",
     "",
-    ...sessions.map((session) => `- [[../Sessions/${sessionName(session)}|${session.createdAt}]] — ${titleCase(session.phase)}`),
+    ...(sessions.length
+      ? sessions.map(
+          (session) =>
+            `- [[../Sessions/${sessionName(session)}|${session.createdAt}]] — ${titleCase(session.phase)}`,
+        )
+      : ["No sessions recorded."]),
     "",
-    "## Current knowledge",
+    "## Current concept state",
     "",
-    ...sessions.flatMap((session) =>
-      Object.entries(session.knowledge ?? {}).map(
-        ([nodeId, entry]) => `- **${heading(nodeId)}:** ${entry.status ?? "unknown"}; due ${entry.review?.dueAt ?? "not scheduled"}`,
-      ),
-    ),
-    "",
-  ].join("\n");
+  ];
+  if (!concepts.length) lines.push("No concepts recorded.", "");
+  for (const concept of concepts) {
+    const review = state.reviews[concept.reviewId];
+    lines.push(
+      `### ${heading(concept.title)}`,
+      "",
+      `- **Concept ID:** \`${concept.id}\``,
+      `- **Key:** \`${concept.key}\``,
+      `- **Status:** ${titleCase(concept.status)}`,
+      `- **Latest grade:** ${concept.latestGrade ? titleCase(concept.latestGrade) : "None"}`,
+      `- **Review:** level ${review?.level ?? 0}; due ${review?.dueAt ?? "not scheduled"}`,
+      "",
+      "#### Evidence history",
+      "",
+    );
+    const evidence = concept.evidenceIds
+      .map((id) => assessments.get(id))
+      .filter(Boolean)
+      .sort((left, right) => left.assessment.createdAt.localeCompare(right.assessment.createdAt));
+    if (!evidence.length) {
+      lines.push("No assessment evidence recorded.", "");
+      continue;
+    }
+    for (const { assessment, session } of evidence) {
+      lines.push(
+        `- ${assessment.createdAt} — **${titleCase(assessment.grade)}** (${assessment.kind}) in [[../Sessions/${sessionName(session)}|session ${session.id}]] — ${assessment.evidence}`,
+      );
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
 }
 
 function renderReviews(state) {
-  const items = Object.values(state.sessions ?? {}).flatMap((session) =>
-    Object.entries(session.knowledge ?? {})
-      .filter(([, entry]) => entry.review?.dueAt)
-      .map(([nodeId, entry]) => ({ session, nodeId, entry })),
-  );
-  items.sort((a, b) => a.entry.review.dueAt.localeCompare(b.entry.review.dueAt));
+  const items = Object.values(state.reviews ?? {})
+    .filter((review) => review.dueAt)
+    .map((review) => ({ review, concept: state.concepts[review.conceptId] }))
+    .filter((item) => item.concept);
+  items.sort((a, b) => a.review.dueAt.localeCompare(b.review.dueAt));
   return [
     "# Review queue",
     "",
     items.length
-      ? items.map(({ session, nodeId, entry }) => `- ${entry.review.dueAt} — [[Sessions/${sessionName(session)}|${heading(session.topic)}]] / ${heading(nodeId)}`).join("\n")
+      ? items
+          .map(({ review, concept }) => {
+            const topic = state.topics[concept.topicId];
+            const session = state.sessions[concept.sourceSessionIds.at(-1)];
+            const link = session
+              ? `[[Sessions/${sessionName(session)}|${heading(topic?.name ?? session.topic)}]]`
+              : heading(topic?.name ?? "Unknown topic");
+            return `- ${review.dueAt} — ${link} / ${heading(concept.title)}`;
+          })
+          .join("\n")
       : "No reviews scheduled.",
     "",
   ].join("\n");
@@ -226,14 +287,14 @@ export function renderVault(root, state) {
   fs.writeFileSync(path.join(vault, "Home.md"), renderHome(state));
   fs.writeFileSync(path.join(vault, "Reviews.md"), renderReviews(state));
 
-  const topics = new Map();
   for (const session of Object.values(state.sessions ?? {})) {
-    fs.writeFileSync(path.join(sessionsDir, `${sessionName(session)}.md`), renderSessionNote(session));
-    if (!topics.has(session.topic)) topics.set(session.topic, []);
-    topics.get(session.topic).push(session);
+    fs.writeFileSync(
+      path.join(sessionsDir, `${sessionName(session)}.md`),
+      renderSessionNote(state, session),
+    );
   }
-  for (const [topic, sessions] of topics) {
-    fs.writeFileSync(path.join(topicsDir, `${slugify(topic)}.md`), renderTopic(topic, sessions));
+  for (const topic of Object.values(state.topics ?? {})) {
+    fs.writeFileSync(path.join(topicsDir, `${topicName(topic)}.md`), renderTopic(state, topic));
   }
   return vault;
 }

@@ -1,9 +1,14 @@
 import { randomUUID } from "node:crypto";
 
+import {
+  conceptForNode,
+  createConceptForSession,
+  knowledgeForSession,
+  recordConceptAssessment,
+} from "./concepts.mjs";
 import { LearningError, requireText } from "./errors.mjs";
 import { nextFrontier } from "./graph.mjs";
 import { updateActiveSession } from "./model.mjs";
-import { advanceReview } from "./retention.mjs";
 
 const GRADES = new Set(["correct", "partial", "incorrect"]);
 const KINDS = new Set([
@@ -16,7 +21,6 @@ const KINDS = new Set([
   "synthesis",
   "retention",
 ]);
-const DURABLE_KINDS = new Set(["transfer", "reconstruction", "debugging", "synthesis", "retention"]);
 
 function validate(input) {
   if (!GRADES.has(input.grade)) {
@@ -53,6 +57,7 @@ function validate(input) {
     evidence,
     mistakeType: typeof input.mistakeType === "string" ? input.mistakeType.trim() : "",
     contaminated: input.contaminated === true,
+    conceptId: null,
     createdAt: input.now ?? new Date().toISOString(),
   };
 }
@@ -89,7 +94,7 @@ export function recordAssessment(state, input) {
   const assessment = validate(input);
   return updateActiveSession(
     state,
-    (session) => {
+    (session, next) => {
       if (session.assessments.some((item) => item.id === assessment.id)) {
         throw new LearningError(`Assessment already exists: ${assessment.id}`, "DUPLICATE_ASSESSMENT");
       }
@@ -106,23 +111,26 @@ export function recordAssessment(state, input) {
         }
       }
 
-      if (!assessment.contaminated) {
-        const current = session.knowledge[assessment.nodeId] ?? {
+      let concept = conceptForNode(next, session, assessment.nodeId, { required: false });
+      if (!concept && !assessment.contaminated && assessment.stage === "probe") {
+        concept = createConceptForSession(next, session, {
           nodeId: assessment.nodeId,
-          status: "unknown",
-          evidence: [],
-          latestGrade: null,
-          retry: null,
-          review: { level: 0, dueAt: null, completed: 0 },
-        };
-        current.evidence.push(assessment.id);
-        current.latestGrade = assessment.grade;
-        if (assessment.grade === "correct") {
-          current.status = assessment.kind === "multiple-choice" ? "fragile" : "developing";
-          current.retry = null;
-        } else if (assessment.grade === "partial") {
-          current.status = "fragile";
-          current.retry = {
+          title: assessment.nodeId,
+          now: assessment.createdAt,
+        });
+      }
+      if (!concept && !assessment.contaminated) {
+        throw new LearningError(
+          `Assessment concept is not declared in this session: ${assessment.nodeId}`,
+          "CONCEPT_NOT_DECLARED",
+        );
+      }
+      assessment.conceptId = concept?.id ?? null;
+
+      if (!assessment.contaminated) {
+        let retry = null;
+        if (assessment.grade === "partial") {
+          retry = {
             questionId: assessment.questionId,
             attempts: 1,
             required: true,
@@ -130,29 +138,20 @@ export function recordAssessment(state, input) {
             requiresNewTransfer: false,
             mistakeType: assessment.mistakeType,
           };
-        } else {
-          current.status = "gap";
-          current.retry = retryFor(session, assessment);
+        } else if (assessment.grade === "incorrect") {
+          retry = retryFor(session, assessment);
         }
-        if (DURABLE_KINDS.has(assessment.kind)) {
-          current.review = advanceReview(current.review, {
-            grade: assessment.grade,
-            kind: assessment.kind,
-            now: assessment.createdAt,
-          });
-          if (current.review.level >= 4 && assessment.grade === "correct") {
-            current.status = "strong";
-          }
-        }
-        session.knowledge[assessment.nodeId] = current;
+        recordConceptAssessment(next, session, concept, assessment, retry);
 
         if (
           assessment.stage === "teach" &&
           assessment.grade === "correct" &&
-          DURABLE_KINDS.has(assessment.kind)
+          ["transfer", "reconstruction", "debugging", "synthesis", "retention"].includes(
+            assessment.kind,
+          )
         ) {
           session.activeStepId = null;
-          session.frontier = nextFrontier(session.plan, session.knowledge);
+          session.frontier = nextFrontier(session.plan, knowledgeForSession(next, session));
         }
         if (assessment.kind === "retention") {
           next.reviewCount += 1;

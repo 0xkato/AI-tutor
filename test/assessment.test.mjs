@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { recordAssessment } from "../src/assessment.mjs";
+import { conceptForNode } from "../src/concepts.mjs";
 import { createInitialState, getActiveSession, startSession } from "../src/model.mjs";
 
 const now = "2026-08-24T08:00:00.000Z";
@@ -48,12 +49,12 @@ test("assessment requires exact evidence rather than a bare label", () => {
 
 test("the first miss opens a retry without authorizing the answer", () => {
   const state = recordAssessment(fresh(), attempt());
-  const knowledge = getActiveSession(state).knowledge["gradient-direction"];
+  const concept = conceptForNode(state, getActiveSession(state), "gradient-direction");
 
-  assert.equal(knowledge.retry.questionId, "q-loss-direction");
-  assert.equal(knowledge.retry.attempts, 1);
-  assert.equal(knowledge.retry.required, true);
-  assert.equal(knowledge.retry.answerMayBeTaught, false);
+  assert.equal(concept.retry.questionId, "q-loss-direction");
+  assert.equal(concept.retry.attempts, 1);
+  assert.equal(concept.retry.required, true);
+  assert.equal(concept.retry.answerMayBeTaught, false);
 });
 
 test("a second genuine miss permits teaching but still requires a new transfer question", () => {
@@ -66,7 +67,11 @@ test("a second genuine miss permits teaching but still requires a new transfer q
       evidence: "The second attempt repeated the same direction error after bounded feedback.",
     }),
   );
-  const retry = getActiveSession(state).knowledge["gradient-direction"].retry;
+  const retry = conceptForNode(
+    state,
+    getActiveSession(state),
+    "gradient-direction",
+  ).retry;
 
   assert.equal(retry.attempts, 2);
   assert.equal(retry.required, false);
@@ -88,7 +93,7 @@ test("contaminated questions are logged but excluded from knowledge evidence", (
 
   assert.equal(session.assessments.length, 1);
   assert.equal(session.assessments[0].contaminated, true);
-  assert.equal(session.knowledge["gradient-direction"], undefined);
+  assert.equal(conceptForNode(state, session, "gradient-direction", { required: false }), null);
 });
 
 test("clarification cannot be recorded as a graded assessment", () => {

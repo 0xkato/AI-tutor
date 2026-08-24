@@ -39,6 +39,7 @@ export function migrateV1ToV2(value) {
   const reviews = {};
 
   for (const session of Object.values(original.sessions ?? {})) {
+    const { knowledge: legacyKnowledge = {}, ...sessionWithoutKnowledge } = session;
     const topicId = topicIdForV1(session.topic);
     const conceptIds = [];
     const topic = topics[topicId] ?? {
@@ -56,7 +57,20 @@ export function migrateV1ToV2(value) {
       topic.latestSessionId = session.id;
     }
 
-    for (const [nodeId, knowledge] of Object.entries(session.knowledge ?? {})) {
+    const nodeIds = [
+      ...new Set([
+        ...Object.keys(legacyKnowledge),
+        ...(session.plan?.nodes ?? []).map((node) => node.id),
+      ]),
+    ];
+    for (const nodeId of nodeIds) {
+      const knowledge = legacyKnowledge[nodeId] ?? {
+        status: "unknown",
+        latestGrade: null,
+        evidence: [],
+        retry: null,
+        review: { level: 0, dueAt: null, completed: 0 },
+      };
       const conceptId = conceptIdForV1(session.id, nodeId);
       const reviewId = reviewIdForConcept(conceptId);
       conceptIds.push(conceptId);
@@ -86,11 +100,28 @@ export function migrateV1ToV2(value) {
       };
     }
     topics[topicId] = topic;
+    const conceptByNode = new Map(
+      conceptIds.map((conceptId) => [concepts[conceptId].key, conceptId]),
+    );
+    const plan = session.plan
+      ? {
+          ...session.plan,
+          nodes: session.plan.nodes.map((node) => ({
+            ...node,
+            conceptId: conceptByNode.get(node.id) ?? null,
+          })),
+        }
+      : null;
     sessions[session.id] = {
-      ...session,
+      ...sessionWithoutKnowledge,
       kind: "learn",
       topicId,
       conceptIds,
+      plan,
+      assessments: session.assessments.map((assessment) => ({
+        ...assessment,
+        conceptId: conceptByNode.get(assessment.nodeId) ?? null,
+      })),
     };
   }
 

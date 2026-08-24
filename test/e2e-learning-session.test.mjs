@@ -120,10 +120,14 @@ test("complete adaptive session persists evidence, retry state, review, and Obsi
     fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
   );
   const session = state.sessions.s1;
+  const covectors = session.conceptIds
+    .map((conceptId) => state.concepts[conceptId])
+    .find((concept) => concept.key === "covectors");
+  const review = state.reviews[covectors.reviewId];
   assert.equal(session.phase, "complete");
   assert.equal(session.assessments.length, 3);
-  assert.equal(session.knowledge.covectors.retry, null);
-  assert.equal(session.knowledge.covectors.review.level, 1);
+  assert.equal(covectors.retry, null);
+  assert.equal(review.level, 1);
   assert.equal(session.sources[0].verification.includes("independent"), true);
   assert.equal(session.visuals[0].verification.includes("Inspected"), true);
 

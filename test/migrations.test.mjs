@@ -89,7 +89,9 @@ test("migrateV1ToV2 deterministically preserves sessions, evidence, and due revi
   assert.deepEqual(first, second);
   assert.equal(first.schemaVersion, 2);
   assert.equal(first.sessions.s1.target, original.sessions.s1.target);
-  assert.deepEqual(first.sessions.s1.assessments, original.sessions.s1.assessments);
+  assert.deepEqual(first.sessions.s1.assessments, [
+    { ...original.sessions.s1.assessments[0], conceptId },
+  ]);
   assert.deepEqual(first.concepts[conceptId].evidenceIds, ["a1"]);
   assert.equal(first.reviews[first.concepts[conceptId].reviewId].dueAt, DUE);
   assert.deepEqual(original, versionOneFixture(), "migration must not mutate version 1");

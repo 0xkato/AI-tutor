@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { recordAssessment } from "../src/assessment.mjs";
+import { conceptForNode } from "../src/concepts.mjs";
 import {
   addSource,
   addVisual,
@@ -151,9 +152,11 @@ test("a successful transfer resolves the step and schedules retention", () => {
   });
 
   const session = getActiveSession(state);
+  const concept = conceptForNode(state, session, "covectors");
+  const review = state.reviews[concept.reviewId];
   assert.equal(session.activeStepId, null);
-  assert.equal(session.knowledge.covectors.review.level, 1);
-  assert.equal(session.knowledge.covectors.review.dueAt, "2026-08-25T08:00:00.000Z");
+  assert.equal(review.level, 1);
+  assert.equal(review.dueAt, "2026-08-25T08:00:00.000Z");
 });
 
 test("visuals stay inside the vault and require inspection evidence", () => {

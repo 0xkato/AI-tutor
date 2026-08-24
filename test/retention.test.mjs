@@ -57,15 +57,30 @@ test("contaminated evidence does not change a review schedule", () => {
 
 test("dueReviews returns due nodes in chronological order", () => {
   const state = createInitialState({ now });
-  state.sessions.s1 = {
-    id: "s1",
-    topic: "Topic",
-    knowledge: {
-      later: { review: { level: 1, dueAt: "2026-08-24T07:00:00.000Z", completed: 1 } },
-      first: { review: { level: 1, dueAt: "2026-08-23T07:00:00.000Z", completed: 1 } },
-      future: { review: { level: 1, dueAt: "2026-08-25T07:00:00.000Z", completed: 1 } },
-    },
-  };
+  state.sessions.s1 = { id: "s1" };
+  state.topics.t1 = { id: "t1", name: "Topic" };
+  for (const [key, dueAt] of [
+    ["later", "2026-08-24T07:00:00.000Z"],
+    ["first", "2026-08-23T07:00:00.000Z"],
+    ["future", "2026-08-25T07:00:00.000Z"],
+  ]) {
+    state.concepts[`c-${key}`] = {
+      id: `c-${key}`,
+      topicId: "t1",
+      key,
+      title: key,
+      status: "developing",
+      reviewId: `r-${key}`,
+      sourceSessionIds: ["s1"],
+    };
+    state.reviews[`r-${key}`] = {
+      id: `r-${key}`,
+      conceptId: `c-${key}`,
+      level: 1,
+      dueAt,
+      completed: 1,
+    };
+  }
   assert.deepEqual(
     dueReviews(state, { now }).map((item) => item.nodeId),
     ["first", "later"],
