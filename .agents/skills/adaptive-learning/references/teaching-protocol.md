@@ -24,8 +24,10 @@ Then binary-search each prerequisite strand:
 4. Stop probing once every important branch has a bounded frontier. Do not
    turn diagnosis into an exhaustive trivia interview.
 
-An admitted knowledge gap is not a quiz target. Teach the missing mechanism
-before testing it, then assess with a new example.
+An admitted knowledge gap is not a quiz target. Persist it with
+`record-admitted-gap` without an assessment or grade, teach the missing
+mechanism before testing it, then assess with a new example. Never duplicate
+the admission as incorrect attempts to satisfy a retry gate.
 
 ## 3. Produce the dependency route
 
@@ -94,4 +96,3 @@ Multiple choice may cheaply locate a frontier, but recognition alone supports
 only fragile evidence. Due review results drive spaced retention. Three related
 due nodes or every seventh completed review should trigger a whole-system
 synthesis rather than isolated repetition.
-

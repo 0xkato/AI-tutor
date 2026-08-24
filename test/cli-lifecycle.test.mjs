@@ -71,3 +71,63 @@ test("CLI failures preserve state and return structured error text", () => {
   assert.match(result.stderr, /INSUFFICIENT_PROBE_EVIDENCE/);
   assert.equal(fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"), before);
 });
+
+test("an admitted gap can complete diagnosis without creating a false assessment or retry", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-admitted-gap-"));
+  run(root, "init", "--now", "2026-08-24T12:59:00.000Z");
+  run(
+    root,
+    "start",
+    "--id",
+    "session-admitted-gap",
+    "--topic",
+    "Gradient accumulation",
+    "--target",
+    "Explain why shared branch contributions add",
+    "--context",
+    "The learner explicitly says this mechanism is not understood",
+    "--now",
+    "2026-08-24T13:00:00.000Z",
+  );
+
+  run(
+    root,
+    "record-admitted-gap",
+    "--id",
+    "gap-shared-branches",
+    "--node",
+    "shared-gradient-accumulation",
+    "--statement",
+    "I understand the chain rule but not why contributions from multiple downstream uses add.",
+    "--evidence",
+    "The learner explicitly identified shared-branch accumulation as the missing causal connection before any mechanism question was asked.",
+    "--now",
+    "2026-08-24T13:00:00.001Z",
+  );
+  run(
+    root,
+    "finish-probe",
+    "--summary",
+    "The chain rule is the demonstrated foundation; shared-gradient-accumulation is an admitted gap that must be taught before testing.",
+    "--now",
+    "2026-08-24T13:00:00.002Z",
+  );
+
+  const state = JSON.parse(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+  );
+  const session = state.sessions["session-admitted-gap"];
+  const [gap] = session.admittedGaps;
+  const concept = state.concepts[gap.conceptId];
+
+  assert.equal(session.phase, "plan");
+  assert.deepEqual(session.assessments, []);
+  assert.equal(session.admittedGaps.length, 1);
+  assert.equal(gap.id, "gap-shared-branches");
+  assert.equal(gap.nodeId, "shared-gradient-accumulation");
+  assert.equal(concept.status, "gap");
+  assert.equal(concept.latestGrade, null);
+  assert.deepEqual(concept.evidenceIds, []);
+  assert.equal(concept.retry, null);
+  assert.equal(state.reviews[concept.reviewId].status, "inactive");
+});

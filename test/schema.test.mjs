@@ -30,7 +30,7 @@ test("validateState accepts and clones a complete version-2 initial state", () =
   assert.equal(validated.schemaVersion, 2);
 });
 
-test("validateState additively upgrades version-2 sessions created before synthesis checkpoints", () => {
+test("validateState additively upgrades version-2 sessions created before later session fields", () => {
   let state = createInitialState({ now: NOW });
   state = startSession(state, {
     id: "legacy-v2-session",
@@ -41,10 +41,12 @@ test("validateState additively upgrades version-2 sessions created before synthe
   });
   delete state.sessions["legacy-v2-session"].synthesisRequired;
   delete state.sessions["legacy-v2-session"].synthesisCheckpoint;
+  delete state.sessions["legacy-v2-session"].admittedGaps;
 
   const validated = validateState(state);
   assert.equal(validated.sessions["legacy-v2-session"].synthesisRequired, false);
   assert.equal(validated.sessions["legacy-v2-session"].synthesisCheckpoint, null);
+  assert.deepEqual(validated.sessions["legacy-v2-session"].admittedGaps, []);
 });
 
 test("validateState rejects structurally incomplete version-2 state", () => {

@@ -5,6 +5,8 @@ import {
   createInitialState,
   finishProbe,
   getActiveSession,
+  recordAdmittedGap,
+  setPlan,
   startSession,
 } from "../src/model.mjs";
 import { recordAssessment } from "../src/assessment.mjs";
@@ -29,6 +31,36 @@ test("startSession persists the learner target and enters probe", () => {
   assert.equal(session.phase, "probe");
   assert.equal(session.target, "A solid introduction to differential forms");
   assert.equal(session.learnerContext, "Comfortable with basic calculus");
+});
+
+test("a dependency plan cannot omit an admitted gap", () => {
+  let state = start();
+  state = recordAdmittedGap(state, {
+    id: "gap-1",
+    nodeId: "shared-gradient-accumulation",
+    statement: "I do not understand why downstream branch contributions add.",
+    evidence: "The learner explicitly identified shared-gradient accumulation as the missing mechanism before any assessment question.",
+    now,
+  });
+  state = finishProbe(state, {
+    summary: "Shared-gradient accumulation is an admitted gap.",
+    now,
+  });
+
+  assert.throws(
+    () =>
+      setPlan(state, {
+        plan: {
+          targetNodeId: "unrelated-target",
+          nodes: [{ id: "unrelated-target", title: "Unrelated target" }],
+          edges: [],
+        },
+        now,
+      }),
+    (error) =>
+      error.code === "PLAN_OMITS_DIAGNOSED_CONCEPT" &&
+      /shared-gradient-accumulation/.test(error.message),
+  );
 });
 
 test("a second active session is rejected", () => {

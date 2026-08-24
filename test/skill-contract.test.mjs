@@ -40,6 +40,10 @@ test("skill corpus preserves the complete adaptive-learning behavior", () => {
     ["broad probe", /start (with )?a broad probe/i],
     ["binary-search prerequisites", /binary[- ]search each prerequisite strand/i],
     ["teach admitted gaps", /admitted knowledge gap.*teach.*before.*test/is],
+    [
+      "persist admitted gaps without false grading",
+      /record-admitted-gap[\s\S]*without.*(assessment|grad)/i,
+    ],
     ["agent-led research", /agent (owns|handles).*research.*verification.*fact-check/is],
     ["visible source choice", /discuss.*source (selection|choices).*learner/is],
     ["no per-source approval", /do not require.*per-source approval/i],

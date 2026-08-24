@@ -18,6 +18,7 @@ import {
   finishProbe,
   getActiveSession,
   recordStep,
+  recordAdmittedGap,
   setPlan,
   startSession,
 } from "../src/model.mjs";
@@ -41,6 +42,7 @@ const commands = [
   ["init", "Initialize local state and the Obsidian vault"],
   ["start", "Start a learning session from a learner-supplied target"],
   ["record-probe", "Record one diagnostic question and assessment"],
+  ["record-admitted-gap", "Record a learner-stated gap without grading it"],
   ["finish-probe", "Finish diagnosis and record the learner map"],
   ["add-source", "Attach a verified source and supported claim"],
   ["set-plan", "Validate and store a dependency plan"],
@@ -80,6 +82,7 @@ const COMMAND_OPTIONS = {
     "mistake-type",
     "contaminated",
   ],
+  "record-admitted-gap": ["id", "node", "statement", "evidence"],
   "finish-probe": ["summary"],
   "add-source": ["id", "title", "url", "source-class", "supports", "verification"],
   "set-plan": ["file"],
@@ -420,6 +423,15 @@ function commandResult(command, options, root) {
     }
     if (command === "record-probe") {
       return recordAssessment(current, assessmentInput(options, "probe"));
+    }
+    if (command === "record-admitted-gap") {
+      return recordAdmittedGap(current, {
+        id: last(options, "id"),
+        nodeId: last(options, "node"),
+        statement: last(options, "statement"),
+        evidence: last(options, "evidence"),
+        now: last(options, "now"),
+      });
     }
     if (command === "finish-probe") {
       return finishProbe(current, {

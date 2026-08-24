@@ -29,6 +29,9 @@ The learner supplies the learning target; do not silently replace or broaden it.
 - Persist the learner-owned target and relevant prior context.
 - Start with a broad probe, then binary-search each prerequisite strand until
   the learner's actual edge of understanding is located.
+- When the learner explicitly identifies a missing mechanism, persist it with
+  `record-admitted-gap` without creating an assessment or grade. Do not use a
+  fabricated incorrect answer or duplicate admission to unlock teaching.
 - Summarize what is demonstrated, fragile, missing, and not yet checked.
 - Research the missing path and store claim-level provenance.
 - Build and validate a prerequisite dependency DAG before teaching. Show the
@@ -49,6 +52,8 @@ The learner supplies the learning target; do not silently replace or broaden it.
 
 - Assess substantive answers as exactly **Correct**, **Partial**, or
   **Incorrect**, followed by the specific evidence.
+- An admitted gap is diagnostic context, not a substantive answer. Use
+  `record-admitted-gap`, then teach it before testing with a new example.
 - A clarification explains only the missing term or premise and returns to the
   same question.
 - On a first genuine miss, identify the error type, do not reveal the answer,

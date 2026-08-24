@@ -20,6 +20,16 @@ state.sessions.s1 = {
   updatedAt: "2026-08-24T09:00:00.000Z",
   completedAt: null,
   probeSummary: "Vectors are understood; covectors are the edge.",
+  admittedGaps: [
+    {
+      id: "gap-1",
+      nodeId: "forms",
+      conceptId: "concept-1",
+      statement: "I do not yet understand how covectors lead to differential forms.",
+      evidence: "The learner explicitly identified the covector-to-form connection as missing before any assessment question.",
+      createdAt: "2026-08-24T08:20:00.000Z",
+    },
+  ],
   conceptIds: ["concept-1"],
   assessments: [
     {
@@ -127,6 +137,9 @@ test("renderSessionNote contains the complete inspectable learning record", () =
     "# Differential Forms",
     "Build a causal introduction",
     "Vectors are understood; covectors are the edge.",
+    "## Admitted gaps",
+    "Not an assessment",
+    "covector-to-form connection as missing",
     "```mermaid",
     "Definition of a covector",
     "## Teaching steps",

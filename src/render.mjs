@@ -83,6 +83,22 @@ export function renderSessionNote(state, session) {
     lines.push("No dependency plan recorded.");
   }
 
+  lines.push("", "## Admitted gaps", "");
+  if (session.admittedGaps?.length) {
+    for (const gap of session.admittedGaps) {
+      lines.push(
+        `### ${headingText(gap.nodeId)}`,
+        "",
+        `- **Learner statement:** ${listValue(gap.statement)}`,
+        `- **Diagnostic evidence:** ${listValue(gap.evidence)}`,
+        "- **Classification:** Not an assessment; no grade or retry was created.",
+        "",
+      );
+    }
+  } else {
+    lines.push("None recorded.", "");
+  }
+
   lines.push("", "## Sources and verification", "");
   if (session.sources?.length) {
     for (const source of session.sources) {

@@ -92,7 +92,8 @@ node bin/learn.mjs --help
 npm test
 ```
 
-The full lifecycle is `init`, `start`, `record-probe`, `finish-probe`,
+The full lifecycle is `init`, `start`, `record-probe` or
+`record-admitted-gap`, `finish-probe`,
 `add-source`, `set-plan`, `begin-teach`, `record-step`, `record-assessment`,
 `start-synthesis`, `record-synthesis`, `add-visual`, `status`, `context`, `due`,
 `start-review`, `defer-review`, `close-review`, and `close`. Teaching and

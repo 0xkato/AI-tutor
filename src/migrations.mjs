@@ -120,6 +120,7 @@ export function migrateV1ToV2(value) {
       kind: "learn",
       topicId,
       conceptIds,
+      admittedGaps: [],
       reviewItems: [],
       synthesisRequired: false,
       checkpoint: null,

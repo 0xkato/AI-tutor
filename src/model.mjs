@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   bindConceptToSession,
   bindPlanConcepts,
+  createConceptForSession,
   knowledgeForSession,
   registerTopic,
 } from "./concepts.mjs";
@@ -101,6 +102,7 @@ export function startSession(state, input) {
     updatedAt: createdAt,
     completedAt: null,
     probeSummary: "",
+    admittedGaps: [],
     assessments: [],
     conceptIds: [],
     sources: [],
@@ -122,6 +124,61 @@ export function startSession(state, input) {
   return next;
 }
 
+export function recordAdmittedGap(state, input = {}) {
+  const id = safeIdentifier(input.id ?? randomUUID(), "admitted gap id");
+  const nodeId = safeSingleLine(input.nodeId, "nodeId", { maxLength: 512 });
+  const statement = safeText(input.statement, "admitted gap statement");
+  const evidence = safeText(input.evidence, "admitted gap evidence");
+  if (evidence.length < 20 || evidence.split(/\s+/).length < 4) {
+    throw new LearningError(
+      "admitted gap evidence must identify the exact missing mechanism",
+      "WEAK_EVIDENCE",
+    );
+  }
+  const createdAt = timestamp(input.now);
+
+  return updateActiveSession(
+    state,
+    (session, next) => {
+      if (session.phase !== "probe") {
+        throw new LearningError(
+          `Cannot record an admitted gap during ${session.phase}`,
+          "INVALID_PHASE",
+        );
+      }
+      const duplicateId = Object.values(next.sessions).some((candidate) =>
+        candidate.admittedGaps?.some((gap) => gap.id === id),
+      );
+      if (duplicateId) {
+        throw new LearningError(`Admitted gap already exists: ${id}`, "DUPLICATE_ADMITTED_GAP");
+      }
+      if (session.admittedGaps.some((gap) => gap.nodeId === nodeId)) {
+        throw new LearningError(
+          `An admitted gap is already recorded for: ${nodeId}`,
+          "DUPLICATE_ADMITTED_GAP",
+        );
+      }
+
+      const concept = createConceptForSession(next, session, {
+        nodeId,
+        title: nodeId,
+        now: createdAt,
+      });
+      concept.status = "gap";
+      concept.updatedAt = createdAt;
+      session.admittedGaps.push({
+        id,
+        nodeId,
+        conceptId: concept.id,
+        statement,
+        evidence,
+        createdAt,
+      });
+    },
+    { now: createdAt },
+  );
+}
+
 export function finishProbe(state, { summary, now } = {}) {
   const probeSummary = requireText(summary, "probe summary");
   return updateActiveSession(
@@ -133,9 +190,9 @@ export function finishProbe(state, { summary, now } = {}) {
       const validProbeCount = session.assessments.filter(
         (item) => item.stage === "probe" && !item.contaminated,
       ).length;
-      if (validProbeCount === 0) {
+      if (validProbeCount === 0 && session.admittedGaps.length === 0) {
         throw new LearningError(
-          "Probe requires at least one uncontaminated probe",
+          "Probe requires at least one uncontaminated probe or admitted gap",
           "INSUFFICIENT_PROBE_EVIDENCE",
         );
       }
@@ -170,6 +227,15 @@ export function setPlan(state, { plan, now } = {}) {
       if (omittedRetry) {
         throw new LearningError(
           `Dependency plan must include diagnosed concept: ${omittedRetry.key}`,
+          "PLAN_OMITS_DIAGNOSED_CONCEPT",
+        );
+      }
+      const omittedAdmittedGap = session.admittedGaps.find(
+        (gap) => !plannedNodeIds.has(gap.nodeId),
+      );
+      if (omittedAdmittedGap) {
+        throw new LearningError(
+          `Dependency plan must include admitted gap: ${omittedAdmittedGap.nodeId}`,
           "PLAN_OMITS_DIAGNOSED_CONCEPT",
         );
       }

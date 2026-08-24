@@ -197,7 +197,14 @@ function validateAssessment(item, label, globalAssessmentIds) {
   stateInstant(item.createdAt, `${label}.createdAt`);
 }
 
-function validateSession(session, key, globalAssessmentIds, globalSourceIds, globalVisualIds) {
+function validateSession(
+  session,
+  key,
+  globalAssessmentIds,
+  globalAdmittedGapIds,
+  globalSourceIds,
+  globalVisualIds,
+) {
   const label = `sessions.${key}`;
   object(session, label);
   if (session.id !== key) invalid(`${label}.id must match its key`);
@@ -216,6 +223,24 @@ function validateSession(session, key, globalAssessmentIds, globalSourceIds, glo
     invalid(`${label}.completedAt requires the complete phase`);
   }
   text(session.probeSummary, `${label}.probeSummary`, { allowEmpty: true });
+
+  const admittedGapNodes = new Set();
+  for (const [index, gap] of array(session.admittedGaps, `${label}.admittedGaps`).entries()) {
+    const gapLabel = `${label}.admittedGaps[${index}]`;
+    object(gap, gapLabel);
+    text(gap.id, `${gapLabel}.id`);
+    if (globalAdmittedGapIds.has(gap.id)) invalid(`duplicate admitted gap ID: ${gap.id}`);
+    globalAdmittedGapIds.add(gap.id);
+    text(gap.nodeId, `${gapLabel}.nodeId`);
+    if (admittedGapNodes.has(gap.nodeId)) {
+      invalid(`${label}.admittedGaps contains duplicate node: ${gap.nodeId}`);
+    }
+    admittedGapNodes.add(gap.nodeId);
+    text(gap.conceptId, `${gapLabel}.conceptId`);
+    text(gap.statement, `${gapLabel}.statement`);
+    text(gap.evidence, `${gapLabel}.evidence`);
+    stateInstant(gap.createdAt, `${gapLabel}.createdAt`);
+  }
 
   for (const [index, assessment] of array(session.assessments, `${label}.assessments`).entries()) {
     validateAssessment(assessment, `${label}.assessments[${index}]`, globalAssessmentIds);
@@ -354,6 +379,9 @@ function validateSession(session, key, globalAssessmentIds, globalSourceIds, glo
     invalid(`${label}.reviewItems must be empty for a learning session`);
   }
   if (session.kind === "review") {
+    if (session.admittedGaps.length !== 0) {
+      invalid(`${label}.admittedGaps must be empty for a review session`);
+    }
     if (session.reviewItems.length === 0) invalid(`${label}.reviewItems is required for a review session`);
     if (!["review", "complete"].includes(session.phase)) {
       invalid(`${label}.phase is invalid for a review session`);
@@ -470,6 +498,7 @@ export function validateState(value) {
   for (const session of Object.values(state.sessions)) {
     if (!session || typeof session !== "object" || Array.isArray(session)) continue;
     if (!("reviewItems" in session)) session.reviewItems = [];
+    if (!("admittedGaps" in session)) session.admittedGaps = [];
     if (!("synthesisRequired" in session)) session.synthesisRequired = false;
     if (!("checkpoint" in session)) session.checkpoint = null;
     if (!("synthesisCheckpoint" in session)) session.synthesisCheckpoint = null;
@@ -493,10 +522,11 @@ export function validateState(value) {
   }
 
   const assessmentIds = new Map();
+  const admittedGapIds = new Set();
   const sourceIds = new Set();
   const visualIds = new Set();
   for (const [id, session] of Object.entries(state.sessions)) {
-    validateSession(session, id, assessmentIds, sourceIds, visualIds);
+    validateSession(session, id, assessmentIds, admittedGapIds, sourceIds, visualIds);
   }
   if (state.activeSessionId !== null && !state.sessions[state.activeSessionId]) {
     invalid("activeSessionId references an unknown session");
@@ -525,6 +555,17 @@ export function validateState(value) {
       if (!state.concepts[conceptId]) invalid(`sessions.${id} references unknown concept: ${conceptId}`);
       if (state.concepts[conceptId]?.topicId !== session.topicId) {
         invalid(`sessions.${id} references a concept from another topic: ${conceptId}`);
+      }
+    }
+    for (const gap of session.admittedGaps) {
+      const concept = state.concepts[gap.conceptId];
+      if (
+        !concept ||
+        !session.conceptIds.includes(gap.conceptId) ||
+        concept.key !== gap.nodeId ||
+        concept.topicId !== session.topicId
+      ) {
+        invalid(`sessions.${id} admitted gap ${gap.id} has an invalid concept binding`);
       }
     }
     if (session.plan) {

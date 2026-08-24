@@ -87,6 +87,12 @@ node bin/learn.mjs record-probe --root <root> \
   --answer "<learner answer>" --grade correct \
   --evidence "<specific demonstrated or missing mechanism>"
 
+# When the learner states the gap directly, persist it without grading:
+node bin/learn.mjs record-admitted-gap --root <root> \
+  --id <stable-gap-id> --node <concept-node> \
+  --statement "<learner's stated gap>" \
+  --evidence "<why this is the exact admitted missing mechanism>"
+
 node bin/learn.mjs finish-probe --root <root> \
   --summary "<demonstrated foundations and bounded gaps>"
 ```
@@ -111,6 +117,8 @@ Valid assessment kinds are `multiple-choice`, `explanation`, `prediction`,
 `transfer`, `reconstruction`, `debugging`, `synthesis`, and `retention`.
 Grades are lowercase CLI values: `correct`, `partial`, or `incorrect`. Add
 `--contaminated` when answer exposure invalidates the question.
+`record-admitted-gap` creates no assessment, grade, retry, or review progress;
+the admitted node must still appear in the dependency plan before teaching.
 
 ## Research and plan
 

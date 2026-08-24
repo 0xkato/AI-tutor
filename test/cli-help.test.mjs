@@ -18,6 +18,7 @@ test("help lists the complete learning-session lifecycle", () => {
     "init",
     "start",
     "record-probe",
+    "record-admitted-gap",
     "finish-probe",
     "add-source",
     "set-plan",

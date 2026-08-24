@@ -84,6 +84,7 @@ export function startReviewSession(state, { id, reviewIds, now } = {}) {
     updatedAt: startedAt,
     completedAt: null,
     probeSummary: "",
+    admittedGaps: [],
     assessments: [],
     conceptIds: [],
     sources: [],
