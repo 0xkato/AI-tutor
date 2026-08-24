@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import path from "node:path";
 
 import {
   bindConceptToSession,
@@ -9,12 +8,19 @@ import {
 } from "./concepts.mjs";
 import { LearningError, requireText } from "./errors.mjs";
 import { nextFrontier, validatePlan } from "./graph.mjs";
-import { SCHEMA_VERSION } from "./schema.mjs";
+import {
+  safeIdentifier,
+  safeRelativeVaultPath,
+  safeSingleLine,
+  safeText,
+  validateSourceReference,
+} from "./inputs.mjs";
+import { parseInstant, SCHEMA_VERSION } from "./schema.mjs";
 
 export { SCHEMA_VERSION };
 
 function timestamp(now) {
-  return now ?? new Date().toISOString();
+  return parseInstant(now ?? new Date().toISOString(), "event time");
 }
 
 export function createInitialState({ now } = {}) {
@@ -57,15 +63,15 @@ export function startSession(state, input) {
   if (state.activeSessionId) {
     throw new LearningError("A learning session is already active", "SESSION_ACTIVE");
   }
-  const topic = requireText(input.topic, "topic");
-  const target = requireText(input.target, "target");
-  const id = input.id ?? randomUUID();
+  const topic = safeSingleLine(input.topic, "topic", { maxLength: 512 });
+  const target = safeText(input.target, "target");
+  const id = safeIdentifier(input.id ?? randomUUID(), "session id");
   if (state.sessions[id]) {
     throw new LearningError(`Session already exists: ${id}`, "DUPLICATE_SESSION");
   }
   const createdAt = timestamp(input.now);
   const next = structuredClone(state);
-  const topicId = input.topicId ?? randomUUID();
+  const topicId = safeIdentifier(input.topicId ?? randomUUID(), "topic id");
   registerTopic(next, { id: topicId, name: topic, sessionId: id, now: createdAt });
   const reuseConceptIds = input.reuseConceptIds ?? [];
   if (!Array.isArray(reuseConceptIds)) {
@@ -79,7 +85,8 @@ export function startSession(state, input) {
     topic,
     topicId,
     target,
-    learnerContext: typeof input.context === "string" ? input.context.trim() : "",
+    learnerContext:
+      input.context === undefined ? "" : safeText(input.context, "learner context", { allowEmpty: true }),
     phase: "probe",
     createdAt,
     updatedAt: createdAt,
@@ -175,12 +182,12 @@ export function beginTeach(state, { now } = {}) {
 
 export function addSource(state, input) {
   const source = {
-    id: input.id ?? randomUUID(),
-    title: requireText(input.title, "source title"),
-    url: requireText(input.url, "source url"),
-    sourceClass: requireText(input.sourceClass, "source class"),
-    supports: requireText(input.supports, "supported claim"),
-    verification: requireText(input.verification, "source verification"),
+    id: safeIdentifier(input.id ?? randomUUID(), "source id"),
+    title: safeSingleLine(input.title, "source title", { maxLength: 1_024 }),
+    url: validateSourceReference(input.url),
+    sourceClass: safeSingleLine(input.sourceClass, "source class", { maxLength: 256 }),
+    supports: safeText(input.supports, "supported claim"),
+    verification: safeText(input.verification, "source verification"),
     createdAt: timestamp(input.now),
   };
   return updateActiveSession(
@@ -197,12 +204,12 @@ export function addSource(state, input) {
 
 export function recordStep(state, input) {
   const step = {
-    id: input.id ?? randomUUID(),
-    nodeId: requireText(input.nodeId, "nodeId"),
-    foundation: requireText(input.foundation, "foundation"),
-    motivation: requireText(input.motivation, "motivation"),
-    explanation: requireText(input.explanation, "explanation"),
-    checkpointQuestion: requireText(input.checkpointQuestion, "checkpoint question"),
+    id: safeIdentifier(input.id ?? randomUUID(), "step id"),
+    nodeId: safeIdentifier(input.nodeId, "nodeId"),
+    foundation: safeText(input.foundation, "foundation"),
+    motivation: safeText(input.motivation, "motivation"),
+    explanation: safeText(input.explanation, "explanation"),
+    checkpointQuestion: safeText(input.checkpointQuestion, "checkpoint question"),
     createdAt: timestamp(input.now),
   };
   return updateActiveSession(
@@ -248,26 +255,27 @@ export function recordStep(state, input) {
   );
 }
 
-function relativeVaultPath(value) {
-  const visualPath = requireText(value, "visual path").replace(/\\/g, "/");
-  const normalized = path.posix.normalize(visualPath);
-  if (
-    path.posix.isAbsolute(visualPath) ||
-    normalized === ".." ||
-    normalized.startsWith("../") ||
-    normalized !== visualPath
-  ) {
-    throw new LearningError("visual path must be a normalized relative vault path", "INVALID_VISUAL_PATH");
-  }
-  return visualPath;
-}
-
 export function addVisual(state, input) {
+  const visualPath = safeRelativeVaultPath(input.path);
+  if (!Number.isSafeInteger(input.bytes) || input.bytes < 0) {
+    throw new LearningError("visual bytes must be a non-negative safe integer", "INVALID_VISUAL_IDENTITY");
+  }
+  const mediaType = safeSingleLine(input.mediaType, "visual media type", { maxLength: 256 });
+  if (!/^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/i.test(mediaType)) {
+    throw new LearningError("visual media type is invalid", "INVALID_VISUAL_IDENTITY");
+  }
+  if (typeof input.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(input.sha256)) {
+    throw new LearningError("visual sha256 must be a lowercase SHA-256 digest", "INVALID_VISUAL_IDENTITY");
+  }
   const visual = {
-    id: input.id ?? randomUUID(),
-    path: relativeVaultPath(input.path),
-    description: requireText(input.description, "visual description"),
-    verification: requireText(input.verification, "visual verification"),
+    id: safeIdentifier(input.id ?? randomUUID(), "visual id"),
+    path: visualPath,
+    description: safeText(input.description, "visual description"),
+    verification: safeText(input.verification, "visual verification"),
+    identityStatus: "verified",
+    bytes: input.bytes,
+    mediaType,
+    sha256: input.sha256,
     createdAt: timestamp(input.now),
   };
   return updateActiveSession(

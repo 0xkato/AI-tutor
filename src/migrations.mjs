@@ -128,6 +128,13 @@ export function migrateV1ToV2(value) {
         ...assessment,
         conceptId: conceptByNode.get(assessment.nodeId) ?? null,
       })),
+      visuals: session.visuals.map((visual) => ({
+        ...visual,
+        identityStatus: "legacy-unverified",
+        bytes: null,
+        mediaType: null,
+        sha256: null,
+      })),
     };
   }
 

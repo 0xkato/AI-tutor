@@ -1,11 +1,21 @@
 import { LearningError } from "./errors.mjs";
+import { safeIdentifier, safeText } from "./inputs.mjs";
 import { mermaidLabel } from "./markdown.mjs";
 
 function text(value, label) {
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new LearningError(`${label} is required`, "INVALID_PLAN");
+  try {
+    return safeText(value, label);
+  } catch (error) {
+    throw new LearningError(error.message, "INVALID_PLAN");
   }
-  return value.trim();
+}
+
+function identifier(value, label) {
+  try {
+    return safeIdentifier(value, label);
+  } catch (error) {
+    throw new LearningError(error.message, "INVALID_PLAN");
+  }
 }
 
 function normalized(plan) {
@@ -18,7 +28,7 @@ function normalized(plan) {
 
   const nodes = plan.nodes.map((node) => ({
     ...node,
-    id: text(node?.id, "node id"),
+    id: identifier(node?.id, "node id"),
     title: text(node?.title, "node title"),
   }));
   const ids = new Set();
@@ -29,15 +39,15 @@ function normalized(plan) {
     ids.add(node.id);
   }
 
-  const targetNodeId = text(plan.targetNodeId, "targetNodeId");
+  const targetNodeId = identifier(plan.targetNodeId, "targetNodeId");
   if (!ids.has(targetNodeId)) {
     throw new LearningError(`unknown target node: ${targetNodeId}`, "INVALID_PLAN");
   }
 
   const seenEdges = new Set();
   const edges = plan.edges.map((edge) => {
-    const from = text(edge?.from, "edge from");
-    const to = text(edge?.to, "edge to");
+    const from = identifier(edge?.from, "edge from");
+    const to = identifier(edge?.to, "edge to");
     if (!ids.has(from)) {
       throw new LearningError(`unknown node: ${from}`, "INVALID_PLAN");
     }

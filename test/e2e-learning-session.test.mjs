@@ -96,6 +96,11 @@ test("complete adaptive session persists evidence, retry state, review, and Obsi
     "--evidence", "On the bounded retry, transferred the input-output types and linearity to a new measurement.",
     "--now", at,
   ]);
+  fs.mkdirSync(path.join(root, "vault", "Assets"), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, "vault", "Assets", "covector.svg"),
+    "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>\n",
+  );
   invoke(root, "add-visual", [
     "--id", "visual-1",
     "--path", "Assets/covector.svg",

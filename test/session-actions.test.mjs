@@ -170,6 +170,9 @@ test("visuals stay inside the vault and require inspection evidence", () => {
     path: "Assets/covector.svg",
     description: "A covector shown as parallel level sets acting on a vector.",
     verification: "Inspected the labels, orientation, and relationship to the explanation.",
+    bytes: 42,
+    mediaType: "image/svg+xml",
+    sha256: "a".repeat(64),
     now,
   });
   assert.equal(getActiveSession(next).visuals[0].path, "Assets/covector.svg");

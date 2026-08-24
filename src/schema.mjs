@@ -1,5 +1,6 @@
 import { LearningError } from "./errors.mjs";
 import { validatePlan } from "./graph.mjs";
+import { safeRelativeVaultPath, validateSourceReference } from "./inputs.mjs";
 
 export const SCHEMA_VERSION = 2;
 
@@ -18,6 +19,7 @@ const CHECKPOINT_STATUSES = new Set([
   "resolved",
 ]);
 const RENDER_STATUSES = new Set(["current", "stale", "failed"]);
+const VISUAL_IDENTITY_STATUSES = new Set(["verified", "legacy-unverified"]);
 
 function invalid(message, code = "INVALID_STATE") {
   throw new LearningError(message, code);
@@ -30,9 +32,13 @@ function object(value, label) {
   return value;
 }
 
-function text(value, label, { allowEmpty = false } = {}) {
+function text(value, label, { allowEmpty = false, maxLength = 65_536 } = {}) {
   if (typeof value !== "string" || (!allowEmpty && value.trim() === "")) {
     invalid(`${label} must be ${allowEmpty ? "a string" : "a non-empty string"}`);
+  }
+  if (value.length > maxLength) invalid(`${label} must be at most ${maxLength} characters`);
+  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)) {
+    invalid(`${label} contains a disallowed control character`);
   }
   return value;
 }
@@ -201,6 +207,11 @@ function validateSession(session, key, globalAssessmentIds, globalSourceIds, glo
     for (const field of ["title", "url", "sourceClass", "supports", "verification"]) {
       text(source[field], `${sourceLabel}.${field}`);
     }
+    try {
+      validateSourceReference(source.url);
+    } catch (error) {
+      invalid(`${sourceLabel}.url is invalid: ${error.message}`);
+    }
     stateInstant(source.createdAt, `${sourceLabel}.createdAt`);
   }
 
@@ -248,6 +259,24 @@ function validateSession(session, key, globalAssessmentIds, globalSourceIds, glo
     globalVisualIds.add(visual.id);
     for (const field of ["path", "description", "verification"]) {
       text(visual[field], `${visualLabel}.${field}`);
+    }
+    try {
+      safeRelativeVaultPath(visual.path);
+    } catch (error) {
+      invalid(`${visualLabel}.path is invalid: ${error.message}`);
+    }
+    oneOf(visual.identityStatus, VISUAL_IDENTITY_STATUSES, `${visualLabel}.identityStatus`);
+    if (visual.identityStatus === "verified") {
+      integer(visual.bytes, `${visualLabel}.bytes`);
+      text(visual.mediaType, `${visualLabel}.mediaType`, { maxLength: 256 });
+      if (!/^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/i.test(visual.mediaType)) {
+        invalid(`${visualLabel}.mediaType is invalid`);
+      }
+      if (typeof visual.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(visual.sha256)) {
+        invalid(`${visualLabel}.sha256 must be a lowercase SHA-256 digest`);
+      }
+    } else if (visual.bytes !== null || visual.mediaType !== null || visual.sha256 !== null) {
+      invalid(`${visualLabel} legacy identity fields must be null`);
     }
     stateInstant(visual.createdAt, `${visualLabel}.createdAt`);
   }

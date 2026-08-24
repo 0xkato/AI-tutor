@@ -47,3 +47,56 @@ test("unknown commands fail with a useful error", () => {
   assert.match(result.stderr, /Unknown command: invent/);
   assert.match(result.stderr, /--help/);
 });
+
+test("version and command-specific help are available without reading state", () => {
+  const version = spawnSync(process.execPath, [cli, "--version"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(version.status, 0, version.stderr);
+  assert.equal(version.stdout.trim(), "0.1.0");
+
+  const commandHelp = spawnSync(process.execPath, [cli, "start", "--help"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(commandHelp.status, 0, commandHelp.stderr);
+  assert.match(commandHelp.stdout, /Usage: adaptive-learn start/);
+  assert.match(commandHelp.stdout, /--topic/);
+  assert.match(commandHelp.stdout, /--target/);
+  assert.doesNotMatch(commandHelp.stdout, /--source-class/);
+});
+
+test("commands reject unknown options and duplicate scalar options", () => {
+  const root = path.join(repoRoot, ".does-not-need-to-exist");
+  const unknown = spawnSync(process.execPath, [cli, "status", "--root", root, "--bogus", "x"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(unknown.status, 1);
+  assert.match(unknown.stderr, /\[UNKNOWN_OPTION\].*--bogus/);
+
+  const duplicate = spawnSync(
+    process.execPath,
+    [cli, "status", "--root", root, "--root", root],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.equal(duplicate.status, 1);
+  assert.match(duplicate.stderr, /\[DUPLICATE_OPTION\].*--root/);
+
+  const commandScalar = spawnSync(
+    process.execPath,
+    [cli, "defer-review", "--root", root, "--review", "one", "--review", "two"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.equal(commandScalar.status, 1);
+  assert.match(commandScalar.stderr, /\[DUPLICATE_OPTION\].*--review/);
+
+  const repeatable = spawnSync(
+    process.execPath,
+    [cli, "close", "--root", root, "--gap", "one", "--gap", "two", "--synthesis", "x"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.equal(repeatable.status, 1);
+  assert.doesNotMatch(repeatable.stderr, /DUPLICATE_OPTION/);
+});

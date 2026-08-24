@@ -64,7 +64,15 @@ function versionOneFixture() {
         frontier: [],
         steps: [],
         activeStepId: null,
-        visuals: [],
+        visuals: [
+          {
+            id: "visual-1",
+            path: "Assets/gradient.svg",
+            description: "A local slope diagram.",
+            verification: "The learner inspected the axes and arrow direction.",
+            createdAt: COMPLETED,
+          },
+        ],
         synthesis: "The gradient is a local increase direction.",
         unresolvedGaps: [],
       },
@@ -94,6 +102,13 @@ test("migrateV1ToV2 deterministically preserves sessions, evidence, and due revi
   ]);
   assert.deepEqual(first.concepts[conceptId].evidenceIds, ["a1"]);
   assert.equal(first.reviews[first.concepts[conceptId].reviewId].dueAt, DUE);
+  assert.deepEqual(first.sessions.s1.visuals[0], {
+    ...original.sessions.s1.visuals[0],
+    identityStatus: "legacy-unverified",
+    bytes: null,
+    mediaType: null,
+    sha256: null,
+  });
   assert.deepEqual(original, versionOneFixture(), "migration must not mutate version 1");
 });
 

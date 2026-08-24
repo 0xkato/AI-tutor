@@ -1,8 +1,9 @@
+import { parseInstant } from "./schema.mjs";
+
 const INTERVAL_DAYS = [1, 3, 7, 14, 30, 60];
 
 function plusDays(now, days) {
-  const date = new Date(now);
-  if (Number.isNaN(date.getTime())) throw new TypeError(`Invalid time: ${now}`);
+  const date = new Date(parseInstant(now, "review time"));
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString();
 }
@@ -38,7 +39,7 @@ export function advanceReview(current = {}, evidence) {
 }
 
 export function dueReviews(state, { now } = {}) {
-  const cutoff = new Date(now ?? new Date().toISOString()).getTime();
+  const cutoff = new Date(parseInstant(now ?? new Date().toISOString(), "review cutoff")).getTime();
   const due = [];
   for (const review of Object.values(state.reviews ?? {})) {
     if (!["scheduled", "deferred"].includes(review.status)) continue;

@@ -6,6 +6,7 @@ import path from "node:path";
 import { recordAssessment } from "../src/assessment.mjs";
 import { knowledgeForSession } from "../src/concepts.mjs";
 import { LearningError } from "../src/errors.mjs";
+import { inspectVisual } from "../src/inputs.mjs";
 import {
   addSource,
   addVisual,
@@ -25,6 +26,9 @@ import {
   startReviewSession,
 } from "../src/reviews.mjs";
 import { initializeStore, readState } from "../src/store.mjs";
+
+const packageJson = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+const PRODUCT_VERSION = packageJson.version;
 
 const commands = [
   ["init", "Initialize local state and the Obsidian vault"],
@@ -47,6 +51,97 @@ const commands = [
   ["close", "Close the active session with a synthesis"],
 ];
 
+const GLOBAL_OPTIONS = ["root", "json", "now", "help"];
+const COMMAND_OPTIONS = {
+  init: ["vault-dir"],
+  start: ["id", "topic", "target", "context", "topic-id", "reuse-concept"],
+  "record-probe": [
+    "id",
+    "question-id",
+    "node",
+    "kind",
+    "question",
+    "answer",
+    "grade",
+    "evidence",
+    "mistake-type",
+    "contaminated",
+  ],
+  "finish-probe": ["summary"],
+  "add-source": ["id", "title", "url", "source-class", "supports", "verification"],
+  "set-plan": ["file"],
+  "begin-teach": [],
+  "record-step": ["id", "node", "foundation", "motivation", "explanation", "question"],
+  "record-assessment": [
+    "id",
+    "question-id",
+    "node",
+    "stage",
+    "kind",
+    "question",
+    "answer",
+    "grade",
+    "evidence",
+    "mistake-type",
+    "contaminated",
+  ],
+  "add-visual": ["id", "path", "description", "verification"],
+  "repair-render": [],
+  status: [],
+  context: [],
+  due: [],
+  "start-review": ["id", "review"],
+  "defer-review": ["review", "reason", "until"],
+  "close-review": ["synthesis"],
+  close: ["synthesis", "gap"],
+};
+const BOOLEAN_OPTIONS = new Set(["json", "contaminated", "help"]);
+const REPEATABLE_OPTIONS = {
+  start: new Set(["reuse-concept"]),
+  "start-review": new Set(["review"]),
+  close: new Set(["gap"]),
+};
+const OPTION_DESCRIPTIONS = {
+  root: "Learning repository (default: current directory)",
+  json: "Emit machine-readable JSON",
+  now: "Canonical ISO-8601 event time (optional)",
+  help: "Show help for this command",
+  "vault-dir": "Relative vault directory inside the learning root",
+  id: "Stable record identifier",
+  topic: "Learning topic",
+  target: "Learner-owned target",
+  context: "Relevant learner context",
+  "topic-id": "Stable topic identifier",
+  "reuse-concept": "Existing concept identifier (repeatable)",
+  "question-id": "Stable question identifier",
+  node: "Dependency-plan node identifier",
+  stage: "Assessment stage",
+  kind: "Question or assessment kind",
+  question: "Checkpoint question",
+  answer: "Learner answer",
+  grade: "correct, partial, or incorrect",
+  evidence: "Exact assessment evidence",
+  "mistake-type": "Specific mistake category",
+  contaminated: "Exclude exposed-answer evidence",
+  summary: "Probe conclusion",
+  title: "Source title",
+  url: "http(s) URL or local:<reference>",
+  "source-class": "Source provenance class",
+  supports: "Claim supported by the source",
+  verification: "Recorded verification or inspection",
+  file: "Input JSON file",
+  foundation: "Required foundation",
+  motivation: "Why this step matters",
+  explanation: "Teaching explanation",
+  path: "Relative visual path inside the vault",
+  description: "Visual description",
+  review: "Review identifier (repeatable for start-review)",
+  reason: "Deferral reason",
+  until: "Canonical ISO-8601 deferral time",
+  synthesis: "Whole-system synthesis",
+  gap: "Unresolved gap (repeatable)",
+};
+
 function help() {
   const lines = [
     "Adaptive Learning Agent",
@@ -57,6 +152,7 @@ function help() {
     "  --root <path>         Learning repository (default: current directory)",
     "  --json                Emit machine-readable JSON",
     "  --now <ISO-8601>      Deterministic event time (optional)",
+    "  --version             Print the product version",
     "",
     "Commands:",
     ...commands.map(([name, description]) => `  ${name.padEnd(19)} ${description}`),
@@ -66,26 +162,52 @@ function help() {
   return `${lines.join("\n")}\n`;
 }
 
-function parseOptions(args) {
+function commandHelp(command) {
+  const description = commands.find(([name]) => name === command)?.[1] ?? "";
+  const optionNames = [...GLOBAL_OPTIONS, ...COMMAND_OPTIONS[command]];
+  const lines = [
+    `Usage: adaptive-learn ${command} [options]`,
+    "",
+    description,
+    "",
+    "Options:",
+    ...optionNames.map((name) => {
+      const repeatable = REPEATABLE_OPTIONS[command]?.has(name) ?? false;
+      const suffix = BOOLEAN_OPTIONS.has(name) ? "" : ` <value>${repeatable ? " ..." : ""}`;
+      return `  --${name}${suffix}`.padEnd(30) + OPTION_DESCRIPTIONS[name];
+    }),
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+function parseOptions(command, args) {
   const options = {};
-  const booleans = new Set(["json", "contaminated"]);
+  const allowed = new Set([...GLOBAL_OPTIONS, ...COMMAND_OPTIONS[command]]);
+  const repeatable = REPEATABLE_OPTIONS[command] ?? new Set();
   for (let index = 0; index < args.length; index += 1) {
-    const token = args[index];
+    const token = args[index] === "-h" ? "--help" : args[index];
     if (!token.startsWith("--")) {
       throw new LearningError(`Unexpected positional argument: ${token}`, "INVALID_ARGUMENT");
     }
     const key = token.slice(2);
+    if (!allowed.has(key)) {
+      throw new LearningError(`Unknown option for ${command}: --${key}`, "UNKNOWN_OPTION");
+    }
     let value = true;
-    if (!booleans.has(key)) {
+    if (!BOOLEAN_OPTIONS.has(key)) {
       value = args[index + 1];
       if (value === undefined || value.startsWith("--")) {
         throw new LearningError(`Missing value for --${key}`, "INVALID_ARGUMENT");
       }
       index += 1;
     }
-    if (options[key] === undefined) options[key] = value;
-    else if (Array.isArray(options[key])) options[key].push(value);
-    else options[key] = [options[key], value];
+    if (options[key] === undefined) {
+      options[key] = repeatable.has(key) ? [value] : value;
+    } else if (repeatable.has(key)) {
+      options[key].push(value);
+    } else {
+      throw new LearningError(`Option may be provided only once: --${key}`, "DUPLICATE_OPTION");
+    }
   }
   return options;
 }
@@ -284,9 +406,10 @@ function commandResult(command, options, root) {
       return recordAssessment(current, assessmentInput(options));
     }
     if (command === "add-visual") {
+      const inspected = inspectVisual(root, current, last(options, "path"));
       return addVisual(current, {
       id: last(options, "id"),
-      path: last(options, "path"),
+      ...inspected,
       description: last(options, "description"),
       verification: last(options, "verification"),
       now: last(options, "now"),
@@ -333,13 +456,22 @@ if (!command || command === "--help" || command === "-h" || command === "help") 
   process.exit(0);
 }
 
+if (command === "--version" || command === "-V" || command === "version") {
+  process.stdout.write(`${PRODUCT_VERSION}\n`);
+  process.exit(0);
+}
+
 if (!commands.some(([name]) => name === command)) {
   process.stderr.write(`Unknown command: ${command}. Run with --help.\n`);
   process.exit(1);
 }
 
 try {
-  const options = parseOptions(rawOptions);
+  const options = parseOptions(command, rawOptions);
+  if (options.help === true) {
+    process.stdout.write(commandHelp(command));
+    process.exit(0);
+  }
   const root = path.resolve(last(options, "root") ?? process.cwd());
   const result = commandResult(command, options, root);
   emit(result, options.json === true);
