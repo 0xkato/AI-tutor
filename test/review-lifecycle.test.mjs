@@ -6,9 +6,10 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { writeState } from "../src/store.mjs";
+
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(repository, "bin", "learn.mjs");
-const planPath = path.join(repository, "examples", "differential-forms-plan.json");
 const DAY_ONE = "2026-08-24T08:00:00.000Z";
 const DAY_TWO = "2026-08-25T08:00:00.000Z";
 
@@ -22,7 +23,13 @@ function invoke(root, command, options = [], { ok = true } = {}) {
   return result;
 }
 
-function seedDueReview(root) {
+function seedDueReview(root, { reviewCount = 0 } = {}) {
+  const planPath = path.join(root, "covector-plan.json");
+  fs.writeFileSync(planPath, `${JSON.stringify({
+    targetNodeId: "covectors",
+    nodes: [{ id: "covectors", title: "Covectors" }],
+    edges: [],
+  }, null, 2)}\n`);
   invoke(root, "init", ["--now", DAY_ONE]);
   invoke(root, "start", [
     "--id", "learn-s1",
@@ -53,7 +60,9 @@ function seedDueReview(root) {
     "--foundation", "A linear map preserves vector addition and scalar multiplication.",
     "--motivation", "We need an object that measures a directed displacement linearly.",
     "--explanation", "A covector consumes a vector and produces a scalar linearly.",
-    "--question", "What does this object consume and produce?",
+    "--question-id", "teach-q1",
+    "--kind", "transfer",
+    "--question", "Describe a linear displacement measurement in a new setting.",
     "--now", DAY_ONE,
   ]);
   invoke(root, "record-assessment", [
@@ -68,11 +77,31 @@ function seedDueReview(root) {
     "--evidence", "Transferred the input-output types and linearity to an unfamiliar measurement.",
     "--now", DAY_ONE,
   ]);
+  invoke(root, "start-synthesis", [
+    "--question-id", "learning-synthesis-q1",
+    "--question", "Connect vector structure to a linear scalar measurement.",
+    "--now", DAY_ONE,
+  ]);
+  invoke(root, "record-synthesis", [
+    "--id", "learning-synthesis-a1",
+    "--question-id", "learning-synthesis-q1",
+    "--question", "Connect vector structure to a linear scalar measurement.",
+    "--answer", "A covector consumes a vector and returns a scalar while preserving vector addition and scaling.",
+    "--grade", "correct",
+    "--evidence", "Connected both vector-space operations to the covector's scalar-valued linear action.",
+    "--now", DAY_ONE,
+  ]);
   invoke(root, "close", [
-    "--synthesis", "Covectors linearly measure vectors and provide a foundation for forms.",
     "--gap", "Alternating multilinearity remains unresolved.",
     "--now", DAY_ONE,
   ]);
+
+  if (reviewCount !== 0) {
+    const statePath = path.join(root, ".adaptive-learning", "state.json");
+    const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+    state.reviewCount = reviewCount;
+    writeState(root, state);
+  }
 
   const due = JSON.parse(invoke(root, "due", ["--now", DAY_TWO, "--json"]).stdout);
   return due.reviews.find((review) => review.nodeId === "covectors");
@@ -220,4 +249,60 @@ test("a selected review can be explicitly deferred with a reason and stable ID",
     ),
     [due.reviewId],
   );
+});
+
+test("a required review synthesis is assessed before the review can close", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-review-synthesis-"));
+  const due = seedDueReview(root, { reviewCount: 6 });
+
+  invoke(root, "start-review", [
+    "--id", "review-synthesis",
+    "--review", due.reviewId,
+    "--now", DAY_TWO,
+  ]);
+  invoke(root, "record-assessment", [
+    "--id", "retention-synthesis-a1",
+    "--question-id", "retention-synthesis-q1",
+    "--node", "covectors",
+    "--stage", "retention",
+    "--kind", "retention",
+    "--question", "What structure does a covector preserve while producing what output?",
+    "--answer", "It preserves linear combinations of vectors and produces a scalar.",
+    "--grade", "correct",
+    "--evidence", "Reconstructed the vector-to-scalar mapping and both required linearity operations.",
+    "--now", "2026-08-25T08:05:00.000Z",
+  ]);
+
+  const earlyClose = invoke(root, "close-review", [
+    "--synthesis", "This unassessed summary must not satisfy a required synthesis.",
+    "--now", "2026-08-25T08:06:00.000Z",
+  ], { ok: false });
+  assert.match(earlyClose.stderr, /synthesis assessment is required/i);
+
+  invoke(root, "start-synthesis", [
+    "--question-id", "review-whole-system-q1",
+    "--question", "Connect the retained vector operations to the covector's input and output.",
+    "--now", "2026-08-25T08:07:00.000Z",
+  ]);
+  invoke(root, "record-synthesis", [
+    "--id", "review-whole-system-a1",
+    "--question-id", "review-whole-system-q1",
+    "--question", "Connect the retained vector operations to the covector's input and output.",
+    "--answer", "A covector accepts vectors, returns scalars, and preserves vector addition and scalar multiplication.",
+    "--grade", "correct",
+    "--evidence", "Connected the retained input-output model to both operations that linearity preserves.",
+    "--now", "2026-08-25T08:08:00.000Z",
+  ]);
+  invoke(root, "close-review", ["--now", "2026-08-25T08:10:00.000Z"]);
+
+  const state = JSON.parse(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+  );
+  const session = state.sessions["review-synthesis"];
+  assert.equal(session.synthesisCheckpoint.resolvedEvidenceId, "review-whole-system-a1");
+  assert.equal(
+    session.synthesis,
+    "A covector accepts vectors, returns scalars, and preserves vector addition and scalar multiplication.",
+  );
+  assert.equal(state.reviewCount, 7);
 });

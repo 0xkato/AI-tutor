@@ -139,6 +139,32 @@ test("renderSessionNote contains the complete inspectable learning record", () =
   }
 });
 
+test("renderSessionNote exposes an unfinished synthesis checkpoint for recovery", () => {
+  const recovering = structuredClone(state.sessions.s1);
+  recovering.synthesisRequired = true;
+  recovering.synthesisCheckpoint = {
+    status: "retry-required",
+    questionId: "whole-system-q1",
+    question: "Connect covectors to the complete differential-forms target.",
+    priorQuestionId: null,
+    attempts: 1,
+    resolvedEvidenceId: null,
+    mistakeType: "missing-alternation",
+  };
+
+  const note = renderSessionNote(state, recovering);
+  for (const expected of [
+    "Synthesis checkpoint",
+    "Retry required",
+    "whole-system-q1",
+    "Connect covectors to the complete differential-forms target.",
+    "Attempts:** 1",
+    "missing-alternation",
+  ]) {
+    assert.match(note, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+});
+
 test("renderVault writes home, session, topic, and review notes", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-vault-"));
   renderVault(root, state);

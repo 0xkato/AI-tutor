@@ -19,6 +19,15 @@ import { parseInstant, SCHEMA_VERSION } from "./schema.mjs";
 
 export { SCHEMA_VERSION };
 
+const TEACHING_CHECKPOINT_KINDS = new Set([
+  "multiple-choice",
+  "explanation",
+  "prediction",
+  "transfer",
+  "reconstruction",
+  "debugging",
+]);
+
 function timestamp(now) {
   return parseInstant(now ?? new Date().toISOString(), "event time");
 }
@@ -102,7 +111,8 @@ export function startSession(state, input) {
     checkpoint: null,
     visuals: [],
     synthesis: "",
-    synthesisRequired: false,
+    synthesisRequired: true,
+    synthesisCheckpoint: null,
     unresolvedGaps: [],
     reviewItems: [],
   };
@@ -213,12 +223,26 @@ export function addSource(state, input) {
 }
 
 export function recordStep(state, input) {
+  const checkpointKind = safeSingleLine(input.checkpointKind, "checkpoint kind", {
+    maxLength: 64,
+  });
+  if (!TEACHING_CHECKPOINT_KINDS.has(checkpointKind)) {
+    throw new LearningError(
+      `Unknown teaching checkpoint kind: ${checkpointKind}`,
+      "INVALID_KIND",
+    );
+  }
   const step = {
     id: safeIdentifier(input.id ?? randomUUID(), "step id"),
     nodeId: safeIdentifier(input.nodeId, "nodeId"),
     foundation: safeText(input.foundation, "foundation"),
     motivation: safeText(input.motivation, "motivation"),
     explanation: safeText(input.explanation, "explanation"),
+    checkpointQuestionId: safeIdentifier(
+      input.checkpointQuestionId,
+      "checkpoint question ID",
+    ),
+    checkpointKind,
     checkpointQuestion: safeText(input.checkpointQuestion, "checkpoint question"),
     createdAt: timestamp(input.now),
   };
@@ -231,18 +255,34 @@ export function recordStep(state, input) {
       const unresolvedRetry = session.conceptIds
         .map((conceptId) => next.concepts[conceptId])
         .find((concept) => concept?.retry);
-      const permittedRepair =
+      const startingProbeRepair =
         !session.activeStepId &&
         unresolvedRetry?.retry?.answerMayBeTaught === true &&
         unresolvedRetry.key === step.nodeId;
+      const replacingTeachingCheckpoint =
+        session.activeStepId !== null &&
+        session.checkpoint?.status === "new-transfer-required" &&
+        unresolvedRetry?.retry?.status === "new-transfer-required" &&
+        unresolvedRetry.retry.answerMayBeTaught === true &&
+        unresolvedRetry.key === step.nodeId;
+      const permittedRepair = startingProbeRepair || replacingTeachingCheckpoint;
       if (unresolvedRetry && !permittedRepair) {
         throw new LearningError(
           `A required checkpoint for ${unresolvedRetry.key} must be resolved before another step`,
           "RETRY_REQUIRED",
         );
       }
-      if (session.activeStepId) {
+      if (session.activeStepId && !replacingTeachingCheckpoint) {
         throw new LearningError("The current checkpoint must be resolved before another step", "STEP_UNRESOLVED");
+      }
+      const priorQuestionId = replacingTeachingCheckpoint
+        ? session.checkpoint.priorQuestionId ?? session.checkpoint.questionId
+        : null;
+      if (priorQuestionId === step.checkpointQuestionId) {
+        throw new LearningError(
+          `A new transfer question is required after ${priorQuestionId}`,
+          "NEW_TRANSFER_REQUIRED",
+        );
       }
       if (!session.plan?.nodes.some((node) => node.id === step.nodeId)) {
         throw new LearningError(`Unknown plan node: ${step.nodeId}`, "UNKNOWN_NODE");
@@ -258,8 +298,10 @@ export function recordStep(state, input) {
       session.checkpoint = {
         status: "awaiting-answer",
         nodeId: step.nodeId,
-        questionId: null,
-        priorQuestionId: null,
+        questionId: step.checkpointQuestionId,
+        question: step.checkpointQuestion,
+        kind: step.checkpointKind,
+        priorQuestionId,
         attempts: 0,
         resolvedEvidenceId: null,
         mistakeType: "",
@@ -304,8 +346,7 @@ export function addVisual(state, input) {
   );
 }
 
-export function closeSession(state, { synthesis, unresolvedGaps = [], now } = {}) {
-  const conclusion = requireText(synthesis, "whole-system synthesis");
+export function closeSession(state, { unresolvedGaps = [], now } = {}) {
   if (!Array.isArray(unresolvedGaps) || unresolvedGaps.some((gap) => typeof gap !== "string" || !gap.trim())) {
     throw new LearningError("unresolvedGaps must be an array of non-empty strings", "INVALID_GAPS");
   }
@@ -334,7 +375,35 @@ export function closeSession(state, { synthesis, unresolvedGaps = [], now } = {}
           "RETRY_REQUIRED",
         );
       }
-      session.synthesis = conclusion;
+      if (session.frontier.length > 0) {
+        throw new LearningError(
+          "The dependency plan must be complete before closing",
+          "PLAN_INCOMPLETE",
+        );
+      }
+      const checkpoint = session.synthesisCheckpoint;
+      if (!checkpoint || checkpoint.status !== "resolved" || !checkpoint.resolvedEvidenceId) {
+        throw new LearningError(
+          "A clean correct whole-system synthesis assessment is required before closing",
+          "SYNTHESIS_UNRESOLVED",
+        );
+      }
+      const synthesisAssessment = session.assessments.find(
+        (assessment) => assessment.id === checkpoint.resolvedEvidenceId,
+      );
+      if (
+        !synthesisAssessment ||
+        synthesisAssessment.stage !== "synthesis" ||
+        synthesisAssessment.kind !== "synthesis" ||
+        synthesisAssessment.grade !== "correct" ||
+        synthesisAssessment.contaminated
+      ) {
+        throw new LearningError(
+          "The resolved whole-system synthesis evidence is invalid",
+          "INVALID_SYNTHESIS_EVIDENCE",
+        );
+      }
+      session.synthesis = synthesisAssessment.answer;
       session.unresolvedGaps = unresolvedGaps.map((gap) => gap.trim());
       session.completedAt = closedAt;
       session.phase = "complete";

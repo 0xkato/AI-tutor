@@ -7,7 +7,7 @@ export const SCHEMA_VERSION = 2;
 const SESSION_PHASES = new Set(["probe", "plan", "teach", "review", "complete"]);
 const SESSION_KINDS = new Set(["learn", "review"]);
 const GRADES = new Set(["correct", "partial", "incorrect"]);
-const ASSESSMENT_STAGES = new Set(["probe", "teach", "retention"]);
+const ASSESSMENT_STAGES = new Set(["probe", "teach", "retention", "synthesis"]);
 const CONCEPT_STATUSES = new Set(["unknown", "fragile", "gap", "developing", "strong"]);
 const REVIEW_STATUSES = new Set(["inactive", "scheduled", "claimed", "deferred", "complete"]);
 const REVIEW_ITEM_STATUSES = new Set(["pending", "repair-required", "resolved", "deferred"]);
@@ -134,6 +134,8 @@ function validateCheckpoint(checkpoint, label) {
   oneOf(checkpoint.status, CHECKPOINT_STATUSES, `${label}.status`);
   text(checkpoint.nodeId, `${label}.nodeId`);
   nullableText(checkpoint.questionId, `${label}.questionId`);
+  nullableText(checkpoint.question, `${label}.question`);
+  nullableText(checkpoint.kind, `${label}.kind`);
   nullableText(checkpoint.priorQuestionId, `${label}.priorQuestionId`);
   integer(checkpoint.attempts, `${label}.attempts`);
   nullableText(checkpoint.resolvedEvidenceId, `${label}.resolvedEvidenceId`);
@@ -152,6 +154,27 @@ function validateCheckpoint(checkpoint, label) {
   }
   if (checkpoint.status === "resolved" && checkpoint.resolvedEvidenceId === null) {
     invalid(`${label}.resolvedEvidenceId is required when resolved`);
+  }
+}
+
+function validateSynthesisCheckpoint(checkpoint, label) {
+  if (checkpoint === null) return;
+  object(checkpoint, label);
+  oneOf(checkpoint.status, CHECKPOINT_STATUSES, `${label}.status`);
+  text(checkpoint.questionId, `${label}.questionId`);
+  text(checkpoint.question, `${label}.question`);
+  nullableText(checkpoint.priorQuestionId, `${label}.priorQuestionId`);
+  integer(checkpoint.attempts, `${label}.attempts`);
+  nullableText(checkpoint.resolvedEvidenceId, `${label}.resolvedEvidenceId`);
+  text(checkpoint.mistakeType, `${label}.mistakeType`, { allowEmpty: true });
+  if (checkpoint.status === "resolved" && checkpoint.resolvedEvidenceId === null) {
+    invalid(`${label}.resolvedEvidenceId is required when resolved`);
+  }
+  if (checkpoint.status !== "resolved" && checkpoint.resolvedEvidenceId !== null) {
+    invalid(`${label}.resolvedEvidenceId requires a resolved checkpoint`);
+  }
+  if (checkpoint.status === "new-transfer-required" && checkpoint.priorQuestionId === null) {
+    invalid(`${label}.priorQuestionId is required before a new transfer`);
   }
 }
 
@@ -228,12 +251,15 @@ function validateSession(session, key, globalAssessmentIds, globalSourceIds, glo
     for (const field of ["nodeId", "foundation", "motivation", "explanation", "checkpointQuestion"]) {
       text(step[field], `${stepLabel}.${field}`);
     }
+    nullableText(step.checkpointQuestionId, `${stepLabel}.checkpointQuestionId`);
+    nullableText(step.checkpointKind, `${stepLabel}.checkpointKind`);
     stateInstant(step.createdAt, `${stepLabel}.createdAt`);
   }
   if (session.activeStepId !== null && !stepIds.has(session.activeStepId)) {
     invalid(`${label}.activeStepId references an unknown step`);
   }
   validateCheckpoint(session.checkpoint, `${label}.checkpoint`);
+  validateSynthesisCheckpoint(session.synthesisCheckpoint, `${label}.synthesisCheckpoint`);
   if (session.activeStepId !== null) {
     const activeStep = session.steps.find((step) => step.id === session.activeStepId);
     if (!session.checkpoint || session.checkpoint.status === "resolved") {
@@ -241,6 +267,16 @@ function validateSession(session, key, globalAssessmentIds, globalSourceIds, glo
     }
     if (session.checkpoint.nodeId !== activeStep.nodeId) {
       invalid(`${label}.checkpoint must match the active step node`);
+    }
+    if (
+      activeStep.checkpointQuestionId !== null &&
+      (
+        session.checkpoint.questionId !== activeStep.checkpointQuestionId ||
+        session.checkpoint.question !== activeStep.checkpointQuestion ||
+        session.checkpoint.kind !== activeStep.checkpointKind
+      )
+    ) {
+      invalid(`${label}.checkpoint must match the active step question identity`);
     }
   }
   if (
@@ -436,6 +472,18 @@ export function validateState(value) {
     if (!("reviewItems" in session)) session.reviewItems = [];
     if (!("synthesisRequired" in session)) session.synthesisRequired = false;
     if (!("checkpoint" in session)) session.checkpoint = null;
+    if (!("synthesisCheckpoint" in session)) session.synthesisCheckpoint = null;
+    if (session.checkpoint && typeof session.checkpoint === "object") {
+      if (!("question" in session.checkpoint)) session.checkpoint.question = null;
+      if (!("kind" in session.checkpoint)) session.checkpoint.kind = null;
+    }
+    if (Array.isArray(session.steps)) {
+      for (const step of session.steps) {
+        if (!step || typeof step !== "object" || Array.isArray(step)) continue;
+        if (!("checkpointQuestionId" in step)) step.checkpointQuestionId = null;
+        if (!("checkpointKind" in step)) step.checkpointKind = null;
+      }
+    }
   }
   for (const review of Object.values(state.reviews)) {
     if (!review || typeof review !== "object" || Array.isArray(review)) continue;
@@ -489,8 +537,15 @@ export function validateState(value) {
       }
     }
     for (const assessment of session.assessments) {
-      if (!assessment.contaminated && assessment.conceptId === null) {
+      if (
+        !assessment.contaminated &&
+        assessment.conceptId === null &&
+        assessment.stage !== "synthesis"
+      ) {
         invalid(`sessions.${id} assessment ${assessment.id} requires a conceptId`);
+      }
+      if (assessment.stage === "synthesis" && assessment.conceptId !== null) {
+        invalid(`sessions.${id} synthesis assessment ${assessment.id} cannot bind a concept`);
       }
       if (assessment.conceptId !== null && !state.concepts[assessment.conceptId]) {
         invalid(`sessions.${id} assessment ${assessment.id} references an unknown concept`);
@@ -509,6 +564,21 @@ export function validateState(value) {
         !session.assessments.some((candidate) => candidate.id === assessment.id)
       ) {
         invalid(`sessions.${id}.checkpoint has invalid resolved evidence`);
+      }
+    }
+    if (session.synthesisCheckpoint?.resolvedEvidenceId) {
+      const assessment = assessmentIds.get(session.synthesisCheckpoint.resolvedEvidenceId);
+      if (
+        !assessment ||
+        assessment.contaminated ||
+        assessment.grade !== "correct" ||
+        assessment.stage !== "synthesis" ||
+        assessment.kind !== "synthesis" ||
+        assessment.questionId !== session.synthesisCheckpoint.questionId ||
+        assessment.question !== session.synthesisCheckpoint.question ||
+        !session.assessments.some((candidate) => candidate.id === assessment.id)
+      ) {
+        invalid(`sessions.${id}.synthesisCheckpoint has invalid resolved evidence`);
       }
     }
     for (const item of session.reviewItems) {

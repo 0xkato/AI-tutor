@@ -134,6 +134,7 @@ node bin/learn.mjs record-step --root <root> \
   --node covectors --foundation "<known invariant>" \
   --motivation "<problem forcing the step>" \
   --explanation "<one new causal move>" \
+  --question-id teach-q1 --kind transfer \
   --question "<fully framed checkpoint>"
 
 node bin/learn.mjs record-assessment --root <root> \
@@ -143,8 +144,33 @@ node bin/learn.mjs record-assessment --root <root> \
   --mistake-type "<bounded error type>"
 ```
 
-The engine blocks a second teaching step until an uncontaminated, durable
-checkpoint resolves the active step.
+`record-step` persists the question ID, exact question text, and kind before the
+learner answers. `record-assessment` must preserve all three. The engine blocks
+a second teaching step until the checkpoint resolves, except after a second
+miss when teaching is permitted: record the repaired explanation and a new
+transfer question as a replacement step on the same node before accepting the
+new answer.
+
+## Assessed synthesis and closure
+
+After the dependency frontier is complete—or when an active review reports
+that synthesis is required—persist the synthesis question before asking it:
+
+```bash
+node bin/learn.mjs start-synthesis --root <root> \
+  --question-id synthesis-q1 \
+  --question "<whole-system transfer question>"
+
+node bin/learn.mjs record-synthesis --root <root> \
+  --id synthesis-a1 --question-id synthesis-q1 \
+  --question "<the exact persisted question>" \
+  --answer "<learner answer>" --grade correct \
+  --evidence "<exact connected mechanisms demonstrated>"
+```
+
+The synthesis checkpoint uses the same bounded retry, teaching, contamination,
+and new-transfer rules as other checkpoints. A required synthesis cannot be
+replaced by an unassessed summary passed to `close` or `close-review`.
 
 ## Visual and closeout
 
@@ -153,11 +179,13 @@ node bin/learn.mjs add-visual --root <root> \
   --path "Assets/covector.svg" --description "<what it shows>" \
   --verification "<what was inspected>"
 
-node bin/learn.mjs close --root <root> \
-  --synthesis "<whole-system synthesis>" \
-  --gap "<unresolved gap>"
+node bin/learn.mjs close --root <root> --gap "<unresolved gap>"
 ```
 
-Repeat `--gap` for multiple gaps. Successful mutations atomically update JSON
-and regenerate the derived Obsidian notes. If the command fails, do not advance
-the conversation as though persistence succeeded.
+`close` derives the session synthesis from the resolved clean correct synthesis
+assessment. Repeat `--gap` for multiple gaps. A review with no required
+synthesis still uses `close-review --synthesis "<audit summary>"`; a review that
+requires synthesis uses `start-synthesis`, `record-synthesis`, then
+`close-review` without arbitrary synthesis prose. Successful mutations
+atomically update JSON and regenerate the derived Obsidian notes. If the
+command fails, do not advance the conversation as though persistence succeeded.

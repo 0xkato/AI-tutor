@@ -95,6 +95,7 @@ export function startReviewSession(state, { id, reviewIds, now } = {}) {
     visuals: [],
     synthesis: "",
     synthesisRequired: synthesisRequiredForSelection(next, selected),
+    synthesisCheckpoint: null,
     unresolvedGaps: [],
     reviewItems: selected.map((review) => ({
       reviewId: review.reviewId,
@@ -183,7 +184,6 @@ export function deferReviewItem(state, { reviewId, reason, until, now } = {}) {
 }
 
 export function closeReviewSession(state, { synthesis, now } = {}) {
-  const conclusion = requireText(synthesis, "review synthesis");
   const closedAt = instant(now);
   return updateActiveSession(
     state,
@@ -199,6 +199,35 @@ export function closeReviewSession(state, { synthesis, now } = {}) {
           "All review items must be resolved or deferred before closing",
           "REVIEW_ITEMS_UNRESOLVED",
         );
+      }
+
+      let conclusion;
+      if (session.synthesisRequired) {
+        const checkpoint = session.synthesisCheckpoint;
+        if (!checkpoint || checkpoint.status !== "resolved" || !checkpoint.resolvedEvidenceId) {
+          throw new LearningError(
+            "A clean correct whole-system synthesis assessment is required before closing",
+            "SYNTHESIS_UNRESOLVED",
+          );
+        }
+        const synthesisAssessment = session.assessments.find(
+          (assessment) => assessment.id === checkpoint.resolvedEvidenceId,
+        );
+        if (
+          !synthesisAssessment ||
+          synthesisAssessment.stage !== "synthesis" ||
+          synthesisAssessment.kind !== "synthesis" ||
+          synthesisAssessment.grade !== "correct" ||
+          synthesisAssessment.contaminated
+        ) {
+          throw new LearningError(
+            "The resolved whole-system synthesis evidence is invalid",
+            "INVALID_SYNTHESIS_EVIDENCE",
+          );
+        }
+        conclusion = synthesisAssessment.answer;
+      } else {
+        conclusion = requireText(synthesis, "review synthesis");
       }
 
       let completed = 0;

@@ -66,7 +66,9 @@ function teaching() {
     foundation: "A linear map preserves vector addition and scalar multiplication.",
     motivation: "We need a scalar measurement that respects vector structure.",
     explanation: "A linear functional maps a vector to a scalar linearly.",
-    checkpointQuestion: "Apply the vector-to-scalar rule in a new setting.",
+    checkpointQuestionId: "teach-q1",
+    checkpointKind: "transfer",
+    checkpointQuestion: "What must a linear temperature sensitivity consume and produce?",
     now: "2026-08-24T08:04:00.000Z",
   });
 }
@@ -108,6 +110,22 @@ test("assessment stages and session kinds are explicit", () => {
   assert.throws(
     () => recordAssessment(afterValidProbe(), answer({ id: "late-probe" })),
     /probe assessments require the probe phase/i,
+  );
+});
+
+test("a teaching question identity is durable before its answer and cannot be replaced", () => {
+  const state = teaching();
+  const session = getActiveSession(state);
+  const step = session.steps.find((item) => item.id === "step-1");
+
+  assert.equal(step.checkpointQuestionId, "teach-q1");
+  assert.equal(step.checkpointKind, "transfer");
+  assert.equal(session.checkpoint.questionId, "teach-q1");
+  assert.equal(session.checkpoint.question, step.checkpointQuestion);
+  assert.equal(session.checkpoint.kind, "transfer");
+  assert.throws(
+    () => recordAssessment(state, teachingAttempt({ questionId: "replacement-q1" })),
+    (error) => error.code === "CHECKPOINT_IDENTITY_MISMATCH",
   );
 });
 
@@ -185,6 +203,8 @@ test("a second probe miss can enter the permitted teaching repair", () => {
     foundation: "The learner already recognizes vector addition.",
     motivation: "Vector addition alone cannot express scaling by field elements.",
     explanation: "Scalar multiplication supplies the missing operation.",
+    checkpointQuestionId: "repair-transfer-q1",
+    checkpointKind: "transfer",
     checkpointQuestion: "Transfer both operations to a new vector-space example.",
     now: "2026-08-24T08:04:00.000Z",
   });
@@ -248,18 +268,6 @@ test("a teaching checkpoint follows retry, teaching permission, and new transfer
   assert.equal(getActiveSession(state).checkpoint.status, "new-transfer-required");
 
   assert.throws(
-    () => recordStep(state, {
-      id: "step-2",
-      nodeId: "linear-functional",
-      foundation: "The prior step is not resolved.",
-      motivation: "This should not advance yet.",
-      explanation: "A new step would bypass required repair.",
-      checkpointQuestion: "This question must not open.",
-      now: "2026-08-24T08:07:00.000Z",
-    }),
-    /new transfer|required checkpoint/i,
-  );
-  assert.throws(
     () => recordAssessment(state, teachingAttempt({
       id: "teach-a3",
       grade: "correct",
@@ -267,8 +275,39 @@ test("a teaching checkpoint follows retry, teaching permission, and new transfer
       evidence: "Corrected the mapping only on the already-used question after teaching.",
       now: "2026-08-24T08:08:00.000Z",
     })),
-    /new transfer question/i,
+    (error) => ["CHECKPOINT_IDENTITY_MISMATCH", "NEW_TRANSFER_REQUIRED"].includes(error.code),
   );
+  assert.throws(
+    () => recordStep(state, {
+      id: "invalid-repair-step",
+      nodeId: "linear-functional",
+      foundation: "The prior question has already received two misses.",
+      motivation: "Repeating it would not provide new transfer evidence.",
+      explanation: "A replacement checkpoint must use a new question identity.",
+      checkpointQuestionId: "teach-q1",
+      checkpointKind: "transfer",
+      checkpointQuestion: "What must a linear temperature sensitivity consume and produce?",
+      now: "2026-08-24T08:07:00.000Z",
+    }),
+    (error) => error.code === "NEW_TRANSFER_REQUIRED",
+  );
+
+  state = recordStep(state, {
+    id: "repair-step-2",
+    nodeId: "linear-functional",
+    foundation: "The learner retains that a linear map preserves vector structure.",
+    motivation: "The prior attempts confused the output type, so the rule needs a new setting.",
+    explanation: "A linear functional consumes a vector and produces one scalar linearly.",
+    checkpointQuestionId: "teach-transfer-q1",
+    checkpointKind: "transfer",
+    checkpointQuestion: "In a pricing model, what does a linear sensitivity consume and produce?",
+    now: "2026-08-24T08:08:00.000Z",
+  });
+  let session = getActiveSession(state);
+  assert.equal(session.activeStepId, "repair-step-2");
+  assert.equal(session.checkpoint.status, "awaiting-answer");
+  assert.equal(session.checkpoint.questionId, "teach-transfer-q1");
+  assert.equal(session.checkpoint.priorQuestionId, "teach-q1");
 
   state = recordAssessment(state, teachingAttempt({
     id: "teach-a4",
@@ -279,7 +318,7 @@ test("a teaching checkpoint follows retry, teaching permission, and new transfer
     evidence: "Transferred the repaired vector-to-scalar rule to a new pricing setting.",
     now: "2026-08-24T08:09:00.000Z",
   }));
-  const session = getActiveSession(state);
+  session = getActiveSession(state);
   assert.equal(session.checkpoint.status, "resolved");
   assert.equal(session.checkpoint.resolvedEvidenceId, "teach-a4");
   assert.equal(session.activeStepId, null);

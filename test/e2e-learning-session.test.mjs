@@ -63,7 +63,9 @@ test("complete adaptive session persists evidence, retry state, review, and Obsi
     "--foundation", "A linear map preserves vector addition and scalar multiplication.",
     "--motivation", "We need an object that measures a directed displacement linearly.",
     "--explanation", "A covector consumes a vector and produces a scalar while preserving linear combinations.",
-    "--question", "What does this object consume and produce, and what law must it preserve?",
+    "--question-id", "teach-q1",
+    "--kind", "transfer",
+    "--question", "Describe a new linear displacement-measuring object.",
     "--now", at,
   ]);
   invoke(root, "record-assessment", [
@@ -108,8 +110,44 @@ test("complete adaptive session persists evidence, retry state, review, and Obsi
     "--verification", "Inspected labels, arrow direction, and consistency with the teaching explanation.",
     "--now", at,
   ]);
+  invoke(root, "record-step", [
+    "--id", "step-2",
+    "--node", "forms",
+    "--foundation", "A covector is a linear scalar-valued measurement of one vector.",
+    "--motivation", "We need measurements that consume several vectors with orientation.",
+    "--explanation", "A differential form generalizes the measurement to alternating multilinear inputs.",
+    "--question-id", "teach-forms-q1",
+    "--kind", "transfer",
+    "--question", "Describe an oriented area measurement on two displacement vectors.",
+    "--now", at,
+  ]);
+  invoke(root, "record-assessment", [
+    "--id", "teach-forms-a1",
+    "--question-id", "teach-forms-q1",
+    "--node", "forms",
+    "--stage", "teach",
+    "--kind", "transfer",
+    "--question", "Describe an oriented area measurement on two displacement vectors.",
+    "--answer", "It consumes two vectors, returns a scalar, is multilinear, and changes sign when inputs swap.",
+    "--grade", "correct",
+    "--evidence", "Transferred alternating multilinear scalar measurement to an unfamiliar area example.",
+    "--now", at,
+  ]);
+  invoke(root, "start-synthesis", [
+    "--question-id", "synthesis-q1",
+    "--question", "Connect vectors, covectors, and differential forms in one causal chain.",
+    "--now", at,
+  ]);
+  invoke(root, "record-synthesis", [
+    "--id", "synthesis-a1",
+    "--question-id", "synthesis-q1",
+    "--question", "Connect vectors, covectors, and differential forms in one causal chain.",
+    "--answer", "Vectors are inputs to covectors, whose scalar linear measurements generalize to alternating multilinear forms.",
+    "--grade", "correct",
+    "--evidence", "Connected all planned nodes and preserved their input, output, linearity, and alternation roles.",
+    "--now", at,
+  ]);
   invoke(root, "close", [
-    "--synthesis", "Vectors are inputs to covectors, whose scalar linear measurements are generalized by forms.",
     "--gap", "Alternating multilinearity still needs a later teaching step.",
     "--now", at,
   ]);
@@ -130,7 +168,9 @@ test("complete adaptive session persists evidence, retry state, review, and Obsi
     .find((concept) => concept.key === "covectors");
   const review = state.reviews[covectors.reviewId];
   assert.equal(session.phase, "complete");
-  assert.equal(session.assessments.length, 3);
+  assert.equal(session.assessments.length, 5);
+  assert.equal(session.synthesisCheckpoint.resolvedEvidenceId, "synthesis-a1");
+  assert.match(session.synthesis, /generalize to alternating multilinear forms/);
   assert.equal(covectors.retry, null);
   assert.equal(review.level, 1);
   assert.equal(session.sources[0].verification.includes("independent"), true);

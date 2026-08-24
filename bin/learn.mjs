@@ -29,6 +29,10 @@ import {
   startReviewSession,
 } from "../src/reviews.mjs";
 import { initializeStore, readState } from "../src/store.mjs";
+import {
+  recordSynthesisAssessment,
+  startSynthesis,
+} from "../src/synthesis.mjs";
 
 const packageJson = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 const PRODUCT_VERSION = packageJson.version;
@@ -43,6 +47,8 @@ const commands = [
   ["begin-teach", "Begin one-step-at-a-time teaching"],
   ["record-step", "Record one motivated teaching step"],
   ["record-assessment", "Record a checkpoint or retention result"],
+  ["start-synthesis", "Persist the whole-system synthesis question"],
+  ["record-synthesis", "Record the whole-system synthesis assessment"],
   ["add-visual", "Attach a verified visual artifact"],
   ["doctor", "Diagnose runtime, state, backup, vault, and host discovery"],
   ["backup", "Create a checksummed canonical-state snapshot"],
@@ -55,7 +61,7 @@ const commands = [
   ["start-review", "Claim due items and start a retention review"],
   ["defer-review", "Explicitly defer one selected review item"],
   ["close-review", "Close a resolved retention review"],
-  ["close", "Close the active session with a synthesis"],
+  ["close", "Close the active session from resolved synthesis evidence"],
 ];
 
 const GLOBAL_OPTIONS = ["root", "json", "now", "help"];
@@ -78,13 +84,33 @@ const COMMAND_OPTIONS = {
   "add-source": ["id", "title", "url", "source-class", "supports", "verification"],
   "set-plan": ["file"],
   "begin-teach": [],
-  "record-step": ["id", "node", "foundation", "motivation", "explanation", "question"],
+  "record-step": [
+    "id",
+    "node",
+    "foundation",
+    "motivation",
+    "explanation",
+    "question-id",
+    "kind",
+    "question",
+  ],
   "record-assessment": [
     "id",
     "question-id",
     "node",
     "stage",
     "kind",
+    "question",
+    "answer",
+    "grade",
+    "evidence",
+    "mistake-type",
+    "contaminated",
+  ],
+  "start-synthesis": ["question-id", "question"],
+  "record-synthesis": [
+    "id",
+    "question-id",
     "question",
     "answer",
     "grade",
@@ -104,7 +130,7 @@ const COMMAND_OPTIONS = {
   "start-review": ["id", "review"],
   "defer-review": ["review", "reason", "until"],
   "close-review": ["synthesis"],
-  close: ["synthesis", "gap"],
+  close: ["gap"],
 };
 const BOOLEAN_OPTIONS = new Set(["json", "contaminated", "help", "check"]);
 const REPEATABLE_OPTIONS = {
@@ -278,6 +304,7 @@ function statusFor(state) {
           activeStepId: session.activeStepId ?? null,
           retry: retryList(state, session),
           synthesisRequired: session.synthesisRequired ?? false,
+          synthesisCheckpoint: session.synthesisCheckpoint ?? null,
           reviewItems: (session.reviewItems ?? []).map((item) => ({
             reviewId: item.reviewId,
             conceptId: item.conceptId,
@@ -427,12 +454,34 @@ function commandResult(command, options, root) {
       foundation: last(options, "foundation"),
       motivation: last(options, "motivation"),
       explanation: last(options, "explanation"),
+      checkpointQuestionId: last(options, "question-id"),
+      checkpointKind: last(options, "kind"),
       checkpointQuestion: last(options, "question"),
       now: last(options, "now"),
       });
     }
     if (command === "record-assessment") {
       return recordAssessment(current, assessmentInput(options));
+    }
+    if (command === "start-synthesis") {
+      return startSynthesis(current, {
+        questionId: last(options, "question-id"),
+        question: last(options, "question"),
+        now: last(options, "now"),
+      });
+    }
+    if (command === "record-synthesis") {
+      return recordSynthesisAssessment(current, {
+        id: last(options, "id"),
+        questionId: last(options, "question-id"),
+        question: last(options, "question"),
+        answer: last(options, "answer"),
+        grade: last(options, "grade"),
+        evidence: last(options, "evidence"),
+        mistakeType: last(options, "mistake-type"),
+        contaminated: options.contaminated === true,
+        now: last(options, "now"),
+      });
     }
     if (command === "add-visual") {
       const inspected = inspectVisual(root, current, last(options, "path"));
@@ -460,7 +509,6 @@ function commandResult(command, options, root) {
     }
     if (command === "close") {
       return closeSession(current, {
-      synthesis: last(options, "synthesis"),
       unresolvedGaps: all(options, "gap"),
       now: last(options, "now"),
       });

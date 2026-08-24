@@ -255,6 +255,20 @@ export function recordAssessment(state, input) {
         if (step.nodeId !== assessment.nodeId) {
           throw new LearningError("Assessment node must match the active teaching step", "NODE_MISMATCH");
         }
+        if (
+          step.checkpointQuestionId !== undefined &&
+          step.checkpointQuestionId !== null &&
+          (
+            assessment.questionId !== step.checkpointQuestionId ||
+            assessment.question !== step.checkpointQuestion ||
+            assessment.kind !== step.checkpointKind
+          )
+        ) {
+          throw new LearningError(
+            `Teaching answer must preserve checkpoint question ${step.checkpointQuestionId} exactly`,
+            "CHECKPOINT_IDENTITY_MISMATCH",
+          );
+        }
       }
 
       const pendingConcept = unresolvedRetry(next, session);

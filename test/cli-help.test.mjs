@@ -24,6 +24,8 @@ test("help lists the complete learning-session lifecycle", () => {
     "begin-teach",
     "record-step",
     "record-assessment",
+    "start-synthesis",
+    "record-synthesis",
     "add-visual",
     "doctor",
     "backup",
@@ -98,7 +100,7 @@ test("commands reject unknown options and duplicate scalar options", () => {
 
   const repeatable = spawnSync(
     process.execPath,
-    [cli, "close", "--root", root, "--gap", "one", "--gap", "two", "--synthesis", "x"],
+    [cli, "close", "--root", root, "--gap", "one", "--gap", "two"],
     { cwd: repoRoot, encoding: "utf8" },
   );
   assert.equal(repeatable.status, 1);

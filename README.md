@@ -94,10 +94,12 @@ npm test
 
 The full lifecycle is `init`, `start`, `record-probe`, `finish-probe`,
 `add-source`, `set-plan`, `begin-teach`, `record-step`, `record-assessment`,
-`add-visual`, `status`, `context`, `due`, `start-review`, `defer-review`,
-`close-review`, and `close`. Operational commands are `doctor`, `backup`,
-`restore --check`, `repair-render`, and `export`. Complete learning examples
-are in the shared skill's `references/cli-reference.md`.
+`start-synthesis`, `record-synthesis`, `add-visual`, `status`, `context`, `due`,
+`start-review`, `defer-review`, `close-review`, and `close`. Teaching and
+synthesis question identities are persisted before answers are accepted.
+Operational commands are `doctor`, `backup`, `restore --check`,
+`repair-render`, and `export`. Complete learning examples are in the shared
+skill's `references/cli-reference.md`.
 
 ## Persistence and safety
 

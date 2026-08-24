@@ -40,8 +40,9 @@ The learner supplies the learning target; do not silently replace or broaden it.
 - Begin from unconditional foundations, definitions and invariants already
   justified by evidence.
 - Motivate every step as a discovery forced by a concrete problem.
-- Teach one reasoning step at a time. Record its foundation, motivation,
-  explanation, and checkpoint.
+- Teach one reasoning step at a time. Before presenting its checkpoint, persist
+  the foundation, motivation, explanation, question ID, question text, and
+  kind with `record-step`.
 - Resolve that checkpoint before advancing to another step.
 
 ### Assessment and repair
@@ -55,6 +56,9 @@ The learner supplies the learning target; do not silently replace or broaden it.
 - When canonical state requires a retry, reuse the exact persisted question,
   question ID, node, and kind. Never place a different question under the old
   identity to satisfy the retry gate.
+- After a second miss permits teaching, teach the missing mechanism and persist
+  the replacement transfer as a repair `record-step` with a new question ID,
+  exact question text, and kind before asking for or accepting its answer.
 - If an answer leaks, mark the question contaminated, discard it as evidence,
   and use a new transfer question or task.
 - Prefer own-words explanation, prediction, transfer, reconstruction, and
@@ -72,10 +76,15 @@ The learner supplies the learning target; do not silently replace or broaden it.
 - Run `close-review` only after every selected item is resolved or explicitly
   deferred. A review count and next interval advance only through this closed
   lifecycle, never from merely viewing the queue.
-- Periodically require a whole-system synthesis that reconnects detailed
-  mechanisms to the complete model.
-- Close with the learner's demonstrated synthesis, explicit unresolved gaps,
-  and scheduled reviews. Never translate a schedule into a mastery claim.
+- When context says synthesis is required, run `start-synthesis` before asking
+  the whole-system question, then persist the assessment with
+  `record-synthesis`. This applies to learning sessions and required review
+  syntheses.
+- Run `close` or `close-review` only after the required synthesis resolves.
+  Close derives the demonstrated synthesis only from a clean correct
+  assessment; arbitrary prose passed at close cannot replace it.
+- Close with explicit unresolved gaps and scheduled reviews. Never translate a
+  schedule into a mastery claim.
 
 ## Research and visual boundary
 
@@ -91,6 +100,9 @@ verification. Mermaid is the default for the dependency graph.
 ## Persistence invariant
 
 Record every state change through the CLI immediately after it happens in the
-conversation. Never claim that a probe, source, plan, step, assessment, visual,
-or review was persisted until the command succeeds. If recording fails, keep
-the conversational claim bounded and repair persistence before advancing.
+conversation. Teaching checkpoints and whole-system synthesis questions are
+state changes: persist their identity before the learner answers, not inside
+the later assessment. Never claim that a probe, source, plan, step, checkpoint,
+assessment, synthesis, visual, or review was persisted until the command
+succeeds. If recording fails, keep the conversational claim bounded and repair
+persistence before advancing.

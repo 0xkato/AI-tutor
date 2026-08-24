@@ -160,11 +160,28 @@ export function renderSessionNote(state, session) {
     lines.push("No visuals recorded.", "");
   }
 
+  lines.push("## Whole-system synthesis", "");
+  if (session.synthesis) {
+    lines.push(plainParagraph(session.synthesis), "");
+  } else if (session.synthesisCheckpoint) {
+    const checkpoint = session.synthesisCheckpoint;
+    lines.push(
+      "### Synthesis checkpoint",
+      "",
+      `- **Status:** ${listValue(titleCase(checkpoint.status.replaceAll("-", " ")))}`,
+      `- **Question ID:** ${inlineCode(checkpoint.questionId)}`,
+      `- **Question:** ${listValue(checkpoint.question)}`,
+      `- **Attempts:** ${listValue(checkpoint.attempts)}`,
+      `- **Prior question ID:** ${checkpoint.priorQuestionId ? inlineCode(checkpoint.priorQuestionId) : "None"}`,
+      `- **Resolved evidence:** ${checkpoint.resolvedEvidenceId ? inlineCode(checkpoint.resolvedEvidenceId) : "None"}`,
+      `- **Mistake type:** ${listValue(checkpoint.mistakeType || "None")}`,
+      "",
+    );
+  } else {
+    lines.push("Not completed yet.", "");
+  }
+
   lines.push(
-    "## Whole-system synthesis",
-    "",
-    plainParagraph(session.synthesis, "Not completed yet."),
-    "",
     "## Unresolved gaps",
     "",
     list(session.unresolvedGaps),

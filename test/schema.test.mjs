@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createInitialState } from "../src/model.mjs";
+import { createInitialState, startSession } from "../src/model.mjs";
 import { parseInstant, validateState } from "../src/schema.mjs";
 
 const NOW = "2026-08-24T08:00:00.000Z";
@@ -28,6 +28,23 @@ test("validateState accepts and clones a complete version-2 initial state", () =
   assert.deepEqual(validated, state);
   assert.notEqual(validated, state);
   assert.equal(validated.schemaVersion, 2);
+});
+
+test("validateState additively upgrades version-2 sessions created before synthesis checkpoints", () => {
+  let state = createInitialState({ now: NOW });
+  state = startSession(state, {
+    id: "legacy-v2-session",
+    topicId: "legacy-v2-topic",
+    topic: "Durable recovery",
+    target: "Explain recovery from durable state",
+    now: NOW,
+  });
+  delete state.sessions["legacy-v2-session"].synthesisRequired;
+  delete state.sessions["legacy-v2-session"].synthesisCheckpoint;
+
+  const validated = validateState(state);
+  assert.equal(validated.sessions["legacy-v2-session"].synthesisRequired, false);
+  assert.equal(validated.sessions["legacy-v2-session"].synthesisCheckpoint, null);
 });
 
 test("validateState rejects structurally incomplete version-2 state", () => {

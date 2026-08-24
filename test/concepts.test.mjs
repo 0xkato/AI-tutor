@@ -12,10 +12,15 @@ import {
   createInitialState,
   finishProbe,
   getActiveSession,
+  recordStep,
   setPlan,
   startSession,
 } from "../src/model.mjs";
 import { renderVault } from "../src/render.mjs";
+import {
+  recordSynthesisAssessment,
+  startSynthesis,
+} from "../src/synthesis.mjs";
 
 const NOW = "2026-08-24T08:00:00.000Z";
 const LATER = "2026-08-25T08:00:00.000Z";
@@ -72,8 +77,44 @@ function closeValidSession(state, now) {
     now,
   });
   next = beginTeach(next, { now });
+  next = recordStep(next, {
+    id: `${sessionId}-close-step`,
+    nodeId: targetNodeId,
+    foundation: "Local evidence identifies which nearby changes improve the objective.",
+    motivation: "The remaining target must be demonstrated before the session can close.",
+    explanation: "A descent update uses the negative local gradient direction.",
+    checkpointQuestionId: `${sessionId}-close-transfer-question`,
+    checkpointKind: "transfer",
+    checkpointQuestion: "Which local direction should a new optimizer use to reduce its objective?",
+    now,
+  });
+  next = recordAssessment(next, {
+    id: `${sessionId}-close-transfer`,
+    questionId: `${sessionId}-close-transfer-question`,
+    nodeId: targetNodeId,
+    stage: "teach",
+    kind: "transfer",
+    question: "Which local direction should a new optimizer use to reduce its objective?",
+    answer: "It should update opposite the local gradient.",
+    grade: "correct",
+    evidence: "Transferred the local gradient direction into a new optimizer setting.",
+    now,
+  });
+  next = startSynthesis(next, {
+    questionId: `${sessionId}-close-synthesis-question`,
+    question: "Connect local slope evidence to the optimizer's update direction.",
+    now,
+  });
+  next = recordSynthesisAssessment(next, {
+    id: `${sessionId}-close-synthesis`,
+    questionId: `${sessionId}-close-synthesis-question`,
+    question: "Connect local slope evidence to the optimizer's update direction.",
+    answer: "The gradient gives the local increase direction, so descent updates in the opposite direction.",
+    grade: "correct",
+    evidence: "Connected the meaning of the local gradient to the sign of the descent update.",
+    now,
+  });
   return closeSession(next, {
-    synthesis: "Gradient descent uses local slope evidence to choose an update direction.",
     now,
   });
 }

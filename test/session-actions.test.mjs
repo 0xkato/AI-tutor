@@ -15,6 +15,10 @@ import {
   setPlan,
   startSession,
 } from "../src/model.mjs";
+import {
+  recordSynthesisAssessment,
+  startSynthesis,
+} from "../src/synthesis.mjs";
 
 const now = "2026-08-24T08:00:00.000Z";
 
@@ -108,6 +112,8 @@ test("only one teaching step may remain unresolved", () => {
     foundation: "A linear map preserves vector addition and scalar multiplication.",
     motivation: "We need an object that measures a directed displacement.",
     explanation: "A covector is a linear map from vectors to scalars.",
+    checkpointQuestionId: "step-1-q1",
+    checkpointKind: "transfer",
     checkpointQuestion: "What does a covector consume and produce?",
     now,
   });
@@ -119,6 +125,8 @@ test("only one teaching step may remain unresolved", () => {
       foundation: "Alternation is already defined.",
       motivation: "We need oriented area measurements.",
       explanation: "A two-form consumes two vectors.",
+      checkpointQuestionId: "step-2-q1",
+      checkpointKind: "transfer",
       checkpointQuestion: "What does a two-form consume?",
       now,
     }),
@@ -135,7 +143,9 @@ test("a successful transfer resolves the step and schedules retention", () => {
     foundation: "A linear map preserves the two vector-space operations.",
     motivation: "We need a linear measurement of displacement.",
     explanation: "A covector maps a vector to a scalar linearly.",
-    checkpointQuestion: "Apply that definition to a new vector measurement.",
+    checkpointQuestionId: "teach-q1",
+    checkpointKind: "transfer",
+    checkpointQuestion: "What must a new displacement-measuring object consume and produce?",
     now,
   });
   state = recordAssessment(state, {
@@ -178,17 +188,60 @@ test("visuals stay inside the vault and require inspection evidence", () => {
   assert.equal(getActiveSession(next).visuals[0].path, "Assets/covector.svg");
 });
 
-test("closeSession persists synthesis and releases the active session", () => {
-  let state = setPlan(planned(), { plan: dependencyPlan(), now });
+test("closeSession persists assessed synthesis and releases the active session", () => {
+  let state = setPlan(planned(), {
+    plan: {
+      targetNodeId: "forms",
+      nodes: [{ id: "forms", title: "Differential forms" }],
+      edges: [],
+    },
+    now,
+  });
   state = beginTeach(state, { now });
+  state = recordStep(state, {
+    id: "step-close",
+    nodeId: "forms",
+    foundation: "A differential form is an alternating multilinear measurement.",
+    motivation: "We need a coordinate-independent way to measure oriented infinitesimal inputs.",
+    explanation: "A form consumes tangent vectors and returns a scalar multilinearly and alternately.",
+    checkpointQuestionId: "teach-close-q1",
+    checkpointKind: "transfer",
+    checkpointQuestion: "What must an oriented area measurement consume and produce?",
+    now,
+  });
+  state = recordAssessment(state, {
+    id: "teach-close-a1",
+    questionId: "teach-close-q1",
+    nodeId: "forms",
+    stage: "teach",
+    kind: "transfer",
+    question: "What must an oriented area measurement consume and produce?",
+    answer: "It consumes two tangent vectors and produces a scalar alternately and bilinearly.",
+    grade: "correct",
+    evidence: "Transferred the form input-output model to a new oriented area measurement.",
+    now,
+  });
+  state = startSynthesis(state, {
+    questionId: "synthesis-close-q1",
+    question: "Connect vectors, covector-like measurement, and differential forms.",
+    now,
+  });
+  state = recordSynthesisAssessment(state, {
+    id: "synthesis-close-a1",
+    questionId: "synthesis-close-q1",
+    question: "Connect vectors, covector-like measurement, and differential forms.",
+    answer: "Vectors provide inputs, linear scalar measurements motivate covectors, and forms generalize those measurements multilinearly and alternately.",
+    grade: "correct",
+    evidence: "Connected the input space, scalar measurement role, and multilinear alternating generalization.",
+    now,
+  });
   state = closeSession(state, {
-    synthesis: "Vectors support covectors, which provide the linear measurements generalized by forms.",
     unresolvedGaps: ["Exterior derivatives have not been covered."],
     now,
   });
 
   assert.equal(state.activeSessionId, null);
   assert.equal(state.sessions.s1.phase, "complete");
-  assert.match(state.sessions.s1.synthesis, /linear measurements/);
+  assert.match(state.sessions.s1.synthesis, /linear scalar measurements/);
   assert.deepEqual(state.sessions.s1.unresolvedGaps, ["Exterior derivatives have not been covered."]);
 });
