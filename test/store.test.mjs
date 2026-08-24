@@ -43,7 +43,10 @@ test("writeState atomically replaces state and leaves no temporary file", () => 
 
   assert.equal(readState(root).settings.vaultDir, "Learning Vault");
   const paths = pathsFor(root);
-  assert.equal(fs.existsSync(paths.tempState), false);
+  assert.deepEqual(
+    fs.readdirSync(paths.dataDir).filter((name) => name.startsWith("state.json.tmp-")),
+    [],
+  );
   assert.equal(fs.existsSync(paths.lock), false);
 });
 
