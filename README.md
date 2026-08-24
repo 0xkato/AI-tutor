@@ -6,6 +6,21 @@ a time, schedules retention, and renders every session into an Obsidian vault.
 
 The implementation is dependency-free and requires Node.js 20 or newer.
 
+## Install and verify
+
+From a fresh clone on macOS:
+
+```bash
+npm run setup
+npm run doctor -- --json
+```
+
+Setup validates the runtime and host-discovery files, creates protected local
+state, renders the initial Obsidian view, and prints the exact Codex and Pi next
+steps. The release matrix is Node.js 20 and 22. Newer Node versions may satisfy
+the minimum runtime check but are outside that qualified matrix until CI covers
+them.
+
 ## What the learner does
 
 State the understanding you want. The agent owns the rest of the workflow:
@@ -50,10 +65,10 @@ was tested locally.
 
 ## Open the Obsidian view
 
-After the first session begins, open this folder as an Obsidian vault:
+After setup, open this repository-relative folder as an Obsidian vault:
 
 ```text
-/Users/0xkato/Desktop/Hobby/adaptive-learning-agent/vault
+vault/
 ```
 
 The vault contains:
@@ -79,8 +94,10 @@ npm test
 
 The full lifecycle is `init`, `start`, `record-probe`, `finish-probe`,
 `add-source`, `set-plan`, `begin-teach`, `record-step`, `record-assessment`,
-`add-visual`, `status`, `context`, `due`, and `close`. Complete examples are in
-the shared skill's `references/cli-reference.md`.
+`add-visual`, `status`, `context`, `due`, `start-review`, `defer-review`,
+`close-review`, and `close`. Operational commands are `doctor`, `backup`,
+`restore --check`, `repair-render`, and `export`. Complete learning examples
+are in the shared skill's `references/cli-reference.md`.
 
 ## Persistence and safety
 
@@ -89,6 +106,20 @@ the shared skill's `references/cli-reference.md`.
   concurrent Codex/Pi processes cannot silently overwrite one another.
 - Visual paths must remain inside the vault and require recorded inspection.
 - The engine stores no model API keys or network credentials.
+- The engine sends no telemetry and performs no source fetching.
+
+## Operate and recover
+
+- [Quickstart](docs/operator/quickstart.md)
+- [Recovery and backups](docs/operator/recovery.md)
+- [Privacy boundary](docs/operator/privacy.md)
+- [State and export format](docs/operator/state-format.md)
+
+Before distributing a release, run:
+
+```bash
+npm run release-check
+```
 
 ## Claim boundary
 

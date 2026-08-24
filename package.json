@@ -8,6 +8,9 @@
     "adaptive-learn": "./bin/learn.mjs"
   },
   "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "doctor": "node bin/learn.mjs doctor",
+    "release-check": "node scripts/release-check.mjs",
     "test": "node --test test/*.test.mjs",
     "check": "node --check bin/learn.mjs"
   },

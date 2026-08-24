@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { LearningError } from "./errors.mjs";
-import { validateState } from "./schema.mjs";
+import { parseInstant, validateState } from "./schema.mjs";
 import { pathsFor, readState } from "./store.mjs";
 
 const BACKUP_FORMAT_VERSION = 1;
@@ -68,7 +68,9 @@ function validateManifest(manifest, expectedId) {
   ) {
     throw new LearningError(`Backup manifest is invalid: ${expectedId}`, "INVALID_BACKUP");
   }
-  if (Number.isNaN(Date.parse(manifest.createdAt))) {
+  try {
+    parseInstant(manifest.createdAt, "backup createdAt");
+  } catch {
     throw new LearningError(`Backup manifest has an invalid timestamp: ${expectedId}`, "INVALID_BACKUP");
   }
   return manifest;
@@ -76,7 +78,8 @@ function validateManifest(manifest, expectedId) {
 
 export function createBackup(root, { id, now } = {}) {
   const paths = pathsFor(root);
-  const backupId = validateBackupId(id ?? `backup-${new Date(now ?? Date.now()).toISOString().replace(/[:.]/g, "-")}`);
+  const createdAt = parseInstant(now ?? new Date().toISOString(), "backup time");
+  const backupId = validateBackupId(id ?? `backup-${createdAt.replace(/[:.]/g, "-")}`);
   const destination = path.join(paths.backups, backupId);
   ensureDirectory(paths.backups);
   if (fs.existsSync(destination)) {
@@ -88,7 +91,7 @@ export function createBackup(root, { id, now } = {}) {
   const manifest = {
     formatVersion: BACKUP_FORMAT_VERSION,
     id: backupId,
-    createdAt: new Date(now ?? Date.now()).toISOString(),
+    createdAt,
     schemaVersion: state.schemaVersion,
     revision: state.revision,
     stateFile: "state.json",

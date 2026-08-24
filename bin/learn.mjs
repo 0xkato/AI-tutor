@@ -4,8 +4,11 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { recordAssessment } from "../src/assessment.mjs";
+import { checkBackup, createBackup } from "../src/backup.mjs";
 import { knowledgeForSession } from "../src/concepts.mjs";
+import { doctor } from "../src/doctor.mjs";
 import { LearningError } from "../src/errors.mjs";
+import { exportLearnerRecord } from "../src/export.mjs";
 import { inspectVisual } from "../src/inputs.mjs";
 import {
   addSource,
@@ -41,6 +44,10 @@ const commands = [
   ["record-step", "Record one motivated teaching step"],
   ["record-assessment", "Record a checkpoint or retention result"],
   ["add-visual", "Attach a verified visual artifact"],
+  ["doctor", "Diagnose runtime, state, backup, vault, and host discovery"],
+  ["backup", "Create a checksummed canonical-state snapshot"],
+  ["restore", "Validate a backup before any manual restoration"],
+  ["export", "Create a deterministic portable learner record"],
   ["repair-render", "Reconcile the Obsidian projection with canonical state"],
   ["status", "Show the active session"],
   ["context", "Print runner-ready durable context"],
@@ -86,6 +93,10 @@ const COMMAND_OPTIONS = {
     "contaminated",
   ],
   "add-visual": ["id", "path", "description", "verification"],
+  doctor: [],
+  backup: ["id"],
+  restore: ["backup", "check"],
+  export: ["output"],
   "repair-render": [],
   status: [],
   context: [],
@@ -95,7 +106,7 @@ const COMMAND_OPTIONS = {
   "close-review": ["synthesis"],
   close: ["synthesis", "gap"],
 };
-const BOOLEAN_OPTIONS = new Set(["json", "contaminated", "help"]);
+const BOOLEAN_OPTIONS = new Set(["json", "contaminated", "help", "check"]);
 const REPEATABLE_OPTIONS = {
   start: new Set(["reuse-concept"]),
   "start-review": new Set(["review"]),
@@ -135,6 +146,9 @@ const OPTION_DESCRIPTIONS = {
   explanation: "Teaching explanation",
   path: "Relative visual path inside the vault",
   description: "Visual description",
+  backup: "Backup identifier",
+  check: "Validate only; never mutate canonical state",
+  output: "New export directory",
   review: "Review identifier (repeatable for start-review)",
   reason: "Deferral reason",
   until: "Canonical ISO-8601 deferral time",
@@ -323,6 +337,21 @@ function commandResult(command, options, root) {
       };
     }
     return statusFor(initial);
+  }
+
+  if (command === "doctor") return doctor(root);
+  if (command === "backup") {
+    return createBackup(root, { id: last(options, "id"), now: last(options, "now") });
+  }
+  if (command === "restore") {
+    if (options.check !== true) {
+      throw new LearningError("restore requires --check; automatic restoration is not enabled", "RESTORE_CHECK_REQUIRED");
+    }
+    const checked = checkBackup(root, last(options, "backup"));
+    return { valid: checked.valid, id: checked.id, manifest: checked.manifest };
+  }
+  if (command === "export") {
+    return exportLearnerRecord(root, last(options, "output"));
   }
 
   const state = readState(root);
