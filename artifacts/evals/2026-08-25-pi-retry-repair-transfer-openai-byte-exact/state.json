@@ -1,0 +1,738 @@
+{
+  "schemaVersion": 2,
+  "revision": 32,
+  "createdAt": "2026-08-24T20:06:22.355Z",
+  "updatedAt": "2026-08-25T21:00:00.000Z",
+  "activeSessionId": null,
+  "settings": {
+    "vaultDir": "vault"
+  },
+  "sessions": {
+    "e89f7607-ce37-41c5-aca2-b351d5dadd43": {
+      "id": "e89f7607-ce37-41c5-aca2-b351d5dadd43",
+      "kind": "learn",
+      "topic": "Browser-to-database request and response flow",
+      "topicId": "80e05890-7d09-41ac-89c3-a76b770d712f",
+      "target": "Explain how a browser action becomes a durable database change and returns a visible response.",
+      "learnerContext": "The learner can use a web application but cannot yet place client, server, request, response, and database roles. The initial probe must locate the client-server and persistence branches.",
+      "phase": "complete",
+      "createdAt": "2026-08-24T20:06:31.248Z",
+      "updatedAt": "2026-08-24T20:26:04.361Z",
+      "completedAt": "2026-08-24T20:26:04.361Z",
+      "probeSummary": "Demonstrated: the learner recognizes that the browser can change what is visible on the current page. Fragile: 'probably saves it somewhere online' does not place or connect any mechanism. Missing by explicit admission: the request-server-response round trip and the durable persistence mechanism that survives a later visit. Not yet checked: transfer of these roles to a new scenario; the admitted mechanisms must be taught before testing.",
+      "admittedGaps": [
+        {
+          "id": "gap-client-server-roles",
+          "nodeId": "client-server-round-trip",
+          "conceptId": "64f3c397-177f-494c-bb5a-d0cbe31a8338",
+          "statement": "I do not know what the request, response, or server do.",
+          "evidence": "The learner explicitly states that the request, response, and server roles in the browser-to-server round trip are unknown.",
+          "createdAt": "2026-08-24T20:12:07.484Z"
+        },
+        {
+          "id": "gap-durable-persistence",
+          "nodeId": "durable-database-persistence",
+          "conceptId": "070ed97a-2039-49b7-a9c4-49772e380f05",
+          "statement": "I do not know which part makes the name still be Bea when I return tomorrow.",
+          "evidence": "The learner explicitly states that the mechanism making the changed name survive a later visit is unknown.",
+          "createdAt": "2026-08-24T20:12:11.372Z"
+        }
+      ],
+      "assessments": [
+        {
+          "id": "3da5033c-9078-4c2c-a115-e1470ee3f473",
+          "questionId": "teach-client-request-q1",
+          "nodeId": "client-request",
+          "stage": "teach",
+          "kind": "transfer",
+          "question": "Suppose a checkout page sends a newly entered shipping address from the browser to the web application's remote side. What role is the browser playing, what is the outgoing message called, and in which direction does that message travel?",
+          "answer": "The browser is the client. The outgoing message is a request, and it travels from the browser client to the remote server.",
+          "grade": "correct",
+          "evidence": "The learner correctly identifies the browser as the client, names the outgoing message as a request, and gives its direction from the browser client to the remote server.",
+          "mistakeType": "",
+          "contaminated": false,
+          "conceptId": "e3e49866-0ab5-4d11-a8f2-90cc28db3eb2",
+          "createdAt": "2026-08-24T20:16:22.851Z"
+        },
+        {
+          "id": "d91f0aa7-bf92-47b0-8cfd-39c8fa417fb6",
+          "questionId": "teach-server-processing-q1",
+          "nodeId": "server-processing",
+          "stage": "teach",
+          "kind": "transfer",
+          "question": "A library website's browser sends a request that says 'renew loan 42'. Before any database write or response is considered, which component receives and interprets that request, and what is that component's job at this point?",
+          "answer": "The server receives and interprets the 'renew loan 42' request. Its job at this point is to run the application's logic for the requested renewal or coordinate that operation; the request is its input.",
+          "grade": "correct",
+          "evidence": "The learner correctly identifies the server as the receiving and interpreting component, explains that it runs or coordinates the application's requested operation, and distinguishes the request as the server's input.",
+          "mistakeType": "",
+          "contaminated": false,
+          "conceptId": "da91183b-6006-4328-8362-4e6159ca88c8",
+          "createdAt": "2026-08-24T20:17:19.809Z"
+        },
+        {
+          "id": "0f7a5f77-bb36-4c75-acb6-0ae2a10d8364",
+          "questionId": "teach-durable-persistence-q1",
+          "nodeId": "durable-database-persistence",
+          "stage": "teach",
+          "kind": "debugging",
+          "question": "A profile server receives 'change timezone to UTC' and updates only a temporary in-memory variable. After the server restarts, the old timezone returns. In this browser-server-database model, what missing database event caused the failure to persist, and what would that event have guaranteed?",
+          "answer": "The missing event was a database write being committed. A commit would have made the new UTC value durable beyond temporary server memory, so it would still be stored after the server restarted and available on a later request.",
+          "grade": "correct",
+          "evidence": "The learner correctly identifies a committed database write as the missing persistence event and explains durability as survival beyond temporary server memory, across restart, and into later requests.",
+          "mistakeType": "",
+          "contaminated": false,
+          "conceptId": "070ed97a-2039-49b7-a9c4-49772e380f05",
+          "createdAt": "2026-08-24T20:18:23.109Z"
+        },
+        {
+          "id": "334c6517-9716-412a-bb81-18e360b668bb",
+          "questionId": "teach-server-response-q1",
+          "nodeId": "server-response",
+          "stage": "teach",
+          "kind": "transfer",
+          "question": "An online store's server has processed 'add item to wishlist' and now sends a message containing status 'saved' and the updated item back to the browser. What is this returning message called, which component sends it, and in which direction does it travel?",
+          "answer": "It is a response. The server sends it back to the browser client, so it travels from server to client and carries the saved outcome and updated item.",
+          "grade": "correct",
+          "evidence": "The learner correctly names the returning message as a response, identifies the server as sender and browser client as recipient, gives the server-to-client direction, and recognizes that it carries the operation's outcome and returned data.",
+          "mistakeType": "",
+          "contaminated": false,
+          "conceptId": "f5f4df1c-1290-40b5-afc9-2092bc1a93a7",
+          "createdAt": "2026-08-24T20:19:16.416Z"
+        },
+        {
+          "id": "fbf894f3-31e3-4ccc-833d-5efbf44cb296",
+          "questionId": "teach-client-server-round-trip-q1",
+          "nodeId": "client-server-round-trip",
+          "stage": "teach",
+          "kind": "reconstruction",
+          "question": "A travel app's browser asks to cancel booking 73, and the server later returns status 'cancelled'. Reconstruct the client-server round trip in order using the browser client, request, server, and response, and state the direction of both messages; leave the database branch out of this answer.",
+          "answer": "The browser is the client. It sends a cancellation request to the server, so the request travels client to server. The server receives and handles the request. It then sends a response with status cancelled back to the browser, so the response travels server to client.",
+          "grade": "correct",
+          "evidence": "The learner reconstructs the complete round trip in causal order: browser as client, request from client to server, server handling, and response from server back to client.",
+          "mistakeType": "",
+          "contaminated": false,
+          "conceptId": "64f3c397-177f-494c-bb5a-d0cbe31a8338",
+          "createdAt": "2026-08-24T20:23:02.380Z"
+        },
+        {
+          "id": "494a845b-1f32-44a6-a25c-e4039cae0036",
+          "questionId": "teach-visible-response-q1",
+          "nodeId": "visible-response-update",
+          "stage": "teach",
+          "kind": "debugging",
+          "question": "A settings page sends a theme-change request, the server commits the new dark theme, and the response containing 'saved: dark' reaches the browser; however, the page still displays the old light theme because the browser code ignores the response. Which step is missing between response arrival and visible confirmation, and which component must perform it?",
+          "answer": "The missing step is the browser-side client code reading the response and updating or rendering the displayed page with the returned dark-theme state. The browser client must perform that visible UI update. The database commit already made the state durable; the response-driven rendering makes it visible.",
+          "grade": "correct",
+          "evidence": "The learner correctly identifies browser-side response interpretation and rendering as the missing visible-update step, assigns it to the browser client, and clearly distinguishes database durability from response-driven visibility.",
+          "mistakeType": "",
+          "contaminated": false,
+          "conceptId": "4ee4326d-3f26-4a17-a1fd-7c1d8524b05f",
+          "createdAt": "2026-08-24T20:24:00.547Z"
+        },
+        {
+          "id": "0126bb84-52dd-4e18-9638-a4aaa3760492",
+          "questionId": "teach-durable-visible-change-q1",
+          "nodeId": "durable-visible-change",
+          "stage": "teach",
+          "kind": "reconstruction",
+          "question": "A notes-app user edits a title and clicks Save. Reconstruct the successful path from that click to both a durable database value and visible confirmation, using browser client, request, server, database commit, response, and browser rendering; explicitly distinguish which step makes the title durable from which step makes it visible.",
+          "answer": "When the user clicks Save, the browser client sends a request containing the edited title to the server. The server receives and handles that request, then asks the database to write and commit the new title. The database commit is what makes the value durable beyond the current page or server process and available to later requests. After the successful commit, the server sends a response with the saved result back to the browser. Browser-side code reads that response and renders the updated title or confirmation on the page. That final rendering step makes the result visible now; it is not what made the title durable.",
+          "grade": "correct",
+          "evidence": "The learner reconstructs the complete successful path in causal order, places every required role, identifies the database commit as the durability mechanism, and distinguishes browser-side response rendering as the visibility mechanism.",
+          "mistakeType": "",
+          "contaminated": false,
+          "conceptId": "8a9852e9-3bea-46b4-8f29-608caec2777e",
+          "createdAt": "2026-08-24T20:24:59.931Z"
+        },
+        {
+          "id": "synthesis-a1",
+          "questionId": "synthesis-durable-visible-q1",
+          "nodeId": "whole-system-synthesis",
+          "stage": "synthesis",
+          "kind": "synthesis",
+          "question": "A calendar-app user changes a meeting title and clicks Save. Explain the complete successful path through browser client, request, server, database commit, response, and browser rendering; then predict the state if the database commit succeeds but the response never reaches the browser, distinguishing whether the title is durable from whether the user sees confirmation.",
+          "answer": "On the successful path, the browser client sends a request with the changed meeting title to the server. The server interprets and handles the request, then asks the database to write and commit the new title. That database commit makes the title durable for later requests even after the current page or process ends. The server then sends a response with the saved outcome back to the browser, and browser-side code reads the response and renders the new title or a confirmation, which makes the result visible to the user. If the database commit succeeds but the response never reaches the browser, the new title is still durable in the database, but the current browser cannot render a server-confirmed result, so the user may continue to see the old title or no success confirmation. A later request can retrieve the committed new title.",
+          "grade": "correct",
+          "evidence": "The learner synthesizes the complete causal flow, correctly separates committed durability from response-driven visibility, and transfers the model to a lost-response case: durable database state can exist without current-page confirmation and can be retrieved by a later request.",
+          "mistakeType": "",
+          "contaminated": false,
+          "conceptId": null,
+          "createdAt": "2026-08-24T20:25:59.973Z"
+        }
+      ],
+      "conceptIds": [
+        "64f3c397-177f-494c-bb5a-d0cbe31a8338",
+        "070ed97a-2039-49b7-a9c4-49772e380f05",
+        "e3e49866-0ab5-4d11-a8f2-90cc28db3eb2",
+        "da91183b-6006-4328-8362-4e6159ca88c8",
+        "f5f4df1c-1290-40b5-afc9-2092bc1a93a7",
+        "4ee4326d-3f26-4a17-a1fd-7c1d8524b05f",
+        "8a9852e9-3bea-46b4-8f29-608caec2777e"
+      ],
+      "sources": [
+        {
+          "id": "12ddc08d-3a6f-4646-b4dc-6314f0a7d548",
+          "title": "RFC 9110: HTTP Semantics, Sections 3.3-3.4",
+          "url": "https://www.rfc-editor.org/rfc/rfc9110.html#section-3.3",
+          "sourceClass": "primary",
+          "supports": "In HTTP, a client sends request messages to a server, and the server services those requests by sending response messages.",
+          "verification": "Retrieved RFC 9110 directly in the terminal and checked Sections 3.3 and 3.4 for the client, server, request, and response definitions.",
+          "createdAt": "2026-08-24T20:13:07.013Z"
+        },
+        {
+          "id": "cdfb6ddd-c261-452d-ab89-73178e1645bd",
+          "title": "SQLite Is Transactional",
+          "url": "https://www.sqlite.org/transactional.html",
+          "sourceClass": "primary",
+          "supports": "A committed database transaction is durable: its changes survive program, operating-system, and power failures under the documented transaction guarantees.",
+          "verification": "Retrieved SQLite's official transactional documentation directly in the terminal and checked its ACID durability and all-or-nothing transaction statements.",
+          "createdAt": "2026-08-24T20:13:13.997Z"
+        }
+      ],
+      "plan": {
+        "targetNodeId": "durable-visible-change",
+        "nodes": [
+          {
+            "id": "client-request",
+            "title": "A browser client sends a request",
+            "conceptId": "e3e49866-0ab5-4d11-a8f2-90cc28db3eb2"
+          },
+          {
+            "id": "server-processing",
+            "title": "The server interprets and handles the request",
+            "conceptId": "da91183b-6006-4328-8362-4e6159ca88c8"
+          },
+          {
+            "id": "server-response",
+            "title": "The server returns an outcome in a response",
+            "conceptId": "f5f4df1c-1290-40b5-afc9-2092bc1a93a7"
+          },
+          {
+            "id": "client-server-round-trip",
+            "title": "Place client, request, server, and response in one round trip",
+            "conceptId": "64f3c397-177f-494c-bb5a-d0cbe31a8338"
+          },
+          {
+            "id": "durable-database-persistence",
+            "title": "A committed database write makes the change durable",
+            "conceptId": "070ed97a-2039-49b7-a9c4-49772e380f05"
+          },
+          {
+            "id": "visible-response-update",
+            "title": "The browser uses the response to update the visible page",
+            "conceptId": "4ee4326d-3f26-4a17-a1fd-7c1d8524b05f"
+          },
+          {
+            "id": "durable-visible-change",
+            "title": "Explain the complete durable and visible change",
+            "conceptId": "8a9852e9-3bea-46b4-8f29-608caec2777e"
+          }
+        ],
+        "edges": [
+          {
+            "from": "client-request",
+            "to": "server-processing",
+            "reason": "The server can handle the intended change only after the client communicates it in a request."
+          },
+          {
+            "from": "server-processing",
+            "to": "server-response",
+            "reason": "A response reports the outcome produced by server-side handling."
+          },
+          {
+            "from": "client-request",
+            "to": "client-server-round-trip",
+            "reason": "The outward request is the first half of the client-server round trip."
+          },
+          {
+            "from": "server-processing",
+            "to": "client-server-round-trip",
+            "reason": "Server handling connects the incoming request to the returned outcome."
+          },
+          {
+            "from": "server-response",
+            "to": "client-server-round-trip",
+            "reason": "The returning response completes the client-server round trip."
+          },
+          {
+            "from": "server-processing",
+            "to": "durable-database-persistence",
+            "reason": "The server-side operation must ask the database to commit the change for it to outlast the current page."
+          },
+          {
+            "from": "server-response",
+            "to": "visible-response-update",
+            "reason": "The browser needs the returned outcome before it can show server-confirmed state."
+          },
+          {
+            "from": "client-server-round-trip",
+            "to": "durable-visible-change",
+            "reason": "The full explanation must place the outward request, server work, and returning response."
+          },
+          {
+            "from": "durable-database-persistence",
+            "to": "durable-visible-change",
+            "reason": "The database commit explains why the changed name remains on a later visit."
+          },
+          {
+            "from": "visible-response-update",
+            "to": "durable-visible-change",
+            "reason": "The browser's response-driven update explains why the result becomes visible now."
+          }
+        ]
+      },
+      "frontier": [],
+      "steps": [
+        {
+          "id": "0c7e6e6f-2f24-4ca4-b8f8-aa8e8113372a",
+          "nodeId": "client-request",
+          "foundation": "In this web-application scenario, the browser is the client program the learner directly uses, and it can react to the Save click on the current page.",
+          "motivation": "Changing one browser page cannot by itself communicate the intended change to the separate server.",
+          "explanation": "The client sends an outward request message containing the intended change to the server. A request communicates the client's intent; it is not the server's work and it is not a returned result.",
+          "checkpointQuestionId": "teach-client-request-q1",
+          "checkpointKind": "transfer",
+          "checkpointQuestion": "Suppose a checkout page sends a newly entered shipping address from the browser to the web application's remote side. What role is the browser playing, what is the outgoing message called, and in which direction does that message travel?",
+          "createdAt": "2026-08-24T20:14:31.119Z"
+        },
+        {
+          "id": "72be9da3-2067-4217-a830-adcfa0aa86f3",
+          "nodeId": "server-processing",
+          "foundation": "The client-request checkpoint established that the browser sends a request outward to the remote server.",
+          "motivation": "A request arriving is only information; something on the remote side must interpret it and carry out the application's intended operation.",
+          "explanation": "The server receives and services the request. Its application code interprets what the client asked for and performs or coordinates that operation. The server is the actor at this point; the request is its input. This step does not yet establish a durable database write or a returned response.",
+          "checkpointQuestionId": "teach-server-processing-q1",
+          "checkpointKind": "transfer",
+          "checkpointQuestion": "A library website's browser sends a request that says 'renew loan 42'. Before any database write or response is considered, which component receives and interprets that request, and what is that component's job at this point?",
+          "createdAt": "2026-08-24T20:16:35.936Z"
+        },
+        {
+          "id": "0e935b69-89cf-4e2a-9ea6-0a2b6873e258",
+          "nodeId": "durable-database-persistence",
+          "foundation": "The server-processing checkpoint established that server-side application logic interprets the request and coordinates the requested operation.",
+          "motivation": "Work performed only in temporary server memory can disappear, so it cannot explain why a changed value remains for a later visit or after a restart.",
+          "explanation": "For durable state, the server asks the database to write the change and the database commits that write. The commit is the persistence event: under the database's durability guarantee, the stored value survives beyond the current request and process lifetime. A browser page change alone does not establish this.",
+          "checkpointQuestionId": "teach-durable-persistence-q1",
+          "checkpointKind": "debugging",
+          "checkpointQuestion": "A profile server receives 'change timezone to UTC' and updates only a temporary in-memory variable. After the server restarts, the old timezone returns. In this browser-server-database model, what missing database event caused the failure to persist, and what would that event have guaranteed?",
+          "createdAt": "2026-08-24T20:17:41.088Z"
+        },
+        {
+          "id": "fbc485ed-7e44-4c0f-87f6-ab357203541e",
+          "nodeId": "server-response",
+          "foundation": "The learner has established that a client request reaches the server, the server handles it, and a committed database write can make the resulting state durable.",
+          "motivation": "Because the work occurs remotely, the browser still needs a message from the server telling it what outcome occurred.",
+          "explanation": "The server sends a response message back to the client. The response can carry an outcome such as success, failure, or returned data. Its direction is server to client; it reports the server-side outcome but is not itself the database commit.",
+          "checkpointQuestionId": "teach-server-response-q1",
+          "checkpointKind": "transfer",
+          "checkpointQuestion": "An online store's server has processed 'add item to wishlist' and now sends a message containing status 'saved' and the updated item back to the browser. What is this returning message called, which component sends it, and in which direction does it travel?",
+          "createdAt": "2026-08-24T20:18:34.633Z"
+        },
+        {
+          "id": "a71ba8a0-d243-4b4b-9efa-69b4a9293440",
+          "nodeId": "client-server-round-trip",
+          "foundation": "The learner has separately established the outward client request, the server's handling role, and the returning server response.",
+          "motivation": "Knowing those labels separately is not enough to explain how one browser action and one returned outcome form a connected exchange.",
+          "explanation": "Compose the roles into one round trip: the browser acts as client and sends a request to the server; the server receives and handles it; then the server sends a response back to the browser client. The request is the outward leg and the response is the return leg. Database persistence is a separate branch inside the server-side work.",
+          "checkpointQuestionId": "teach-client-server-round-trip-q1",
+          "checkpointKind": "reconstruction",
+          "checkpointQuestion": "A travel app's browser asks to cancel booking 73, and the server later returns status 'cancelled'. Reconstruct the client-server round trip in order using the browser client, request, server, and response, and state the direction of both messages; leave the database branch out of this answer.",
+          "createdAt": "2026-08-24T20:19:27.163Z"
+        },
+        {
+          "id": "f78a7d94-8d25-42d2-ba65-9d5dc977aa69",
+          "nodeId": "visible-response-update",
+          "foundation": "The learner has established that the server sends a response carrying the operation's outcome back to the browser client, while the database commit separately provides durability.",
+          "motivation": "A response can reach the browser without the user seeing the returned outcome if the client does not apply it to the displayed page.",
+          "explanation": "In this web-application model, browser-side client code reads the response's status or data and updates the visible page. That rendering step makes the returned outcome visible; it does not create the durable database state.",
+          "checkpointQuestionId": "teach-visible-response-q1",
+          "checkpointKind": "debugging",
+          "checkpointQuestion": "A settings page sends a theme-change request, the server commits the new dark theme, and the response containing 'saved: dark' reaches the browser; however, the page still displays the old light theme because the browser code ignores the response. Which step is missing between response arrival and visible confirmation, and which component must perform it?",
+          "createdAt": "2026-08-24T20:23:13.414Z"
+        },
+        {
+          "id": "45882559-46b7-4c39-8c38-f086e69a5b99",
+          "nodeId": "durable-visible-change",
+          "foundation": "The learner has established the client-server request and response round trip, the committed database write that provides durability, and the browser-side rendering step that provides visible confirmation.",
+          "motivation": "The target requires one causal explanation that preserves the distinction between the persistence branch and the visible-response branch instead of treating 'saved' as one undefined event.",
+          "explanation": "On a successful save path, the browser client sends a request to the server; the server handles it and asks the database to write and commit the change; after that successful outcome, the server sends a response to the browser; browser-side code reads the response and updates the page. The database commit makes the value durable for later requests, while browser rendering makes the returned outcome visible now.",
+          "checkpointQuestionId": "teach-durable-visible-change-q1",
+          "checkpointKind": "reconstruction",
+          "checkpointQuestion": "A notes-app user edits a title and clicks Save. Reconstruct the successful path from that click to both a durable database value and visible confirmation, using browser client, request, server, database commit, response, and browser rendering; explicitly distinguish which step makes the title durable from which step makes it visible.",
+          "createdAt": "2026-08-24T20:24:10.562Z"
+        }
+      ],
+      "activeStepId": null,
+      "checkpoint": {
+        "status": "resolved",
+        "nodeId": "durable-visible-change",
+        "questionId": "teach-durable-visible-change-q1",
+        "question": "A notes-app user edits a title and clicks Save. Reconstruct the successful path from that click to both a durable database value and visible confirmation, using browser client, request, server, database commit, response, and browser rendering; explicitly distinguish which step makes the title durable from which step makes it visible.",
+        "kind": "reconstruction",
+        "priorQuestionId": null,
+        "attempts": 1,
+        "resolvedEvidenceId": "0126bb84-52dd-4e18-9638-a4aaa3760492",
+        "mistakeType": ""
+      },
+      "visuals": [],
+      "synthesis": "On the successful path, the browser client sends a request with the changed meeting title to the server. The server interprets and handles the request, then asks the database to write and commit the new title. That database commit makes the title durable for later requests even after the current page or process ends. The server then sends a response with the saved outcome back to the browser, and browser-side code reads the response and renders the new title or a confirmation, which makes the result visible to the user. If the database commit succeeds but the response never reaches the browser, the new title is still durable in the database, but the current browser cannot render a server-confirmed result, so the user may continue to see the old title or no success confirmation. A later request can retrieve the committed new title.",
+      "synthesisRequired": true,
+      "synthesisCheckpoint": {
+        "status": "resolved",
+        "questionId": "synthesis-durable-visible-q1",
+        "question": "A calendar-app user changes a meeting title and clicks Save. Explain the complete successful path through browser client, request, server, database commit, response, and browser rendering; then predict the state if the database commit succeeds but the response never reaches the browser, distinguishing whether the title is durable from whether the user sees confirmation.",
+        "priorQuestionId": null,
+        "attempts": 1,
+        "resolvedEvidenceId": "synthesis-a1",
+        "mistakeType": ""
+      },
+      "unresolvedGaps": [],
+      "reviewItems": []
+    },
+    "55ad5c9b-e338-49ac-a32b-d17959d50ef5": {
+      "id": "55ad5c9b-e338-49ac-a32b-d17959d50ef5",
+      "kind": "review",
+      "topic": "Browser-to-database request and response flow",
+      "topicId": "80e05890-7d09-41ac-89c3-a76b770d712f",
+      "target": "Review 1 due concept",
+      "learnerContext": "",
+      "phase": "complete",
+      "createdAt": "2026-08-25T21:00:00.000Z",
+      "updatedAt": "2026-08-25T21:00:00.000Z",
+      "completedAt": "2026-08-25T21:00:00.000Z",
+      "probeSummary": "",
+      "admittedGaps": [],
+      "assessments": [
+        {
+          "id": "6a411f67-2971-4d39-8e25-57fd28d14ebd",
+          "questionId": "retention-durable-visible-q1",
+          "nodeId": "durable-visible-change",
+          "stage": "retention",
+          "kind": "retention",
+          "question": "An unfamiliar ticketing app lets a user change the seat number and click Save. The server successfully commits the new seat in its database, but the response is delayed and the browser continues showing the old seat number. Reconstruct the causal path from the click through the browser client, request, server, database commit, response, and browser rendering. Then distinguish exactly which event makes the new seat durable for a later visit and which event would make it visible on this page.",
+          "answer": "The click changes only the browser. Since the browser still shows the old seat, the database commit did not actually count; nothing is durable until the response arrives and the browser renders it.",
+          "grade": "incorrect",
+          "evidence": "The reasoning breaks at the distinction between the database-persistence branch and the response-driven visibility branch; it treats current-page appearance as evidence about durability.",
+          "mistakeType": "branch conflation",
+          "contaminated": false,
+          "conceptId": "8a9852e9-3bea-46b4-8f29-608caec2777e",
+          "createdAt": "2026-08-25T21:00:00.000Z"
+        },
+        {
+          "id": "494cfc9e-d552-480c-ba46-9a20f9fb1371",
+          "questionId": "retention-durable-visible-q1",
+          "nodeId": "durable-visible-change",
+          "stage": "retention",
+          "kind": "retention",
+          "question": "An unfamiliar ticketing app lets a user change the seat number and click Save. The server successfully commits the new seat in its database, but the response is delayed and the browser continues showing the old seat number. Reconstruct the causal path from the click through the browser client, request, server, database commit, response, and browser rendering. Then distinguish exactly which event makes the new seat durable for a later visit and which event would make it visible on this page.",
+          "answer": "The request goes from the browser to the server, but because the response is delayed, the server's database commit is provisional and rolls back. Browser rendering of the response is what makes the new seat both durable and visible.",
+          "grade": "incorrect",
+          "evidence": "The answer retains the request direction but incorrectly makes response timing determine database persistence and assigns both durability and visibility to browser rendering.",
+          "mistakeType": "causal-branch reversal",
+          "contaminated": false,
+          "conceptId": "8a9852e9-3bea-46b4-8f29-608caec2777e",
+          "createdAt": "2026-08-25T21:00:00.000Z"
+        },
+        {
+          "id": "d3443026-c8be-44b5-90cb-e71b66604e16",
+          "questionId": "retention-durable-visible-transfer-q1",
+          "nodeId": "durable-visible-change",
+          "stage": "retention",
+          "kind": "transfer",
+          "question": "A warehouse app accepts a request to change a bin label from A-17 to B-04. The server commits B-04 to the database, then the network drops before the response reaches the browser. For a later visit, what value should the database provide, and why might the current page still show A-17? Explain which branch establishes durability and which branch establishes the current page's visibility.",
+          "answer": "A later visit should receive B-04 from the database because the commit already made that value durable. The current page can still show A-17 because the response never reached the browser, so client code had no returned result to render. The database commit establishes durability; response arrival followed by browser rendering establishes what becomes visible on the current page.",
+          "grade": "correct",
+          "evidence": "The learner correctly explains that the committed database value B-04 is durable for a later visit, while the lost response prevents current-page rendering from replacing A-17; the two causal branches are explicitly distinguished.",
+          "mistakeType": "",
+          "contaminated": false,
+          "conceptId": "8a9852e9-3bea-46b4-8f29-608caec2777e",
+          "createdAt": "2026-08-25T21:00:00.000Z"
+        }
+      ],
+      "conceptIds": [
+        "8a9852e9-3bea-46b4-8f29-608caec2777e"
+      ],
+      "sources": [],
+      "plan": null,
+      "frontier": [],
+      "steps": [],
+      "activeStepId": null,
+      "checkpoint": {
+        "status": "resolved",
+        "nodeId": "durable-visible-change",
+        "questionId": "retention-durable-visible-transfer-q1",
+        "question": "A warehouse app accepts a request to change a bin label from A-17 to B-04. The server commits B-04 to the database, then the network drops before the response reaches the browser. For a later visit, what value should the database provide, and why might the current page still show A-17? Explain which branch establishes durability and which branch establishes the current page's visibility.",
+        "kind": "transfer",
+        "priorQuestionId": "retention-durable-visible-q1",
+        "attempts": 1,
+        "resolvedEvidenceId": "d3443026-c8be-44b5-90cb-e71b66604e16",
+        "mistakeType": ""
+      },
+      "visuals": [],
+      "synthesis": "Review evidence: after two initial misses that conflated or reversed the persistence and visibility branches, the learner gave a correct transfer explanation. They identified that a committed database value remains durable for a later visit even when the response is lost, and that response arrival plus browser rendering controls current-page visibility. Review resolved through clean correct transfer evidence.",
+      "synthesisRequired": false,
+      "synthesisCheckpoint": null,
+      "unresolvedGaps": [],
+      "reviewItems": [
+        {
+          "reviewId": "c8e22cfe-76ff-43f6-b934-8a567f1c1077",
+          "conceptId": "8a9852e9-3bea-46b4-8f29-608caec2777e",
+          "status": "resolved",
+          "outcomeGrade": "incorrect",
+          "evidenceIds": [
+            "6a411f67-2971-4d39-8e25-57fd28d14ebd",
+            "494cfc9e-d552-480c-ba46-9a20f9fb1371",
+            "d3443026-c8be-44b5-90cb-e71b66604e16"
+          ],
+          "deferralReason": null,
+          "deferredUntil": null
+        }
+      ]
+    }
+  },
+  "topics": {
+    "80e05890-7d09-41ac-89c3-a76b770d712f": {
+      "id": "80e05890-7d09-41ac-89c3-a76b770d712f",
+      "name": "Browser-to-database request and response flow",
+      "createdAt": "2026-08-24T20:06:31.248Z",
+      "updatedAt": "2026-08-25T21:00:00.000Z",
+      "latestSessionId": "55ad5c9b-e338-49ac-a32b-d17959d50ef5",
+      "sessionIds": [
+        "e89f7607-ce37-41c5-aca2-b351d5dadd43",
+        "55ad5c9b-e338-49ac-a32b-d17959d50ef5"
+      ],
+      "conceptIds": [
+        "64f3c397-177f-494c-bb5a-d0cbe31a8338",
+        "070ed97a-2039-49b7-a9c4-49772e380f05",
+        "e3e49866-0ab5-4d11-a8f2-90cc28db3eb2",
+        "da91183b-6006-4328-8362-4e6159ca88c8",
+        "f5f4df1c-1290-40b5-afc9-2092bc1a93a7",
+        "4ee4326d-3f26-4a17-a1fd-7c1d8524b05f",
+        "8a9852e9-3bea-46b4-8f29-608caec2777e"
+      ]
+    }
+  },
+  "concepts": {
+    "64f3c397-177f-494c-bb5a-d0cbe31a8338": {
+      "id": "64f3c397-177f-494c-bb5a-d0cbe31a8338",
+      "topicId": "80e05890-7d09-41ac-89c3-a76b770d712f",
+      "key": "client-server-round-trip",
+      "title": "client-server-round-trip",
+      "status": "developing",
+      "latestGrade": "correct",
+      "evidenceIds": [
+        "fbf894f3-31e3-4ccc-833d-5efbf44cb296"
+      ],
+      "retry": null,
+      "reviewId": "a35b5385-330b-4a7b-869f-75f80c089937",
+      "sourceSessionIds": [
+        "e89f7607-ce37-41c5-aca2-b351d5dadd43"
+      ],
+      "createdAt": "2026-08-24T20:12:07.484Z",
+      "updatedAt": "2026-08-24T20:23:02.380Z"
+    },
+    "070ed97a-2039-49b7-a9c4-49772e380f05": {
+      "id": "070ed97a-2039-49b7-a9c4-49772e380f05",
+      "topicId": "80e05890-7d09-41ac-89c3-a76b770d712f",
+      "key": "durable-database-persistence",
+      "title": "durable-database-persistence",
+      "status": "developing",
+      "latestGrade": "correct",
+      "evidenceIds": [
+        "0f7a5f77-bb36-4c75-acb6-0ae2a10d8364"
+      ],
+      "retry": null,
+      "reviewId": "d6ab8f06-7102-41b4-956f-30e1684bd184",
+      "sourceSessionIds": [
+        "e89f7607-ce37-41c5-aca2-b351d5dadd43"
+      ],
+      "createdAt": "2026-08-24T20:12:11.372Z",
+      "updatedAt": "2026-08-24T20:18:23.109Z"
+    },
+    "e3e49866-0ab5-4d11-a8f2-90cc28db3eb2": {
+      "id": "e3e49866-0ab5-4d11-a8f2-90cc28db3eb2",
+      "topicId": "80e05890-7d09-41ac-89c3-a76b770d712f",
+      "key": "client-request",
+      "title": "A browser client sends a request",
+      "status": "developing",
+      "latestGrade": "correct",
+      "evidenceIds": [
+        "3da5033c-9078-4c2c-a115-e1470ee3f473"
+      ],
+      "retry": null,
+      "reviewId": "f2697aa1-a1d1-4748-90cc-85d266c4d5a0",
+      "sourceSessionIds": [
+        "e89f7607-ce37-41c5-aca2-b351d5dadd43"
+      ],
+      "createdAt": "2026-08-24T20:14:06.616Z",
+      "updatedAt": "2026-08-24T20:16:22.851Z"
+    },
+    "da91183b-6006-4328-8362-4e6159ca88c8": {
+      "id": "da91183b-6006-4328-8362-4e6159ca88c8",
+      "topicId": "80e05890-7d09-41ac-89c3-a76b770d712f",
+      "key": "server-processing",
+      "title": "The server interprets and handles the request",
+      "status": "developing",
+      "latestGrade": "correct",
+      "evidenceIds": [
+        "d91f0aa7-bf92-47b0-8cfd-39c8fa417fb6"
+      ],
+      "retry": null,
+      "reviewId": "dc8936df-d827-4197-8c0e-ce49c3765e9b",
+      "sourceSessionIds": [
+        "e89f7607-ce37-41c5-aca2-b351d5dadd43"
+      ],
+      "createdAt": "2026-08-24T20:14:06.616Z",
+      "updatedAt": "2026-08-24T20:17:19.809Z"
+    },
+    "f5f4df1c-1290-40b5-afc9-2092bc1a93a7": {
+      "id": "f5f4df1c-1290-40b5-afc9-2092bc1a93a7",
+      "topicId": "80e05890-7d09-41ac-89c3-a76b770d712f",
+      "key": "server-response",
+      "title": "The server returns an outcome in a response",
+      "status": "developing",
+      "latestGrade": "correct",
+      "evidenceIds": [
+        "334c6517-9716-412a-bb81-18e360b668bb"
+      ],
+      "retry": null,
+      "reviewId": "d79fa219-576f-4656-9660-3f2e3a5da547",
+      "sourceSessionIds": [
+        "e89f7607-ce37-41c5-aca2-b351d5dadd43"
+      ],
+      "createdAt": "2026-08-24T20:14:06.616Z",
+      "updatedAt": "2026-08-24T20:19:16.416Z"
+    },
+    "4ee4326d-3f26-4a17-a1fd-7c1d8524b05f": {
+      "id": "4ee4326d-3f26-4a17-a1fd-7c1d8524b05f",
+      "topicId": "80e05890-7d09-41ac-89c3-a76b770d712f",
+      "key": "visible-response-update",
+      "title": "The browser uses the response to update the visible page",
+      "status": "developing",
+      "latestGrade": "correct",
+      "evidenceIds": [
+        "494a845b-1f32-44a6-a25c-e4039cae0036"
+      ],
+      "retry": null,
+      "reviewId": "4b63dd46-0025-4812-a550-5716c4464206",
+      "sourceSessionIds": [
+        "e89f7607-ce37-41c5-aca2-b351d5dadd43"
+      ],
+      "createdAt": "2026-08-24T20:14:06.616Z",
+      "updatedAt": "2026-08-24T20:24:00.547Z"
+    },
+    "8a9852e9-3bea-46b4-8f29-608caec2777e": {
+      "id": "8a9852e9-3bea-46b4-8f29-608caec2777e",
+      "topicId": "80e05890-7d09-41ac-89c3-a76b770d712f",
+      "key": "durable-visible-change",
+      "title": "Explain the complete durable and visible change",
+      "status": "developing",
+      "latestGrade": "correct",
+      "evidenceIds": [
+        "0126bb84-52dd-4e18-9638-a4aaa3760492",
+        "6a411f67-2971-4d39-8e25-57fd28d14ebd",
+        "494cfc9e-d552-480c-ba46-9a20f9fb1371",
+        "d3443026-c8be-44b5-90cb-e71b66604e16"
+      ],
+      "retry": null,
+      "reviewId": "c8e22cfe-76ff-43f6-b934-8a567f1c1077",
+      "sourceSessionIds": [
+        "e89f7607-ce37-41c5-aca2-b351d5dadd43",
+        "55ad5c9b-e338-49ac-a32b-d17959d50ef5"
+      ],
+      "createdAt": "2026-08-24T20:14:06.616Z",
+      "updatedAt": "2026-08-25T21:00:00.000Z"
+    }
+  },
+  "reviews": {
+    "a35b5385-330b-4a7b-869f-75f80c089937": {
+      "id": "a35b5385-330b-4a7b-869f-75f80c089937",
+      "conceptId": "64f3c397-177f-494c-bb5a-d0cbe31a8338",
+      "level": 1,
+      "dueAt": "2026-08-25T20:23:02.380Z",
+      "completed": 1,
+      "status": "scheduled",
+      "claimedBySessionId": null,
+      "claimedAt": null,
+      "deferredReason": null,
+      "updatedAt": "2026-08-24T20:23:02.380Z"
+    },
+    "d6ab8f06-7102-41b4-956f-30e1684bd184": {
+      "id": "d6ab8f06-7102-41b4-956f-30e1684bd184",
+      "conceptId": "070ed97a-2039-49b7-a9c4-49772e380f05",
+      "level": 1,
+      "dueAt": "2026-08-25T20:18:23.109Z",
+      "completed": 1,
+      "status": "scheduled",
+      "claimedBySessionId": null,
+      "claimedAt": null,
+      "deferredReason": null,
+      "updatedAt": "2026-08-24T20:18:23.109Z"
+    },
+    "f2697aa1-a1d1-4748-90cc-85d266c4d5a0": {
+      "id": "f2697aa1-a1d1-4748-90cc-85d266c4d5a0",
+      "conceptId": "e3e49866-0ab5-4d11-a8f2-90cc28db3eb2",
+      "level": 1,
+      "dueAt": "2026-08-25T20:16:22.851Z",
+      "completed": 1,
+      "status": "scheduled",
+      "claimedBySessionId": null,
+      "claimedAt": null,
+      "deferredReason": null,
+      "updatedAt": "2026-08-24T20:16:22.851Z"
+    },
+    "dc8936df-d827-4197-8c0e-ce49c3765e9b": {
+      "id": "dc8936df-d827-4197-8c0e-ce49c3765e9b",
+      "conceptId": "da91183b-6006-4328-8362-4e6159ca88c8",
+      "level": 1,
+      "dueAt": "2026-08-25T20:17:19.809Z",
+      "completed": 1,
+      "status": "scheduled",
+      "claimedBySessionId": null,
+      "claimedAt": null,
+      "deferredReason": null,
+      "updatedAt": "2026-08-24T20:17:19.809Z"
+    },
+    "d79fa219-576f-4656-9660-3f2e3a5da547": {
+      "id": "d79fa219-576f-4656-9660-3f2e3a5da547",
+      "conceptId": "f5f4df1c-1290-40b5-afc9-2092bc1a93a7",
+      "level": 1,
+      "dueAt": "2026-08-25T20:19:16.416Z",
+      "completed": 1,
+      "status": "scheduled",
+      "claimedBySessionId": null,
+      "claimedAt": null,
+      "deferredReason": null,
+      "updatedAt": "2026-08-24T20:19:16.416Z"
+    },
+    "4b63dd46-0025-4812-a550-5716c4464206": {
+      "id": "4b63dd46-0025-4812-a550-5716c4464206",
+      "conceptId": "4ee4326d-3f26-4a17-a1fd-7c1d8524b05f",
+      "level": 1,
+      "dueAt": "2026-08-25T20:24:00.547Z",
+      "completed": 1,
+      "status": "scheduled",
+      "claimedBySessionId": null,
+      "claimedAt": null,
+      "deferredReason": null,
+      "updatedAt": "2026-08-24T20:24:00.547Z"
+    },
+    "c8e22cfe-76ff-43f6-b934-8a567f1c1077": {
+      "id": "c8e22cfe-76ff-43f6-b934-8a567f1c1077",
+      "conceptId": "8a9852e9-3bea-46b4-8f29-608caec2777e",
+      "level": 0,
+      "dueAt": "2026-08-26T21:00:00.000Z",
+      "completed": 2,
+      "status": "scheduled",
+      "claimedBySessionId": null,
+      "claimedAt": null,
+      "deferredReason": null,
+      "updatedAt": "2026-08-25T21:00:00.000Z"
+    }
+  },
+  "reviewCount": 1,
+  "render": {
+    "revision": 0,
+    "status": "stale",
+    "error": null
+  }
+}

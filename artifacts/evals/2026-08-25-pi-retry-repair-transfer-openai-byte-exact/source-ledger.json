@@ -1,0 +1,24 @@
+{
+  "formatVersion": 1,
+  "sourceOrigin": "The Pi review reuses the selected concept's two primary sources from the original Codex learning session in the same canonical root; the review introduced no new external claim.",
+  "sources": [
+    {
+      "id": "12ddc08d-3a6f-4646-b4dc-6314f0a7d548",
+      "title": "RFC 9110: HTTP Semantics, Sections 3.3-3.4",
+      "url": "https://www.rfc-editor.org/rfc/rfc9110.html#section-3.3",
+      "sourceClass": "primary",
+      "supports": "In HTTP, a client sends request messages to a server, and the server services those requests by sending response messages.",
+      "verification": "Retrieved RFC 9110 directly in the terminal and checked Sections 3.3 and 3.4 for the client, server, request, and response definitions.",
+      "createdAt": "2026-08-24T20:13:07.013Z"
+    },
+    {
+      "id": "cdfb6ddd-c261-452d-ab89-73178e1645bd",
+      "title": "SQLite Is Transactional",
+      "url": "https://www.sqlite.org/transactional.html",
+      "sourceClass": "primary",
+      "supports": "A committed database transaction is durable: its changes survive program, operating-system, and power failures under the documented transaction guarantees.",
+      "verification": "Retrieved SQLite's official transactional documentation directly in the terminal and checked its ACID durability and all-or-nothing transaction statements.",
+      "createdAt": "2026-08-24T20:13:13.997Z"
+    }
+  ]
+}

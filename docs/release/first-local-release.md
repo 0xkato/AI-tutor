@@ -17,14 +17,14 @@ smoke test is not treated as release acceptance.
 
 | # | Release criterion | Authoritative evidence | Status |
 | --- | --- | --- | --- |
-| 1 | Multi-day Codex-to-Pi retention passes end to end | [`live-host-acceptance.md`](../verification/live-host-acceptance.md) and `artifacts/evals/2026-08-24-*` | **Failed / unproved.** The Codex package is pending because the byte-exact final live state was not retained. Both local Pi behavioral runs contain critical failures. The cloud Pi run proves connectivity only. |
+| 1 | Multi-day Codex-to-Pi retention passes end to end | [`live-host-acceptance.md`](../verification/live-host-acceptance.md), `artifacts/evals/2026-08-24-codex-novice-branches-byte-exact/`, and `artifacts/evals/2026-08-25-pi-retry-repair-transfer-openai-byte-exact/` | **Partially verified / unproved.** Fresh Codex and Pi-to-OpenAI-Codex sessions used the same canonical root and completed the required learning, due-review, bounded repair, transfer, and closure lifecycle with byte-exact final snapshots and no critical failures. Both independent human verdicts remain pending. |
 | 2 | Migration, backup, restore-check, stale-lock recovery, renderer repair, and corrupted-state diagnostics pass destructive checks | Focused recovery/migration/render/setup/CLI/review tests; manual malformed-state check; actual permission-failure audit | **Verified locally.** The actual permission audit committed canonical revision 1 despite `EACCES`; after permissions were restored, `repair-render` preserved the exact state bytes and `doctor` reported the projection current. Export and evaluation capture also refuse source files swapped to symlinks between validation and opening. |
 | 3 | Hostile identifiers, Markdown, sources, paths, timestamps, and visuals cannot corrupt state or notes | Schema, CLI-options, render-safety, source, visual, graph, and protocol-invariant tests in the full suite | **Verified locally** for the defined macOS implementation contract. Unsafe custom vault paths are rejected before canonical state is created and are rejected again during state validation. |
 | 4 | Fresh-clone setup and first session succeed outside the development path | `npm run release-check`, including disposable fresh-path setup and E2E fixtures | **Verified locally** with the complete release check on official Node `v20.20.2` and `v22.23.2` macOS arm64 runtimes. |
-| 5 | Behavioral scenario suite has no critical failure | Three packaged live-host artifacts plus the release validator | **Failed.** The two Pi packages preserve answer leakage, target drift, persistence mismatch, or incomplete-review failures. No artifact currently receives an accepted human verdict. |
+| 5 | Behavioral scenario suite has no critical failure | Five preserved live-host packages plus the release validator | **Partially verified.** The two fresh release candidates have no contaminated questions or critical failures and pass every deterministic check. Their human verdicts remain pending. The earlier Pi failures remain preserved as historical regression evidence rather than being overwritten. |
 | 6 | Complete suite passes on macOS with Node 20 and 22 | Local runtime and GitHub Actions matrix | **Partially verified.** The complete release check passed locally on official Node `v20.20.2` and `v22.23.2` macOS arm64 runtimes. The uncached macOS workflow is committed and contract-tested, but it cannot produce hosted evidence until this local repository has a GitHub remote and the workflow runs there. |
-| 7 | Documentation, privacy, recovery, changelog, and verification match the shipped version | Operator documentation and this audit | **Unproved.** Privacy and recovery documentation exist, but an accepted version, changelog entry, final versioned verification record, and CI evidence do not. |
-| 8 | Repository is clean, committed, and has a release tag | Git status, commit history, and tag list | **Partially verified.** The canonical release-hardening branch is clean and its current changes are committed. No release tag exists. |
+| 7 | Documentation, privacy, recovery, changelog, and verification match the shipped version | Operator documentation and this audit | **Unproved.** Privacy and recovery documentation now include the scoped external-transmission approval boundary, but an accepted version, changelog entry, final versioned verification record, and hosted CI evidence do not. |
+| 8 | Repository is clean, committed, and has a release tag | Git status, commit history, and tag list | **Partially verified.** The release-hardening work is committed through the evidence update before tagging. No release tag exists. |
 
 ## Destructive evidence completed locally
 
@@ -63,8 +63,8 @@ It does not prove hosted GitHub Actions execution or another operating system.
 
 ## Live-host decision
 
-The preserved evidence packages are complete historical records, not passing
-release evidence:
+Five evidence packages are preserved. The two fresh candidates are mechanically
+complete but are not passing release evidence until independent review:
 
 - `2026-08-24-codex-context-resume`: structurally valid, human verdict pending,
   deterministic final-state check false;
@@ -72,26 +72,23 @@ release evidence:
   critical leakage and persistence failures;
 - `2026-08-24-pi-gptoss-target-drift`: structurally valid failed evidence,
   critical target-drift and leakage failures.
+- `2026-08-24-codex-novice-branches-byte-exact`: every deterministic check
+  passes, no critical failures, human verdict pending;
+- `2026-08-25-pi-retry-repair-transfer-openai-byte-exact`: every deterministic
+  check passes, no critical failures, human verdict pending.
 
-The validator accepts these packages only when explicitly asked to preserve
-failed evidence with `--allow-failed`. It rejects all three as release evidence
-without that flag.
+The validator accepts all five structurally with `--allow-failed`. It correctly
+rejects the historical failures and the two pending candidates as release
+evidence without that flag.
 
 ## Required path before a release tag
 
-1. Run a fresh Codex scenario and retain the original final state bytes before
-   any later host mutates the root. Use the tested exclusive
-   `scripts/package-eval-artifact.mjs` capture path immediately after session
-   closure rather than manually copying evidence later.
-2. After explicit founder approval for the described data egress, run a fresh
-   cloud Pi behavioral scenario on a disposable root.
-3. Repair any critical behavioral failure with a regression test or narrowly
-   scoped protocol rule, then rerun from a fresh root.
-4. Obtain independent human `pass` verdicts and validate the accepted packages
+1. Obtain independent human `pass` verdicts for the fresh Codex and Pi packages
+   and validate the accepted packages
    without `--allow-failed`.
-5. Create or attach the intended GitHub remote, then run the committed uncached
+2. Create or attach the intended GitHub remote, then run the committed uncached
    macOS Node 20/22 CI matrix and retain the hosted receipts.
-6. Only after live acceptance, choose the hardened prerelease version, add the
+3. Only after live acceptance, choose the hardened prerelease version, add the
    changelog and exact version record, rerun the full destructive audit, land a
    clean commit, and create the annotated tag.
 

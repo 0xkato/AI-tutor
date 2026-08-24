@@ -27,17 +27,20 @@ Current local evidence includes:
 - an actual `EACCES` renderer failure in which canonical revision 1 committed,
   `repair-render` returned revision 1 without changing canonical state bytes,
   and `doctor` reported a current projection afterward;
-- three complete live-host evidence packages that validate structurally only
-  with `--allow-failed` and are correctly rejected by the release validator.
+- five complete live-host evidence packages: three preserved historical
+  packages and two fresh byte-exact Codex/Pi candidates that validate
+  structurally with no critical failures but still have pending human verdicts.
 
 Those facts do not satisfy the release definition of done. The Codex artifact
-is pending because its original final state bytes were not retained. Both
-local Pi behavioral artifacts contain critical failures. The cloud Pi run was
-only a connectivity smoke test. The supported Node 20/22 matrix is now verified
-locally on macOS arm64. The uncached GitHub Actions workflow is present and
-contract-tested, but this repository has no GitHub remote, so it has not run in
-hosted CI. Accepted human verdicts, changelog/version discipline, clean release
-commit, and release tag are still unproved or absent.
+and Pi-to-OpenAI-Codex artifact now preserve their original final state bytes,
+pass every deterministic check, and contain no critical failures. They remain
+pending because neither has an independent human `pass` verdict. The two older
+local Pi behavioral artifacts retain their critical failures as regression
+evidence. The supported Node 20/22 matrix is verified locally on macOS arm64.
+The uncached GitHub Actions workflow is present and contract-tested, but this
+repository has no GitHub remote, so it has not run in hosted CI. Accepted human
+verdicts, changelog/version discipline, clean release commit, and release tag
+are still unproved or absent.
 
 No production-ready, Pi-support, cross-host, or tagged-release claim is made.
 

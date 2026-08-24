@@ -8,7 +8,8 @@ versions below 20. Newer versions can run, but they are not part of the
 qualified release matrix until CI covers them.
 
 Pi adapter discovery and command behavior are verified locally, but Pi is not
-yet release-qualified. A fresh live Pi behavioral run, independent human pass,
+yet release-qualified. A fresh live Pi-to-OpenAI-Codex behavioral artifact is
+mechanically complete with no critical failures, but an independent human pass
 and accepted artifact are still required before this document may describe Pi
 as supported.
 

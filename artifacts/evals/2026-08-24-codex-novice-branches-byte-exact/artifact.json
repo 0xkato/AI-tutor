@@ -1,0 +1,127 @@
+{
+  "formatVersion": 1,
+  "suiteVersion": "1.0.0",
+  "scenario": {
+    "id": "novice-branches",
+    "version": 1
+  },
+  "host": "codex",
+  "sessionId": "e89f7607-ce37-41c5-aca2-b351d5dadd43",
+  "startedAt": "2026-08-24T20:06:31.248Z",
+  "completedAt": "2026-08-24T20:26:04.361Z",
+  "provenance": {
+    "codexThreadId": "01a03560-bc29-7981-ae46-37067d4b7f8e",
+    "rollout": "/Users/0xkato/.codex/sessions/2026/08/24/rollout-2026-08-24T22-05-27-01a03560-bc29-7981-ae46-37067d4b7f8e.jsonl",
+    "learningRoot": "/private/tmp/adaptive-codex-acceptance.3fZ8E3",
+    "snapshotOrigin": "Byte-exact canonical state copied immediately after the live Codex session closed and before the approved Pi retention run could mutate the shared learning root.",
+    "transcriptScope": "All visible user and assistant messages from the acceptance prompt through closure, excluding only injected environment-context envelopes and all hidden reasoning or tool traffic.",
+    "claimBoundary": "Complete pending Codex evidence package; it is not release acceptance until a human reviewer records a passing verdict."
+  },
+  "rubric": {
+    "dimensions": {
+      "targetFidelity": {
+        "score": 4,
+        "evidence": "The exact browser-to-database target remains unchanged from the opening prompt through the final lost-response synthesis."
+      },
+      "frontierAccuracy": {
+        "score": 4,
+        "evidence": "The broad probe identifies client-server roles and durable persistence as separate admitted gaps, and the validated DAG reconnects both branches at the target."
+      },
+      "questionClarity": {
+        "score": 4,
+        "evidence": "Each checkpoint names the actors, scenario, changing event, and requested causal distinction; the interrupted checkpoint is resumed verbatim."
+      },
+      "leakageAvoidance": {
+        "score": 4,
+        "evidence": "Admitted gaps are taught before transfer checks, the interrupted checkpoint is repeated without an answer, and no assessment feedback precedes persistence."
+      },
+      "assessmentAccuracy": {
+        "score": 4,
+        "evidence": "Every Correct assessment cites the exact required mechanism present in the learner answer, without manufacturing missing links."
+      },
+      "sourceSupport": {
+        "score": 4,
+        "evidence": "Two directly retrieved primary sources support the narrow HTTP role and committed-durability claims, with claim-level verification notes in canonical state and the ledger."
+      },
+      "pacing": {
+        "score": 3,
+        "evidence": "The host advances one frontier checkpoint at a time and preserves the route, though operational persistence narration is more verbose than the ideal learner-facing pace."
+      },
+      "persistence": {
+        "score": 4,
+        "evidence": "The byte-exact final state contains the admitted gaps, sources, validated plan, seven steps, eight assessments, resolved synthesis, scheduled reviews, and no active session."
+      },
+      "synthesis": {
+        "score": 4,
+        "evidence": "The unfamiliar calendar scenario connects request, server handling, committed durable state, response, browser rendering, and the commit-success/response-loss branch."
+      }
+    },
+    "deterministicChecks": [
+      {
+        "name": "canonical-state-valid",
+        "passed": true,
+        "evidence": "The packaging validator validates the schema-version-2 state snapshot."
+      },
+      {
+        "name": "session-closed",
+        "passed": true,
+        "evidence": "The acceptance session phase is complete, completedAt is set, and activeSessionId is null."
+      },
+      {
+        "name": "admitted-gaps-not-graded",
+        "passed": true,
+        "evidence": "The client-server and persistence admissions are stored as admitted gaps without fabricated probe assessments."
+      },
+      {
+        "name": "resume-used-exact-checkpoint",
+        "passed": true,
+        "evidence": "The checkout shipping-address checkpoint shown after interruption is byte-identical to the pending persisted question."
+      },
+      {
+        "name": "questions-persisted-before-answers",
+        "passed": true,
+        "evidence": "Canonical steps and synthesis checkpoint contain exact identities and text matched by their later assessments."
+      },
+      {
+        "name": "clean-synthesis-resolved",
+        "passed": true,
+        "evidence": "The required synthesis is a clean Correct assessment and is the source of the closed-session synthesis."
+      },
+      {
+        "name": "exact-live-final-state-bytes-preserved",
+        "passed": true,
+        "evidence": "The artifact packager copies the untouched final state bytes before any Pi mutation of the shared root."
+      }
+    ],
+    "contaminatedQuestions": [],
+    "criticalFailures": [],
+    "humanVerdict": {
+      "outcome": "pending",
+      "reviewer": "Pending human review",
+      "reviewedAt": null,
+      "rationale": "The evidence package is mechanically complete and awaits the founder's independent verdict."
+    }
+  },
+  "files": {
+    "transcript": {
+      "path": "transcript.md",
+      "bytes": 22941,
+      "sha256": "641574c227330158cd7e4c630c556a643a18293838ee67998851290fe3db946e"
+    },
+    "stateSnapshot": {
+      "path": "state.json",
+      "bytes": 38351,
+      "sha256": "c4c33551d13e3fa0d762e226c730926878629e5599b87a8127700dfed8f14a8f"
+    },
+    "sourceLedger": {
+      "path": "source-ledger.json",
+      "bytes": 1226,
+      "sha256": "6bb53b6aa92bc8a2b541a5521b25f9836656ef2d1ee6bc624958b5f0625698ff"
+    },
+    "renderedNote": {
+      "path": "rendered-note.md",
+      "bytes": 15784,
+      "sha256": "59995779a91c06afe6184b82f272d89d753dfb509e2575f501e68be7a32dfb22"
+    }
+  }
+}

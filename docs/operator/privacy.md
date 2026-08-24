@@ -27,6 +27,20 @@ account settings, and provider telemetry are governed by those products, not
 by this repository. A source URL is recorded as evidence metadata; recording
 it does not fetch or verify the page.
 
+## Scoped external-transmission approval
+
+Before an agent sends local skill or protocol text, canonical learning state,
+transcripts, source records, visuals, or other learner material to an external
+model or provider, it must name the exact payload, destination, purpose, and
+material exclusions before asking for approval.
+
+After that scoped request is stated, a direct explicit approval such as `I
+approve`, `yes`, or `go ahead` authorizes exactly the described transmission.
+The learner does not need to repeat the payload, destination, or a special
+approval phrase. The agent asks again only if the payload, destination,
+purpose, or scope materially changes. The evidence record should preserve the
+approved boundary without copying unrelated private material.
+
 ## Filesystem protection
 
 Canonical state, manifests, backups, generated notes, and export files are

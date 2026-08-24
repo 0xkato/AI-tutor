@@ -47,8 +47,10 @@ skill initializes or resumes durable state before probing or teaching.
 ## Use with Pi
 
 Pi integration is included, but it is not yet release-qualified. The adapter
-and commands below are locally verified; a fresh live behavioral run and
-independent human pass are still required before claiming Pi support.
+and commands below are locally verified. A fresh live Pi-to-OpenAI-Codex
+behavioral run is mechanically complete with no critical failures, but its
+independent human verdict remains pending. Do not claim Pi support until that
+artifact is accepted.
 
 Launch Pi from this repository, then use:
 

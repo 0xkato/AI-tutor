@@ -4,88 +4,94 @@ Date: 2026-08-24
 
 Status: **not release-accepted**
 
-This record separates structurally valid evidence from behavioral release
-acceptance. A complete evidence package can preserve a successful, failed, or
-pending run. Only a package that satisfies every deterministic gate and receives
-an independent human `pass` verdict counts toward release acceptance.
+This record separates mechanically valid evidence from behavioral release
+acceptance. A complete package may preserve a successful, failed, or pending
+run. Only a package that satisfies every deterministic gate and receives an
+independent human `pass` verdict counts toward release acceptance.
 
-## Codex
+## Fresh Codex candidate
 
-The live Codex session completed the `context-resume` scenario successfully at
-the conversational level. It preserved the learner's target, resumed with the
-exact persisted question, avoided answer leakage, recorded four assessments,
-and reached a whole-system synthesis.
+The fresh Codex `novice-branches` session used an unfamiliar browser-to-server
+target, diagnosed multiple prerequisite branches, researched narrow primary
+source claims, built the dependency route, persisted each checkpoint before
+answering, survived an interruption, resumed with the byte-identical pending
+question, and closed after a clean whole-system synthesis.
 
 Evidence:
 
-- `artifacts/evals/2026-08-24-codex-context-resume/`
-- Codex thread: `01a0347e-8674-7b00-9a59-9cc98185a127`
-- learning session: `1fc8b737-a2f6-4aef-a2d1-03641b86f1dd`
+- `artifacts/evals/2026-08-24-codex-novice-branches-byte-exact/`
+- Codex thread: `01a03560-bc29-7981-ae46-37067d4b7f8e`
+- learning session: `e89f7607-ce37-41c5-aca2-b351d5dadd43`
+- byte-exact final state SHA-256:
+  `c4c33551d13e3fa0d762e226c730926878629e5599b87a8127700dfed8f14a8f`
 
-This run is not release-accepted. A later failed Pi review mutated the original
-root before the revision-22 state bytes were copied. The packaged state reverses
-only the isolated review mutations and was cross-checked against an independent
-revision-22 replay, but that reconstruction is not byte-exact preservation of
-the original final live snapshot. The corresponding deterministic check is
-therefore `false`, and the human verdict remains `pending`.
+The package validates structurally with every deterministic check passing, no
+contaminated questions, and no critical failures. Its nine rubric dimensions
+average `3.888888888888889` out of `4`; pacing is `3` and every other dimension
+is `4`. Its human verdict remains `pending`, so it is not release-accepted.
 
-## Pi
+The earlier `artifacts/evals/2026-08-24-codex-context-resume/` package remains
+preserved as historical evidence. Its reconstructed final state is not used as
+the fresh release candidate.
 
-Two live local Pi sessions using `ollama/gpt-oss:20b` were preserved as failed
-evidence:
+## Fresh Pi-to-OpenAI-Codex candidate
+
+After the founder approved sending the adaptive-learning skill/protocol and
+synthetic acceptance state/transcript to OpenAI Codex through Pi, a live Pi
+session used `@earendil-works/pi-coding-agent@0.84.2` with provider
+`openai-codex` and model `gpt-5.6-luna`. It opened the same canonical learning
+root, claimed the due durability-versus-visibility review, persisted the exact
+question before showing it, handled two misses under the same durable identity,
+withheld the answer after the first miss, taught the missing mechanism only
+after the second miss, persisted a new warehouse transfer before asking it,
+recorded the clean transfer, and durably closed before showing closure.
+
+Evidence:
+
+- `artifacts/evals/2026-08-25-pi-retry-repair-transfer-openai-byte-exact/`
+- Pi session: `01a03586-9e68-76f3-8e3b-592d5a5eb813`
+- learning review session: `55ad5c9b-e338-49ac-a32b-d17959d50ef5`
+- review: `c8e22cfe-76ff-43f6-b934-8a567f1c1077`
+- byte-exact final state SHA-256:
+  `ceae680e1ed1cd62975ef605336476f2f0e350536cd1d7c389555af2c4b54bd2`
+
+The package validates structurally with every deterministic check passing, no
+contaminated questions, and no critical failures. Its nine rubric dimensions
+average `3.888888888888889` out of `4`; persistence is `3` because an initial
+non-monotonic timestamp mutation was rejected and safely retried before the
+question, while every other dimension is `4`. Its human verdict remains
+`pending`, so it is not release-accepted.
+
+The two earlier live local `ollama/gpt-oss:20b` packages remain preserved as
+failed regression evidence:
 
 - `artifacts/evals/2026-08-24-pi-gptoss-answer-leakage/` records first-miss
   answer leakage, a persistence mismatch, and an incomplete review.
 - `artifacts/evals/2026-08-24-pi-gptoss-target-drift/` records replacement of
   the selected concept, first-miss answer leakage, and an incomplete review.
 
-These packages are useful regression records. They do not support Pi release
-acceptance.
+Those historical failures are not the fresh Pi release candidate.
 
-The preserved failures were traced against the shared host contract before a
-rerun. The deterministic engine correctly rejected mismatched checkpoint
-identity and incomplete review state, but semantic question-to-concept alignment
-and conversational ordering remain host responsibilities. The shared skill now
-requires three explicit preconditions for the rerun:
+## Scoped approval rule
 
-- a retention question must require the selected concept's causal mechanism,
-  not merely share its broad topic;
-- `record-assessment` must succeed before assessment feedback is shown;
-- first-miss feedback must omit the correct outcome, expected mechanism,
-  correct value, corrective steps, and replacement answer wording.
+Before requesting approval for external transmission, the agent must name the
+exact payload, destination, purpose, and material exclusions. Once that scoped
+request is stated, a direct explicit approval such as `I approve`, `yes`, or
+`go ahead` authorizes exactly that action. The agent must not ask for the same
+approval again merely because the response is short or does not repeat the
+payload and destination. New approval is required only when the payload,
+destination, purpose, or scope materially changes.
 
-The skill-contract regression and complete local release check pass with these
-rules. That is repair evidence, not live-host acceptance; only a fresh Pi run
-can show whether the host follows them.
-
-A separate cloud Pi smoke session proved that the Pi runtime could invoke an
-OpenAI Codex-subscription model and execute a real tool call. The session is
-stored at:
-
-`/private/tmp/adaptive-pi-openai-session.Q8O4YR/2026-08-24T17-15-28-185Z_01a034c5-1c38-7fc5-a279-8bd59e0c0420.jsonl`
-
-That smoke test proves model/runtime/tool connectivity only. It does not prove
-the adaptive-learning behavior.
-
-The cloud Pi behavioral run has not been performed because it would transmit
-the project skill/protocol and a synthetic acceptance learning state/transcript
-to OpenAI. That requires the founder's explicit approval. No Pi support or
-cross-host release-readiness claim may be made until a fresh behavioral run is
-packaged, independently reviewed, and accepted.
+For this run, the approved scope was the adaptive-learning skill/protocol and
+synthetic acceptance state/transcript sent to OpenAI Codex through Pi. No
+second approval was required.
 
 ## Remaining acceptance work
 
-1. Run a fresh Codex scenario while preserving the final live state bytes before
-   any later mutation. Use `scripts/package-eval-artifact.mjs` immediately after
-   closure; the command now refuses overwrite, freezes the four required files,
-   records their hashes in `artifact.json` and `capture.json`, and validates the
-   pending package before publishing it.
-2. Obtain explicit data-egress approval, then run the cloud Pi behavioral
-   scenario on a fresh disposable root.
-3. Package each run with hashes, canonical state, transcript, source ledger,
-   rendered note, deterministic checks, contamination records, and claim
-   boundaries.
-4. Have the founder independently review each package and replace `pending`
-   with a justified `pass` or `fail` verdict.
-5. Validate accepted packages without `--allow-failed` before making release
-   claims.
+1. Have the founder independently review the fresh Codex and Pi packages and
+   replace each `pending` verdict with a justified `pass` or `fail`.
+2. Validate both accepted packages without `--allow-failed`.
+3. Run the committed macOS Node 20/22 matrix in hosted GitHub Actions after an
+   intended remote exists, and retain the hosted receipts.
+4. Only after those gates pass, choose the release version, add the changelog,
+   rerun the release check from a clean commit, and create the annotated tag.

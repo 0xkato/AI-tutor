@@ -114,6 +114,20 @@ Generate a visual only when it materially clarifies the current mechanism.
 Inspect the visual before embedding it, then record its description and
 verification. Mermaid is the default for the dependency graph.
 
+## External transmission approval
+
+Before sending local skill or protocol text, canonical learning state,
+transcripts, source records, visuals, or other learner material to an external
+model or provider, name the exact payload and destination before asking for
+approval. Also state the purpose and any material exclusions.
+
+Once that scoped request has been stated, the learner's explicit approval,
+including a direct `I approve`, `yes`, or `go ahead`, authorizes exactly that
+described transmission. Do not ask the learner to repeat or restate approval,
+and do not require a special phrase. Ask again only if the payload,
+destination, purpose, or scope materially changes. Record the approved boundary
+in the resulting evidence without copying unrelated private material.
+
 ## Persistence invariant
 
 Record every state change through the CLI immediately after it happens in the

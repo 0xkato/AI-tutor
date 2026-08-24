@@ -1,0 +1,26 @@
+{
+  "formatVersion": 1,
+  "capturedAt": "2026-08-24T20:34:17.245Z",
+  "files": {
+    "transcript": {
+      "path": "transcript.md",
+      "bytes": 22941,
+      "sha256": "641574c227330158cd7e4c630c556a643a18293838ee67998851290fe3db946e"
+    },
+    "stateSnapshot": {
+      "path": "state.json",
+      "bytes": 38351,
+      "sha256": "c4c33551d13e3fa0d762e226c730926878629e5599b87a8127700dfed8f14a8f"
+    },
+    "sourceLedger": {
+      "path": "source-ledger.json",
+      "bytes": 1226,
+      "sha256": "6bb53b6aa92bc8a2b541a5521b25f9836656ef2d1ee6bc624958b5f0625698ff"
+    },
+    "renderedNote": {
+      "path": "rendered-note.md",
+      "bytes": 15784,
+      "sha256": "59995779a91c06afe6184b82f272d89d753dfb509e2575f501e68be7a32dfb22"
+    }
+  }
+}

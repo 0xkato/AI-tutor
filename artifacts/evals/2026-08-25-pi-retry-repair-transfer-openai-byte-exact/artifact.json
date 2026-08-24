@@ -1,0 +1,154 @@
+{
+  "formatVersion": 1,
+  "suiteVersion": "1.0.0",
+  "scenario": {
+    "id": "retry-repair-transfer",
+    "version": 1
+  },
+  "host": "pi",
+  "sessionId": "55ad5c9b-e338-49ac-a32b-d17959d50ef5",
+  "startedAt": "2026-08-25T21:00:00.000Z",
+  "completedAt": "2026-08-25T21:00:00.000Z",
+  "provenance": {
+    "piSessionId": "01a03586-9e68-76f3-8e3b-592d5a5eb813",
+    "piSession": "/private/tmp/adaptive-pi-retention-session.Wzw6sQ/2026-08-24T20-46-49-960Z_01a03586-9e68-76f3-8e3b-592d5a5eb813.jsonl",
+    "provider": "openai-codex",
+    "model": "gpt-5.6-luna",
+    "piPackage": "@earendil-works/pi-coding-agent@0.84.2",
+    "learningRoot": "/private/tmp/adaptive-codex-acceptance.3fZ8E3",
+    "sourceSessionId": "e89f7607-ce37-41c5-aca2-b351d5dadd43",
+    "reviewId": "c8e22cfe-76ff-43f6-b934-8a567f1c1077",
+    "snapshotOrigin": "Byte-exact canonical state copied immediately after the live Pi review closed and before any further state mutation.",
+    "transcriptScope": "Every non-empty visible user and assistant text message in the isolated Pi session; tool traffic and hidden reasoning are excluded.",
+    "scenarioInstantiation": "The retry-repair-transfer lifecycle is exercised as a due cross-host review of an existing source-backed durability-versus-visibility concept in the same canonical learning root.",
+    "orderingAudit": {
+      "firstCheckpointPersisted": 19,
+      "firstQuestionShown": 23,
+      "firstAnswerReceived": 24,
+      "firstAssessmentPersisted": 25,
+      "firstFeedbackShown": 27,
+      "secondAnswerReceived": 28,
+      "secondAssessmentPersisted": 29,
+      "transferCheckpointPersisted": 31,
+      "repairAndTransferShown": 33,
+      "transferAnswerReceived": 34,
+      "transferAssessmentPersisted": 35,
+      "correctFeedbackShown": 37,
+      "closeReviewPersisted": 41,
+      "closureShown": 43
+    },
+    "claimBoundary": "Complete pending Pi-to-OpenAI-Codex evidence package; it is not release acceptance until a human reviewer records a passing verdict."
+  },
+  "rubric": {
+    "dimensions": {
+      "targetFidelity": {
+        "score": 4,
+        "evidence": "The selected durable-visible-change concept, exact persisted question, and separate persistence/visibility branches remain unchanged through both misses, repair, transfer, and closure."
+      },
+      "frontierAccuracy": {
+        "score": 4,
+        "evidence": "The first miss is isolated as branch conflation, the second as causal-branch reversal, and repair teaches only that boundary before a new transfer."
+      },
+      "questionClarity": {
+        "score": 4,
+        "evidence": "The ticketing and warehouse questions name the actors, committed state, response failure, current display, later visit, and exact causal distinction requested."
+      },
+      "leakageAvoidance": {
+        "score": 4,
+        "evidence": "First-miss feedback names only the break and error type, repeats the exact question, and withholds the correct mechanism until the second miss permits teaching."
+      },
+      "assessmentAccuracy": {
+        "score": 4,
+        "evidence": "Both incorrect assessments identify the exact causal error, while the final Correct assessment cites the clean transfer's explicit durability and visibility distinction."
+      },
+      "sourceSupport": {
+        "score": 4,
+        "evidence": "The reviewed concept remains linked to the original session's RFC 9110 and SQLite primary-source records; the review adds no unsupported external claim."
+      },
+      "pacing": {
+        "score": 4,
+        "evidence": "The host asks one question, gives one bounded retry, teaches one compact missing mechanism after the second miss, and asks one new transfer before stopping."
+      },
+      "persistence": {
+        "score": 3,
+        "evidence": "Every accepted checkpoint, assessment, repair transfer, and closure is durably ordered before its visible claim, and final bytes match the frozen snapshot; one rejected non-monotonic timestamp attempt was recovered without mutation before the first question."
+      },
+      "synthesis": {
+        "score": 4,
+        "evidence": "Canonical context correctly said synthesis was not required for the single selected item, and closure summarizes only the clean transfer evidence without inventing an additional mastery claim."
+      }
+    },
+    "deterministicChecks": [
+      {
+        "name": "canonical-state-valid",
+        "passed": true,
+        "evidence": "The packaging validator validates the schema-version-2 frozen state snapshot."
+      },
+      {
+        "name": "review-session-closed",
+        "passed": true,
+        "evidence": "Review session 55ad5c9b-e338-49ac-a32b-d17959d50ef5 is complete, activeSessionId is null, and the selected item is resolved."
+      },
+      {
+        "name": "first-miss-exact-retry-without-answer",
+        "passed": true,
+        "evidence": "The first two assessments reuse question ID retention-durable-visible-q1 and byte-identical question text; first feedback names branch conflation without revealing the resolution."
+      },
+      {
+        "name": "second-miss-new-transfer",
+        "passed": true,
+        "evidence": "After the second miss, the host persists a new transfer checkpoint under retention-durable-visible-transfer-q1 before teaching and showing it."
+      },
+      {
+        "name": "assessment-before-feedback",
+        "passed": true,
+        "evidence": "Pi JSONL ordering was verified at source lines 25<27, 29<33, and 35<37."
+      },
+      {
+        "name": "closure-after-durable-close",
+        "passed": true,
+        "evidence": "The close-review command at Pi JSONL line 41 precedes the visible closure at line 43."
+      },
+      {
+        "name": "review-regressed-and-rescheduled",
+        "passed": true,
+        "evidence": "The review remains scheduled at level 0 for 2026-08-26T21:00:00.000Z after current failed evidence and clean repair transfer; earlier successful evidence remains in concept history."
+      },
+      {
+        "name": "exact-live-final-state-bytes-preserved",
+        "passed": true,
+        "evidence": "The frozen state snapshot SHA-256 is ceae680e1ed1cd62975ef605336476f2f0e350536cd1d7c389555af2c4b54bd2."
+      }
+    ],
+    "contaminatedQuestions": [],
+    "criticalFailures": [],
+    "humanVerdict": {
+      "outcome": "pending",
+      "reviewer": "Pending human review",
+      "reviewedAt": null,
+      "rationale": "The evidence package is mechanically complete and awaits the founder's independent verdict."
+    }
+  },
+  "files": {
+    "transcript": {
+      "path": "transcript.md",
+      "bytes": 3043,
+      "sha256": "9fe8caa528404e05da4a4ba09e5660be7c07c07f57ac3a909f3a99b49466ff4e"
+    },
+    "stateSnapshot": {
+      "path": "state.json",
+      "bytes": 45600,
+      "sha256": "ceae680e1ed1cd62975ef605336476f2f0e350536cd1d7c389555af2c4b54bd2"
+    },
+    "sourceLedger": {
+      "path": "source-ledger.json",
+      "bytes": 1425,
+      "sha256": "b9bfc45637b31cc1fbb7b73223f107b3eb1ee58932e0a08c35a75b25db896dc9"
+    },
+    "renderedNote": {
+      "path": "rendered-note.md",
+      "bytes": 2842,
+      "sha256": "f301c259d418026f4781fe616a47e02755df95f5cba7f7f4d3ff0c5da7905ba4"
+    }
+  }
+}

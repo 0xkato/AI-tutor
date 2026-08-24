@@ -47,6 +47,14 @@ test("skill corpus preserves the complete adaptive-learning behavior", () => {
     ["agent-led research", /agent (owns|handles).*research.*verification.*fact-check/is],
     ["visible source choice", /discuss.*source (selection|choices).*learner/is],
     ["no per-source approval", /do not require.*per-source approval/i],
+    [
+      "scoped external-transmission approval is accepted without a magic phrase",
+      /name the exact payload.*destination.*before asking for\s+approval[\s\S]*explicit approval[\s\S]*authorizes exactly that\s+described transmission[\s\S]*do not ask.*repeat.*approval/is,
+    ],
+    [
+      "materially changed egress scope requires new approval",
+      /ask again only if.*payload.*destination.*purpose.*scope.*materially changes/is,
+    ],
     ["claim-level provenance fields", /supported claim/i],
     ["source class provenance", /source class/i],
     ["verification provenance", /verification note/i],
