@@ -131,7 +131,7 @@ export function finishProbe(state, { summary, now } = {}) {
       }
       const unresolvedRetry = session.conceptIds
         .map((conceptId) => next.concepts[conceptId])
-        .find((concept) => concept?.retry);
+        .find((concept) => concept?.retry && !concept.retry.answerMayBeTaught);
       if (unresolvedRetry) {
         throw new LearningError(
           `Probe checkpoint for ${unresolvedRetry.key} must be resolved before planning`,
@@ -221,7 +221,11 @@ export function recordStep(state, input) {
       const unresolvedRetry = session.conceptIds
         .map((conceptId) => next.concepts[conceptId])
         .find((concept) => concept?.retry);
-      if (unresolvedRetry) {
+      const permittedRepair =
+        !session.activeStepId &&
+        unresolvedRetry?.retry?.answerMayBeTaught === true &&
+        unresolvedRetry.key === step.nodeId;
+      if (unresolvedRetry && !permittedRepair) {
         throw new LearningError(
           `A required checkpoint for ${unresolvedRetry.key} must be resolved before another step`,
           "RETRY_REQUIRED",

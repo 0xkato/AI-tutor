@@ -152,6 +152,50 @@ test("partial answers escalate through retry to a required new transfer", () => 
   assert.equal(retry.answerMayBeTaught, true);
 });
 
+test("a second probe miss can enter the permitted teaching repair", () => {
+  let state = recordAssessment(fresh(), answer({
+    grade: "incorrect",
+    answer: "Only vector addition.",
+    evidence: "The first attempt omitted scalar multiplication from the vector-space structure.",
+    mistakeType: "missing-operation",
+  }));
+  state = recordAssessment(state, answer({
+    id: "a2",
+    grade: "incorrect",
+    answer: "Vector addition and multiplication of vectors.",
+    evidence: "The bounded retry still replaced scalar multiplication with an invalid vector product.",
+  }));
+
+  state = finishProbe(state, {
+    summary: "The bounded probe established a gap in the operations defining vector structure.",
+    now: "2026-08-24T08:01:00.000Z",
+  });
+  state = setPlan(state, {
+    plan: {
+      targetNodeId: "vectors",
+      nodes: [{ id: "vectors", title: "Vectors" }],
+      edges: [],
+    },
+    now: "2026-08-24T08:02:00.000Z",
+  });
+  state = beginTeach(state, { now: "2026-08-24T08:03:00.000Z" });
+  state = recordStep(state, {
+    id: "repair-step",
+    nodeId: "vectors",
+    foundation: "The learner already recognizes vector addition.",
+    motivation: "Vector addition alone cannot express scaling by field elements.",
+    explanation: "Scalar multiplication supplies the missing operation.",
+    checkpointQuestion: "Transfer both operations to a new vector-space example.",
+    now: "2026-08-24T08:04:00.000Z",
+  });
+
+  const session = getActiveSession(state);
+  assert.equal(session.phase, "teach");
+  assert.equal(session.activeStepId, "repair-step");
+  assert.equal(session.checkpoint.status, "awaiting-answer");
+  assert.equal(conceptForNode(state, session, "vectors").retry.status, "new-transfer-required");
+});
+
 test("a teaching checkpoint follows retry, teaching permission, and new transfer states", () => {
   let state = teaching();
   assert.equal(getActiveSession(state).checkpoint.status, "awaiting-answer");
