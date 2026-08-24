@@ -196,6 +196,42 @@ test("a second probe miss can enter the permitted teaching repair", () => {
   assert.equal(conceptForNode(state, session, "vectors").retry.status, "new-transfer-required");
 });
 
+test("a dependency plan cannot omit a diagnosed retry concept", () => {
+  let state = recordAssessment(fresh(), answer({
+    grade: "incorrect",
+    answer: "Only vector addition.",
+    evidence: "The first attempt omitted scalar multiplication from the vector-space structure.",
+    mistakeType: "missing-operation",
+  }));
+  state = recordAssessment(state, answer({
+    id: "a2",
+    grade: "incorrect",
+    answer: "Vector addition and multiplication of vectors.",
+    evidence: "The bounded retry still replaced scalar multiplication with an invalid vector product.",
+  }));
+  state = finishProbe(state, {
+    summary: "The bounded probe established a gap in the operations defining vector structure.",
+    now: "2026-08-24T08:01:00.000Z",
+  });
+
+  assert.throws(
+    () => setPlan(state, {
+      plan: {
+        targetNodeId: "linear-functional",
+        nodes: [{ id: "linear-functional", title: "Linear functional" }],
+        edges: [],
+      },
+      now: "2026-08-24T08:02:00.000Z",
+    }),
+    /dependency plan must include diagnosed concept: vectors/i,
+  );
+  assert.equal(getActiveSession(state).plan, null);
+  assert.equal(
+    conceptForNode(state, getActiveSession(state), "linear-functional", { required: false }),
+    null,
+  );
+});
+
 test("a teaching checkpoint follows retry, teaching permission, and new transfer states", () => {
   let state = teaching();
   assert.equal(getActiveSession(state).checkpoint.status, "awaiting-answer");

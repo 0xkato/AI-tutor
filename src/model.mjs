@@ -153,6 +153,16 @@ export function setPlan(state, { plan, now } = {}) {
       if (session.phase !== "plan") {
         throw new LearningError(`Cannot set a plan during ${session.phase}`, "INVALID_PHASE");
       }
+      const plannedNodeIds = new Set(checked.nodes.map((node) => node.id));
+      const omittedRetry = session.conceptIds
+        .map((conceptId) => next.concepts[conceptId])
+        .find((concept) => concept?.retry && !plannedNodeIds.has(concept.key));
+      if (omittedRetry) {
+        throw new LearningError(
+          `Dependency plan must include diagnosed concept: ${omittedRetry.key}`,
+          "PLAN_OMITS_DIAGNOSED_CONCEPT",
+        );
+      }
       session.plan = bindPlanConcepts(next, session, checked, { now });
       session.frontier = nextFrontier(session.plan, knowledgeForSession(next, session));
     },
