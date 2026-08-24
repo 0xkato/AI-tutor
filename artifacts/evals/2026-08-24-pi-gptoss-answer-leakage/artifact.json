@@ -1,0 +1,137 @@
+{
+  "formatVersion": 1,
+  "suiteVersion": "1.0.0",
+  "scenario": {
+    "id": "retention-regression",
+    "version": 1
+  },
+  "host": "pi",
+  "sessionId": "bfd30957-37ab-4689-9c1a-a667c9ff2cb9",
+  "startedAt": "2026-08-24T16:17:53.979Z",
+  "completedAt": "2026-08-24T16:31:48.574Z",
+  "provenance": {
+    "piSessionFile": "/private/tmp/adaptive-pi-session-ea091fb.bFLKKA/2026-08-24T16-17-53-947Z_7983372c-1a7f-4901-9462-4ecc45e71b83.jsonl",
+    "model": "ollama/gpt-oss:20b",
+    "transcriptScope": "Curated verbatim excerpts covering review selection, checkpoint persistence, learner answer, and the critical host failure; protocol reads and unrelated tool chatter are omitted.",
+    "claimBoundary": "Structurally complete failed evidence; it does not support Pi release acceptance."
+  },
+  "files": {
+    "transcript": {
+      "path": "transcript.md",
+      "bytes": 4330,
+      "sha256": "cc09f6c063bfda856d984007cf208cb63c24ecee02ae06faf50c24a14907c667"
+    },
+    "stateSnapshot": {
+      "path": "state.json",
+      "bytes": 39972,
+      "sha256": "6471eaa2928406e5cfa634b69c34404bc3cc1ace8004992944fb444710fb14c0"
+    },
+    "sourceLedger": {
+      "path": "source-ledger.json",
+      "bytes": 4249,
+      "sha256": "e668d734822d515dde8b852e52c8b8ee102d0e16e701d316f80bc5c57b29207f"
+    },
+    "renderedNote": {
+      "path": "rendered-note.md",
+      "bytes": 1653,
+      "sha256": "9ed9bfbd4135d4f67f8a9bc3089492555204efb7751103217d823dc1780f96e2"
+    }
+  },
+  "rubric": {
+    "dimensions": {
+      "targetFidelity": {
+        "score": 3,
+        "evidence": "The eventual checkpoint matches the selected uniqueness-arbitration review, but the host initially stopped without performing the requested review."
+      },
+      "frontierAccuracy": {
+        "score": 2,
+        "evidence": "The host eventually selected the due concept after correction, but only after misreading truncated CLI information."
+      },
+      "questionClarity": {
+        "score": 4,
+        "evidence": "The displayed retention question is fully framed and matches the persisted checkpoint."
+      },
+      "leakageAvoidance": {
+        "score": 0,
+        "evidence": "The first-miss assessment explicitly states the wait, commit, rollback, and write-time enforcement answer."
+      },
+      "assessmentAccuracy": {
+        "score": 1,
+        "evidence": "The Incorrect label is directionally right, but the response violates the required first-miss boundary by teaching the answer."
+      },
+      "sourceSupport": {
+        "score": 3,
+        "evidence": "The retained concept has primary-source support, although no new source verification was needed for this review."
+      },
+      "pacing": {
+        "score": 1,
+        "evidence": "The host performed extensive tool work, stopped once without the review, and required a corrective user turn."
+      },
+      "persistence": {
+        "score": 2,
+        "evidence": "The review claim and checkpoint were persisted, but the conversational first-miss assessment and leakage were not recorded in canonical state."
+      },
+      "synthesis": {
+        "score": 0,
+        "evidence": "The review did not complete and no synthesis was reached."
+      }
+    },
+    "deterministicChecks": [
+      {
+        "name": "canonical-state-valid",
+        "passed": true,
+        "evidence": "The artifact validator validates the schema-version-2 snapshot."
+      },
+      {
+        "name": "selected-one-review",
+        "passed": true,
+        "evidence": "state.json contains one active review item for unique-constraint-arbitration."
+      },
+      {
+        "name": "question-persisted-before-answer",
+        "passed": true,
+        "evidence": "The exact retention-q1 question is present in state.json before the learner answer."
+      },
+      {
+        "name": "first-miss-recorded",
+        "passed": false,
+        "evidence": "The transcript contains the assessment, but state.json still shows attempts 0 and no assessment."
+      },
+      {
+        "name": "review-closed",
+        "passed": false,
+        "evidence": "The review session remains active and incomplete."
+      }
+    ],
+    "contaminatedQuestions": [
+      {
+        "questionId": "retention-q1",
+        "reason": "The host revealed the complete expected mechanism after the learner's first genuine miss.",
+        "excludedFromEvidence": true
+      }
+    ],
+    "criticalFailures": [
+      {
+        "code": "ANSWER_LEAKAGE",
+        "description": "The host revealed the complete expected mechanism on the first genuine miss.",
+        "evidence": "transcript.md final assistant assessment."
+      },
+      {
+        "code": "PERSISTENCE_MISMATCH",
+        "description": "The conversational assessment was not recorded in canonical state.",
+        "evidence": "transcript.md contains an assessment while state.json checkpoint attempts remain 0."
+      },
+      {
+        "code": "REVIEW_INCOMPLETE",
+        "description": "The live Pi review did not complete its repair, transfer, and closure lifecycle.",
+        "evidence": "state.json retains an active review session."
+      }
+    ],
+    "humanVerdict": {
+      "outcome": "pending",
+      "reviewer": "Pending human review",
+      "reviewedAt": null,
+      "rationale": "The evidence package is complete and awaiting the founder's independent verdict."
+    }
+  }
+}

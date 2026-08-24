@@ -2,6 +2,38 @@
 
 Date: 2026-08-24
 
+## Current release-grade audit
+
+Status: **not release-ready**
+
+The hardened implementation has moved materially beyond the version-1
+prototype described below, but the release decision is still negative. The
+current evidence is reconciled in
+[`docs/release/first-local-release.md`](release/first-local-release.md), and the
+live-host evidence is recorded in
+[`docs/verification/live-host-acceptance.md`](verification/live-host-acceptance.md).
+
+Current local evidence includes:
+
+- 136 automated tests and the repository release-check path;
+- destructive coverage for migration, corrupt and future state, backup and
+  restore-check, stale locks, renderer recovery, render-target safety, setup,
+  CLI lifecycle, and review lifecycle;
+- an actual `EACCES` renderer failure in which canonical revision 1 committed,
+  `repair-render` returned revision 1 without changing canonical state bytes,
+  and `doctor` reported a current projection afterward;
+- three complete live-host evidence packages that validate structurally only
+  with `--allow-failed` and are correctly rejected by the release validator.
+
+Those facts do not satisfy the release definition of done. The Codex artifact
+is pending because its original final state bytes were not retained. Both
+local Pi behavioral artifacts contain critical failures. The cloud Pi run was
+only a connectivity smoke test. The supported Node 20/22 macOS matrix,
+accepted human verdicts, changelog/version discipline, clean release commit,
+and release tag are still unproved or absent.
+
+No production-ready, Pi-support, cross-host, or tagged-release claim is made.
+
 > **Prototype boundary:** This is the verification record for the initial
 > version-1 prototype. The 49 passing tests reproduce its deterministic
 > contract; they do not establish release readiness. The audited release gaps

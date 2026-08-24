@@ -1,0 +1,115 @@
+{
+  "formatVersion": 1,
+  "suiteVersion": "1.0.0",
+  "scenario": {
+    "id": "context-resume",
+    "version": 1
+  },
+  "host": "codex",
+  "sessionId": "1fc8b737-a2f6-4aef-a2d1-03641b86f1dd",
+  "startedAt": "2026-08-24T15:58:26.617Z",
+  "completedAt": "2026-08-24T16:10:25.535Z",
+  "provenance": {
+    "codexThreadId": "01a0347e-8674-7b00-9a59-9cc98185a127",
+    "rollout": "/Users/0xkato/.codex/sessions/2026/08/24/rollout-2026-08-24T17-58-22-01a0347e-8674-7b00-9a59-9cc98185a127.jsonl",
+    "snapshotOrigin": "Revision-22 state reconstructed from the original revision-24 root by reversing the isolated Pi review claim and checkpoint mutations; independently cross-checked against /private/tmp/adaptive-release-acceptance.thmfYb/product at revision 22.",
+    "claimBoundary": "This records a successful live Codex teaching conversation, but the missing byte-exact final state snapshot keeps it from release acceptance until rerun or human disposition."
+  },
+  "files": {
+    "transcript": {
+      "path": "transcript.md",
+      "bytes": 20683,
+      "sha256": "3a564c65610f9910c2e9b5f5ed72a53db34594232a12ef214bd5d4b5277ba6d8"
+    },
+    "stateSnapshot": {
+      "path": "state.json",
+      "bytes": 37687,
+      "sha256": "ede7c0cd30a6b0038c05e5b4b5fee05bccb47e903af6f73bb28860afd985745f"
+    },
+    "sourceLedger": {
+      "path": "source-ledger.json",
+      "bytes": 4249,
+      "sha256": "e668d734822d515dde8b852e52c8b8ee102d0e16e701d316f80bc5c57b29207f"
+    },
+    "renderedNote": {
+      "path": "rendered-note.md",
+      "bytes": 18518,
+      "sha256": "b5324ac24abb4d2b50e5f31c789d3e79b2b47221b2eb7a956fe81c3d5ab51051"
+    }
+  },
+  "rubric": {
+    "dimensions": {
+      "targetFidelity": {
+        "score": 4,
+        "evidence": "Transcript preserves the learner's exact race-safe idempotency target from the opening prompt through closure."
+      },
+      "frontierAccuracy": {
+        "score": 4,
+        "evidence": "Transcript locates write-time uniqueness arbitration first, then advances through transaction outcome and handler recovery."
+      },
+      "questionClarity": {
+        "score": 4,
+        "evidence": "Each displayed checkpoint states the engine, schema, concurrent actions, requested branches, and explicit scope boundary."
+      },
+      "leakageAvoidance": {
+        "score": 4,
+        "evidence": "The resumed checkpoint is repeated verbatim without an answer, and every later answer follows a learner attempt."
+      },
+      "assessmentAccuracy": {
+        "score": 4,
+        "evidence": "Each Correct assessment names the exact causal links present in the immediately preceding learner answer."
+      },
+      "sourceSupport": {
+        "score": 4,
+        "evidence": "The source ledger contains six claim-level primary-source records, and the transcript keeps PostgreSQL-specific behavior separate from portable invariants."
+      },
+      "pacing": {
+        "score": 3,
+        "evidence": "The host asks one checkpoint at a time; several operational narration messages are useful but more verbose than necessary."
+      },
+      "persistence": {
+        "score": 3,
+        "evidence": "Revision 22 semantics, completed session, questions, assessments, sources, and rendered note are preserved; the byte-exact final live state was reconstructed after a later isolated review mutation."
+      },
+      "synthesis": {
+        "score": 4,
+        "evidence": "The final learner response connects schema, concurrency, commit/rollback, conflict recovery, payload equivalence, and the pre-read boundary."
+      }
+    },
+    "deterministicChecks": [
+      {
+        "name": "canonical-state-valid",
+        "passed": true,
+        "evidence": "The artifact validator validates the schema-version-2 snapshot."
+      },
+      {
+        "name": "session-closed",
+        "passed": true,
+        "evidence": "state.json has no active session and the acceptance session phase is complete."
+      },
+      {
+        "name": "resume-used-exact-checkpoint",
+        "passed": true,
+        "evidence": "The pre-interruption and post-resume seat-reservation questions are byte-identical in transcript.md and match the persisted step."
+      },
+      {
+        "name": "questions-and-assessments-persisted",
+        "passed": true,
+        "evidence": "state.json contains four resolved teaching checkpoints, four assessments, and one resolved synthesis matching the transcript."
+      },
+      {
+        "name": "exact-live-final-state-bytes-preserved",
+        "passed": false,
+        "evidence": "A later failed Pi review mutated the original root; this snapshot reverses only its two isolated mutations and is cross-checked against an independent revision-22 replay, but the original revision-22 state bytes were not retained."
+      }
+    ],
+    "contaminatedQuestions": [],
+    "criticalFailures": [],
+    "humanVerdict": {
+      "outcome": "pending",
+      "reviewer": "Pending human review",
+      "reviewedAt": null,
+      "rationale": "The evidence package is complete and awaiting the founder's independent verdict."
+    }
+  }
+}

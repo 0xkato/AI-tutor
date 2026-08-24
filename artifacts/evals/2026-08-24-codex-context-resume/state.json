@@ -1,0 +1,437 @@
+{
+  "schemaVersion": 2,
+  "revision": 22,
+  "createdAt": "2026-08-24T15:56:15.419Z",
+  "updatedAt": "2026-08-24T16:10:06.053Z",
+  "activeSessionId": null,
+  "settings": {
+    "vaultDir": "vault"
+  },
+  "sessions": {
+    "1fc8b737-a2f6-4aef-a2d1-03641b86f1dd": {
+      "id": "1fc8b737-a2f6-4aef-a2d1-03641b86f1dd",
+      "kind": "learn",
+      "topic": "Race-safe idempotent creation",
+      "topicId": "07480908-8bcf-4619-83a0-073fcd4519e3",
+      "target": "Understand why a database uniqueness constraint, rather than a pre-insert read alone, makes idempotent creation race-safe when two requests arrive simultaneously and both read that no row exists",
+      "learnerContext": "Learner understands APIs and basic database reads and writes, but explicitly does not understand the exact concurrency mechanism when both requests read that no row exists",
+      "phase": "complete",
+      "createdAt": "2026-08-24T15:59:34.490Z",
+      "updatedAt": "2026-08-24T16:10:06.053Z",
+      "completedAt": "2026-08-24T16:10:06.053Z",
+      "probeSummary": "Reported foundation: understands APIs and basic database reads and writes; this is prior context, not assessed evidence. Demonstrated: no substantive concurrency mechanism has yet been assessed. Admitted missing mechanism: how the database arbitrates simultaneous inserts after both requests observe absence. Not yet checked: transfer prediction for commit versus rollback and application handling of a uniqueness conflict.",
+      "admittedGaps": [
+        {
+          "id": "gap-concurrent-uniqueness-arbitration",
+          "nodeId": "unique-constraint-arbitration",
+          "conceptId": "98c8c2fe-9a35-46d4-b2ef-863107b43a42",
+          "statement": "I do not understand the exact concurrency mechanism when two requests simultaneously read that no row exists",
+          "evidence": "The learner explicitly identified this as the missing mechanism while reporting familiarity with APIs and basic database reads and writes",
+          "createdAt": "2026-08-24T15:59:50.987Z"
+        }
+      ],
+      "assessments": [
+        {
+          "id": "98414ece-661d-4c20-a865-4a0d40e6c995",
+          "questionId": "teach-unique-arbitration-1",
+          "nodeId": "unique-constraint-arbitration",
+          "stage": "teach",
+          "kind": "transfer",
+          "question": "Assume a PostgreSQL table coupon_redemptions has an immediate UNIQUE constraint on (account_id, coupon_id). Requests A and B simultaneously check whether account 42 has redeemed coupon SAVE10; both SELECTs return no row. A then inserts (42, SAVE10) but has not committed when B attempts the same insert. In your own words, explain what happens to B if A commits, what happens to B if A rolls back, and what guarantee the UNIQUE constraint provides that the two earlier SELECTs did not. Limit your answer to the database concurrency mechanism; do not discuss HTTP response handling yet.",
+          "answer": "B first has to wait because A's insert has already created a conflicting uncommitted unique-index entry. If A commits, B rechecks, sees that the key now belongs to a committed row, and its insert fails with a uniqueness violation. If A rolls back, that conflicting entry disappears and B may insert and commit. The two SELECTs only described what each request could see at read time; they did not reserve the key. The UNIQUE constraint gives a shared write-time rule that prevents both requests from committing the same (account_id, coupon_id).",
+          "grade": "correct",
+          "evidence": "The learner correctly explained that B waits on A's uncommitted same-key index entry, rechecks after A ends, fails on A commit, may proceed on A rollback, and distinguished read-time visibility from the unique constraint's shared write-time at-most-one-committed-row invariant.",
+          "mistakeType": "",
+          "contaminated": false,
+          "conceptId": "98c8c2fe-9a35-46d4-b2ef-863107b43a42",
+          "createdAt": "2026-08-24T16:03:47.200Z"
+        },
+        {
+          "id": "0a277e3f-dab4-42fc-b226-daf5c69bab6d",
+          "questionId": "teach-commit-outcome-1",
+          "nodeId": "commit-outcome-branch",
+          "stage": "teach",
+          "kind": "debugging",
+          "question": "Assume a PostgreSQL table seat_reservations has an immediate UNIQUE constraint on (event_id, seat_number). Transaction A inserts seat (7, 12) but remains uncommitted. Transaction B attempts the same seat and its unique-index check finds A's entry. An engineer proposes that B should immediately receive a duplicate-key error without waiting, because an index entry already exists. Diagnose the proposal: explain why that immediate decision could be wrong and identify what must happen before PostgreSQL can decide whether B has a real uniqueness conflict. Limit your answer to database transaction state.",
+          "answer": "The immediate duplicate-key decision could be wrong because A's index entry belongs to an uncommitted transaction and may disappear if A rolls back. B has to wait until A commits or rolls back, then PostgreSQL must recheck whether a committed conflicting row remains. Only after that transaction outcome can it decide whether B has a real uniqueness conflict.",
+          "grade": "correct",
+          "evidence": "The learner correctly diagnosed that an uncommitted index entry is only a provisional conflict, may disappear on rollback, and therefore requires waiting for A's transaction outcome and rechecking committed conflict state before deciding B's result.",
+          "mistakeType": "",
+          "contaminated": false,
+          "conceptId": "f42020da-2332-4110-9f49-b4ca6fc07cca",
+          "createdAt": "2026-08-24T16:05:53.636Z"
+        },
+        {
+          "id": "190f48fc-df52-4bcc-a3c9-f13bd1bb8986",
+          "questionId": "teach-idempotent-recovery-1",
+          "nodeId": "idempotent-conflict-recovery",
+          "stage": "teach",
+          "kind": "debugging",
+          "question": "Assume an orders API defines idempotent creation as follows: equivalent POST requests carrying the same idempotency_key must resolve to one logical order. The orders table has UNIQUE(idempotency_key). Requests A and B carry the same key and payload, and both pre-insert SELECTs return no row. A's insert commits order 9001; B's insert waits and then receives the uniqueness conflict. The current handler converts every database exception into HTTP 500. Diagnose why the UNIQUE constraint alone is insufficient for the stated API contract, describe what B's handler should do after this specific conflict, and distinguish the guarantee supplied by the database from the guarantee supplied by the handler.",
+          "answer": "The UNIQUE constraint is sufficient to stop two committed orders with the same idempotency key, but returning HTTP 500 to B means the API has not made B resolve to the one logical order. After this specific uniqueness conflict, B's handler should treat it as a concurrent winner, read the row for that key using a statement that can see A's committed row, verify that it represents the equivalent request, and return order 9001. The database guarantees at most one committed row per key; the handler guarantees that the losing equivalent request is mapped to and returns that same resource instead of becoming an unrelated error.",
+          "grade": "correct",
+          "evidence": "The learner correctly distinguished the database's at-most-one-committed-row invariant from the handler's same-logical-result contract, and specified targeted conflict recovery through a visibility-safe read, request equivalence verification, and returning the winning order rather than an unrelated error.",
+          "mistakeType": "",
+          "contaminated": false,
+          "conceptId": "171b6dfd-bbc0-4601-9161-ddcb5db38f86",
+          "createdAt": "2026-08-24T16:07:36.415Z"
+        },
+        {
+          "id": "3e48f0a7-f770-4f94-8717-4983605d284a",
+          "questionId": "teach-race-safe-target-1",
+          "nodeId": "race-safe-idempotent-creation",
+          "stage": "teach",
+          "kind": "reconstruction",
+          "question": "Assume two separate API instances receive equivalent requests to create an export job for the same non-null key (account_id=42, client_token=T9). The shared PostgreSQL table has an immediate UNIQUE constraint on (account_id, client_token). Both instances run a pre-insert SELECT and see no row. Instance A inserts the key but is still uncommitted when instance B attempts its insert. Reconstruct the complete correctness mechanism for both possible outcomes of A's transaction, including what B's handler should do in each case. Then explain why moving the SELECT earlier or adding a mutex inside each individual API process cannot replace the database constraint, and state the final invariant that the combined database-and-handler design provides.",
+          "answer": "Both SELECTs can see no row because neither reserves the key. When B reaches the constrained insert, it encounters A's uncommitted entry and waits for A's transaction outcome. If A commits, B's recheck produces the uniqueness conflict; B's handler should then read the committed row for (42, T9), verify it represents the equivalent request, and return A's export job. If A rolls back, the provisional conflict disappears, B's insert may become the committed winner, and B returns the job it created. Moving the SELECT earlier only makes the observation older and still does not reserve the key. A mutex inside each API process cannot coordinate A and B because they are in separate instances. The database constraint gives at most one committed export-job row for the complete key, and the conflict-recovery handler makes every equivalent request resolve to that one logical job.",
+          "grade": "correct",
+          "evidence": "The learner correctly reconstructed simultaneous absence reads, write-time waiting and recheck, commit and rollback branches, winner recovery with equivalence verification, the failure of earlier reads and per-process mutexes across instances, and the final combined invariant of one committed row plus one logical result for equivalent requests.",
+          "mistakeType": "",
+          "contaminated": false,
+          "conceptId": "f86b2a8a-09e3-4895-9dc3-de3d7445611f",
+          "createdAt": "2026-08-24T16:08:56.239Z"
+        },
+        {
+          "id": "synthesis-a-race-safe-idempotent-1",
+          "questionId": "synthesis-race-safe-idempotent-1",
+          "nodeId": "whole-system-synthesis",
+          "stage": "synthesis",
+          "kind": "synthesis",
+          "question": "Design a race-safe idempotent creation flow for a service where many worker processes may simultaneously receive the same external event and must create exactly one fulfillment record. Assume PostgreSQL Read Committed and that equivalent deliveries carry the same non-null event_id and payload. In one connected explanation, specify the database schema invariant and handler flow; trace what happens when two workers both pre-read absence and then one worker's constrained insert is still uncommitted when the other attempts its insert, covering both commit and rollback; explain how the losing committed-conflict path returns the one logical fulfillment and how a mismatched payload should be treated; and state precisely why the pre-read alone cannot supply the correctness guarantee.",
+          "answer": "Store event_id as NOT NULL with a UNIQUE constraint, and store enough payload identity, such as the normalized payload or a stable fingerprint, to verify that reuse of an event_id is actually equivalent. Each worker may pre-read as a fast path, but then attempts the constrained insert or an atomic ON CONFLICT form. If A has inserted the event_id but is uncommitted when B inserts, B waits for A's transaction outcome. If A commits, B takes the specific conflict path, performs a visibility-safe read that can see A's committed fulfillment, compares the stored payload identity with B's payload, and returns that one fulfillment when they match. If A rolls back, the provisional conflict disappears, B may insert the fulfillment and return its own committed winner. If the same event_id carries a mismatched payload, the handler must reject it as conflicting key reuse rather than treating it as an equivalent retry. The database supplies at most one committed fulfillment row per event_id; the handler supplies equivalence checking and maps all equivalent deliveries to that one result. The pre-read alone cannot supply this guarantee because it is a snapshot observation, not a reservation or an atomic rule governing later writes, so multiple workers can all truthfully observe absence before any commits.",
+          "grade": "correct",
+          "evidence": "The learner connected schema design, a non-null unique event key, payload identity, optional pre-read fast path, constrained write arbitration, wait and recheck, commit and rollback branches, visibility-safe winner recovery, mismatched payload rejection, and the division between the database's at-most-one-row invariant and the handler's one-logical-result contract.",
+          "mistakeType": "",
+          "contaminated": false,
+          "conceptId": null,
+          "createdAt": "2026-08-24T16:10:01.814Z"
+        }
+      ],
+      "conceptIds": [
+        "98c8c2fe-9a35-46d4-b2ef-863107b43a42",
+        "f42020da-2332-4110-9f49-b4ca6fc07cca",
+        "171b6dfd-bbc0-4601-9161-ddcb5db38f86",
+        "f86b2a8a-09e3-4895-9dc3-de3d7445611f"
+      ],
+      "sources": [
+        {
+          "id": "ace5e3aa-c73b-4b5e-a04b-281e188dc578",
+          "title": "PostgreSQL Documentation: Index Uniqueness Checks",
+          "url": "https://www.postgresql.org/docs/current/index-unique-checks.html",
+          "sourceClass": "primary",
+          "supports": "For an immediate unique index, a would-be inserter encountering the same key from an uncommitted transaction waits; rollback removes the conflict, while commit leads to a uniqueness violation after rechecking.",
+          "verification": "Retrieved the official page directly with curl and checked the uncommitted-conflict rules and the statement that uniqueness checking must be integral to index insertion to avoid races.",
+          "createdAt": "2026-08-24T16:00:33.412Z"
+        },
+        {
+          "id": "e382cfe0-a50e-4dfd-b6c0-c88ccf8518fa",
+          "title": "PostgreSQL Documentation: Unique Constraints",
+          "url": "https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-UNIQUE-CONSTRAINTS",
+          "sourceClass": "primary",
+          "supports": "A unique constraint ensures constrained key values are unique across rows and automatically creates a unique B-tree index in PostgreSQL.",
+          "verification": "Retrieved the official constraints page directly with curl and checked the unique-constraint definition, generated index, and NULL portability caveat.",
+          "createdAt": "2026-08-24T16:00:33.589Z"
+        },
+        {
+          "id": "70cbb864-db5c-4795-909e-653616d0c828",
+          "title": "SQLite Documentation: Transactions",
+          "url": "https://www.sqlite.org/lang_transaction.html#read_transactions_versus_write_transactions",
+          "sourceClass": "primary",
+          "supports": "Database engines can enforce writer coordination differently: SQLite permits multiple simultaneous readers but only one simultaneous writer, and a competing write upgrade can fail with SQLITE_BUSY.",
+          "verification": "Retrieved the official SQLite transaction page directly with curl and checked its simultaneous-reader and single-writer rules.",
+          "createdAt": "2026-08-24T16:00:33.766Z"
+        },
+        {
+          "id": "688d8a94-33ff-42f0-bee2-b20d1944ef03",
+          "title": "SQLite Documentation: UNIQUE Constraints",
+          "url": "https://www.sqlite.org/lang_createtable.html#unique_constraints",
+          "sourceClass": "primary",
+          "supports": "SQLite checks UNIQUE constraints as a write-time table invariant and treats duplicate constrained non-NULL value combinations as constraint violations.",
+          "verification": "Retrieved the official SQLite CREATE TABLE page directly with curl and checked the UNIQUE constraint and constraint-violation sections.",
+          "createdAt": "2026-08-24T16:00:33.944Z"
+        },
+        {
+          "id": "f9162136-0f76-4248-8e38-8d48552d5420",
+          "title": "PostgreSQL Documentation: INSERT and ON CONFLICT",
+          "url": "https://www.postgresql.org/docs/current/sql-insert.html#SQL-ON-CONFLICT",
+          "sourceClass": "primary",
+          "supports": "ON CONFLICT turns a unique-constraint conflict into an explicit alternative action; DO NOTHING avoids the second insert, while DO UPDATE guarantees an atomic insert-or-update outcome under high concurrency.",
+          "verification": "Retrieved the official INSERT page directly with curl and checked the ON CONFLICT alternative actions, arbiter constraints, atomic high-concurrency guarantee, and RETURNING behavior.",
+          "createdAt": "2026-08-24T16:06:20.081Z"
+        },
+        {
+          "id": "ac982800-e95b-4ff8-b755-316dcc03a3e1",
+          "title": "PostgreSQL Documentation: Read Committed Isolation",
+          "url": "https://www.postgresql.org/docs/current/transaction-iso.html#XACT-READ-COMMITTED",
+          "sourceClass": "primary",
+          "supports": "Under PostgreSQL Read Committed, ON CONFLICT may resolve against a concurrent row outside the INSERT snapshot; DO NOTHING can suppress insertion even when that row is not visible to the statement, while a later SELECT statement receives a newer snapshot.",
+          "verification": "Retrieved the official transaction-isolation page directly with curl and checked the statement-snapshot rule plus the documented ON CONFLICT DO UPDATE and DO NOTHING concurrency behavior.",
+          "createdAt": "2026-08-24T16:06:20.263Z"
+        }
+      ],
+      "plan": {
+        "targetNodeId": "race-safe-idempotent-creation",
+        "nodes": [
+          {
+            "id": "unique-constraint-arbitration",
+            "title": "The uniqueness check arbitrates competing writes",
+            "conceptId": "98c8c2fe-9a35-46d4-b2ef-863107b43a42"
+          },
+          {
+            "id": "commit-outcome-branch",
+            "title": "Commit or rollback determines the losing insert's outcome",
+            "conceptId": "f42020da-2332-4110-9f49-b4ca6fc07cca"
+          },
+          {
+            "id": "idempotent-conflict-recovery",
+            "title": "The API maps the losing write to the existing resource",
+            "conceptId": "171b6dfd-bbc0-4601-9161-ddcb5db38f86"
+          },
+          {
+            "id": "race-safe-idempotent-creation",
+            "title": "Race-safe idempotent creation",
+            "conceptId": "f86b2a8a-09e3-4895-9dc3-de3d7445611f"
+          }
+        ],
+        "edges": [
+          {
+            "from": "unique-constraint-arbitration",
+            "to": "commit-outcome-branch",
+            "reason": "The learner must see that uniqueness is checked as part of the write before predicting what happens when the competing transaction commits or rolls back."
+          },
+          {
+            "from": "commit-outcome-branch",
+            "to": "idempotent-conflict-recovery",
+            "reason": "The application can handle the second request correctly only after the database has resolved whether that insert wins, conflicts, or may proceed."
+          },
+          {
+            "from": "idempotent-conflict-recovery",
+            "to": "race-safe-idempotent-creation",
+            "reason": "Combining the database's at-most-one-row invariant with recovery of the existing row gives repeated concurrent requests one logical creation result."
+          }
+        ]
+      },
+      "frontier": [],
+      "steps": [
+        {
+          "id": "549a3c0a-4120-481f-854f-bc725e4f9a93",
+          "nodeId": "unique-constraint-arbitration",
+          "foundation": "Two independent requests may both complete a SELECT before either transaction commits an INSERT. A SELECT result saying that key K is absent describes what that read can see at that moment; by itself it neither reserves K nor creates an invariant that future writes must obey.",
+          "motivation": "If both requests treat the same absence observation as permission to insert, application-level check-then-insert contains a time-of-check/time-of-use gap and can produce duplicate logical creations unless the shared database arbitrates the writes.",
+          "explanation": "With an immediate unique constraint on K, uniqueness checking is integrated into the write path. In PostgreSQL, if request B's insert finds the same unique-index key created by request A's still-uncommitted transaction, B waits for A to end and then rechecks visibility. If A commits and keeps the row, B receives a uniqueness violation; if A rolls back, the conflict disappears and B may proceed. Thus both reads may truthfully report absence, but both writes cannot become committed rows with K. Other engines may coordinate writers by different locking or conflict rules; the portable point is that the constraint is enforced at the shared write boundary, not by the earlier application read. This establishes the storage invariant only; mapping the losing request to the existing resource is a later step.",
+          "checkpointQuestionId": "teach-unique-arbitration-1",
+          "checkpointKind": "transfer",
+          "checkpointQuestion": "Assume a PostgreSQL table coupon_redemptions has an immediate UNIQUE constraint on (account_id, coupon_id). Requests A and B simultaneously check whether account 42 has redeemed coupon SAVE10; both SELECTs return no row. A then inserts (42, SAVE10) but has not committed when B attempts the same insert. In your own words, explain what happens to B if A commits, what happens to B if A rolls back, and what guarantee the UNIQUE constraint provides that the two earlier SELECTs did not. Limit your answer to the database concurrency mechanism; do not discuss HTTP response handling yet.",
+          "createdAt": "2026-08-24T16:01:46.295Z"
+        },
+        {
+          "id": "a7f20de7-e73a-49e2-b095-95adf70f9e6c",
+          "nodeId": "commit-outcome-branch",
+          "foundation": "The previous checkpoint established that an immediate unique-index check can discover a same-key entry created by another transaction even before that transaction commits.",
+          "motivation": "The physical presence of an index entry is not yet proof that a conflicting committed row will survive, because the transaction that created the entry may still roll back.",
+          "explanation": "The conflict is provisional while the first transaction is active. PostgreSQL therefore waits for that transaction to finish and repeats the visibility check instead of deciding from the raw index entry alone. A commit makes the conflicting row eligible to defeat the second insert; a rollback removes the logical conflict and allows the waiting insert to compete normally. This is why the transaction outcome, not merely which request read or began inserting first, determines the final uniqueness result.",
+          "checkpointQuestionId": "teach-commit-outcome-1",
+          "checkpointKind": "debugging",
+          "checkpointQuestion": "Assume a PostgreSQL table seat_reservations has an immediate UNIQUE constraint on (event_id, seat_number). Transaction A inserts seat (7, 12) but remains uncommitted. Transaction B attempts the same seat and its unique-index check finds A's entry. An engineer proposes that B should immediately receive a duplicate-key error without waiting, because an index entry already exists. Diagnose the proposal: explain why that immediate decision could be wrong and identify what must happen before PostgreSQL can decide whether B has a real uniqueness conflict. Limit your answer to database transaction state.",
+          "createdAt": "2026-08-24T16:04:21.828Z"
+        },
+        {
+          "id": "e0194d4c-f69f-4864-ab4f-3de67b514574",
+          "nodeId": "idempotent-conflict-recovery",
+          "foundation": "The uniqueness constraint already guarantees that concurrent inserts for the same idempotency key cannot leave two committed rows, and a uniqueness conflict tells the losing request that a competing row won the database arbitration.",
+          "motivation": "An unhandled uniqueness violation can still become an application error. That preserves one-row storage safety, but it does not by itself satisfy a contract in which repeated uses of the same idempotency key must resolve to the same logical creation result.",
+          "explanation": "For this lesson, idempotent creation means one committed resource per key and every equivalent request with that key resolving to that resource. The database supplies the at-most-one-row invariant. The handler supplies recovery: it treats the specific uniqueness conflict as a concurrent winner, then obtains and returns the row for that key, or uses a suitable atomic ON CONFLICT pattern. In PostgreSQL Read Committed, ON CONFLICT DO NOTHING can suppress the losing insert because of a concurrent row that was not visible to the INSERT statement's snapshot, so a follow-up SELECT is a new statement with a new snapshot. The exact retry and deletion handling depends on the application's transaction design. The earlier pre-read may remain an optimization, but it is not the correctness boundary.",
+          "checkpointQuestionId": "teach-idempotent-recovery-1",
+          "checkpointKind": "debugging",
+          "checkpointQuestion": "Assume an orders API defines idempotent creation as follows: equivalent POST requests carrying the same idempotency_key must resolve to one logical order. The orders table has UNIQUE(idempotency_key). Requests A and B carry the same key and payload, and both pre-insert SELECTs return no row. A's insert commits order 9001; B's insert waits and then receives the uniqueness conflict. The current handler converts every database exception into HTTP 500. Diagnose why the UNIQUE constraint alone is insufficient for the stated API contract, describe what B's handler should do after this specific conflict, and distinguish the guarantee supplied by the database from the guarantee supplied by the handler.",
+          "createdAt": "2026-08-24T16:06:41.878Z"
+        },
+        {
+          "id": "6909431d-7d0e-4c67-bb9c-0a797636a173",
+          "nodeId": "race-safe-idempotent-creation",
+          "foundation": "The learner has demonstrated three components: an absence read does not reserve a key; the unique write path waits or otherwise arbitrates until transaction outcome is known; and the losing equivalent request must recover the winner's resource.",
+          "motivation": "A design still needs a precise correctness boundary when requests run on different threads, processes, or application instances, where a process-local check or lock cannot coordinate every writer.",
+          "explanation": "Under the stated assumptions, race-safe idempotent creation places a non-null uniqueness invariant over the complete logical idempotency key in the shared database that all writers use. The pre-read can avoid unnecessary insert attempts in the common case, but correctness does not depend on its result. Each request attempts the constrained write or an atomic ON CONFLICT form. The database permits at most one committed winner for the key; a rolled-back provisional winner leaves room for another request; and the handler maps the committed losing path to the equivalent existing resource. A process-local mutex cannot replace the constraint when another process or instance can write. The full invariant depends on all relevant writes passing through the constraint and on the key actually representing the intended equivalence class.",
+          "checkpointQuestionId": "teach-race-safe-target-1",
+          "checkpointKind": "reconstruction",
+          "checkpointQuestion": "Assume two separate API instances receive equivalent requests to create an export job for the same non-null key (account_id=42, client_token=T9). The shared PostgreSQL table has an immediate UNIQUE constraint on (account_id, client_token). Both instances run a pre-insert SELECT and see no row. Instance A inserts the key but is still uncommitted when instance B attempts its insert. Reconstruct the complete correctness mechanism for both possible outcomes of A's transaction, including what B's handler should do in each case. Then explain why moving the SELECT earlier or adding a mutex inside each individual API process cannot replace the database constraint, and state the final invariant that the combined database-and-handler design provides.",
+          "createdAt": "2026-08-24T16:08:04.537Z"
+        }
+      ],
+      "activeStepId": null,
+      "checkpoint": {
+        "status": "resolved",
+        "nodeId": "race-safe-idempotent-creation",
+        "questionId": "teach-race-safe-target-1",
+        "question": "Assume two separate API instances receive equivalent requests to create an export job for the same non-null key (account_id=42, client_token=T9). The shared PostgreSQL table has an immediate UNIQUE constraint on (account_id, client_token). Both instances run a pre-insert SELECT and see no row. Instance A inserts the key but is still uncommitted when instance B attempts its insert. Reconstruct the complete correctness mechanism for both possible outcomes of A's transaction, including what B's handler should do in each case. Then explain why moving the SELECT earlier or adding a mutex inside each individual API process cannot replace the database constraint, and state the final invariant that the combined database-and-handler design provides.",
+        "kind": "reconstruction",
+        "priorQuestionId": null,
+        "attempts": 1,
+        "resolvedEvidenceId": "3e48f0a7-f770-4f94-8717-4983605d284a",
+        "mistakeType": ""
+      },
+      "visuals": [],
+      "synthesis": "Store event_id as NOT NULL with a UNIQUE constraint, and store enough payload identity, such as the normalized payload or a stable fingerprint, to verify that reuse of an event_id is actually equivalent. Each worker may pre-read as a fast path, but then attempts the constrained insert or an atomic ON CONFLICT form. If A has inserted the event_id but is uncommitted when B inserts, B waits for A's transaction outcome. If A commits, B takes the specific conflict path, performs a visibility-safe read that can see A's committed fulfillment, compares the stored payload identity with B's payload, and returns that one fulfillment when they match. If A rolls back, the provisional conflict disappears, B may insert the fulfillment and return its own committed winner. If the same event_id carries a mismatched payload, the handler must reject it as conflicting key reuse rather than treating it as an equivalent retry. The database supplies at most one committed fulfillment row per event_id; the handler supplies equivalence checking and maps all equivalent deliveries to that one result. The pre-read alone cannot supply this guarantee because it is a snapshot observation, not a reservation or an atomic rule governing later writes, so multiple workers can all truthfully observe absence before any commits.",
+      "synthesisRequired": true,
+      "synthesisCheckpoint": {
+        "status": "resolved",
+        "questionId": "synthesis-race-safe-idempotent-1",
+        "question": "Design a race-safe idempotent creation flow for a service where many worker processes may simultaneously receive the same external event and must create exactly one fulfillment record. Assume PostgreSQL Read Committed and that equivalent deliveries carry the same non-null event_id and payload. In one connected explanation, specify the database schema invariant and handler flow; trace what happens when two workers both pre-read absence and then one worker's constrained insert is still uncommitted when the other attempts its insert, covering both commit and rollback; explain how the losing committed-conflict path returns the one logical fulfillment and how a mismatched payload should be treated; and state precisely why the pre-read alone cannot supply the correctness guarantee.",
+        "priorQuestionId": null,
+        "attempts": 1,
+        "resolvedEvidenceId": "synthesis-a-race-safe-idempotent-1",
+        "mistakeType": ""
+      },
+      "unresolvedGaps": [],
+      "reviewItems": []
+    }
+  },
+  "topics": {
+    "07480908-8bcf-4619-83a0-073fcd4519e3": {
+      "id": "07480908-8bcf-4619-83a0-073fcd4519e3",
+      "name": "Race-safe idempotent creation",
+      "createdAt": "2026-08-24T15:59:34.490Z",
+      "updatedAt": "2026-08-24T16:10:06.053Z",
+      "latestSessionId": "1fc8b737-a2f6-4aef-a2d1-03641b86f1dd",
+      "sessionIds": [
+        "1fc8b737-a2f6-4aef-a2d1-03641b86f1dd"
+      ],
+      "conceptIds": [
+        "98c8c2fe-9a35-46d4-b2ef-863107b43a42",
+        "f42020da-2332-4110-9f49-b4ca6fc07cca",
+        "171b6dfd-bbc0-4601-9161-ddcb5db38f86",
+        "f86b2a8a-09e3-4895-9dc3-de3d7445611f"
+      ]
+    }
+  },
+  "concepts": {
+    "98c8c2fe-9a35-46d4-b2ef-863107b43a42": {
+      "id": "98c8c2fe-9a35-46d4-b2ef-863107b43a42",
+      "topicId": "07480908-8bcf-4619-83a0-073fcd4519e3",
+      "key": "unique-constraint-arbitration",
+      "title": "unique-constraint-arbitration",
+      "status": "developing",
+      "latestGrade": "correct",
+      "evidenceIds": [
+        "98414ece-661d-4c20-a865-4a0d40e6c995"
+      ],
+      "retry": null,
+      "reviewId": "6d94af22-de01-4b35-b3bd-4ef2755acb34",
+      "sourceSessionIds": [
+        "1fc8b737-a2f6-4aef-a2d1-03641b86f1dd"
+      ],
+      "createdAt": "2026-08-24T15:59:50.987Z",
+      "updatedAt": "2026-08-24T16:03:47.200Z"
+    },
+    "f42020da-2332-4110-9f49-b4ca6fc07cca": {
+      "id": "f42020da-2332-4110-9f49-b4ca6fc07cca",
+      "topicId": "07480908-8bcf-4619-83a0-073fcd4519e3",
+      "key": "commit-outcome-branch",
+      "title": "Commit or rollback determines the losing insert's outcome",
+      "status": "developing",
+      "latestGrade": "correct",
+      "evidenceIds": [
+        "0a277e3f-dab4-42fc-b226-daf5c69bab6d"
+      ],
+      "retry": null,
+      "reviewId": "7be6f619-428d-44b5-8a65-e31375aa7b47",
+      "sourceSessionIds": [
+        "1fc8b737-a2f6-4aef-a2d1-03641b86f1dd"
+      ],
+      "createdAt": "2026-08-24T16:01:10.080Z",
+      "updatedAt": "2026-08-24T16:05:53.636Z"
+    },
+    "171b6dfd-bbc0-4601-9161-ddcb5db38f86": {
+      "id": "171b6dfd-bbc0-4601-9161-ddcb5db38f86",
+      "topicId": "07480908-8bcf-4619-83a0-073fcd4519e3",
+      "key": "idempotent-conflict-recovery",
+      "title": "The API maps the losing write to the existing resource",
+      "status": "developing",
+      "latestGrade": "correct",
+      "evidenceIds": [
+        "190f48fc-df52-4bcc-a3c9-f13bd1bb8986"
+      ],
+      "retry": null,
+      "reviewId": "c2fc01c6-a05f-414c-8c7c-342888c067eb",
+      "sourceSessionIds": [
+        "1fc8b737-a2f6-4aef-a2d1-03641b86f1dd"
+      ],
+      "createdAt": "2026-08-24T16:01:10.080Z",
+      "updatedAt": "2026-08-24T16:07:36.415Z"
+    },
+    "f86b2a8a-09e3-4895-9dc3-de3d7445611f": {
+      "id": "f86b2a8a-09e3-4895-9dc3-de3d7445611f",
+      "topicId": "07480908-8bcf-4619-83a0-073fcd4519e3",
+      "key": "race-safe-idempotent-creation",
+      "title": "Race-safe idempotent creation",
+      "status": "developing",
+      "latestGrade": "correct",
+      "evidenceIds": [
+        "3e48f0a7-f770-4f94-8717-4983605d284a"
+      ],
+      "retry": null,
+      "reviewId": "d0fd3514-d602-41fe-b36a-a976fb119607",
+      "sourceSessionIds": [
+        "1fc8b737-a2f6-4aef-a2d1-03641b86f1dd"
+      ],
+      "createdAt": "2026-08-24T16:01:10.080Z",
+      "updatedAt": "2026-08-24T16:08:56.239Z"
+    }
+  },
+  "reviews": {
+    "6d94af22-de01-4b35-b3bd-4ef2755acb34": {
+      "id": "6d94af22-de01-4b35-b3bd-4ef2755acb34",
+      "conceptId": "98c8c2fe-9a35-46d4-b2ef-863107b43a42",
+      "level": 1,
+      "dueAt": "2026-08-25T16:03:47.200Z",
+      "completed": 1,
+      "status": "scheduled",
+      "claimedBySessionId": null,
+      "claimedAt": null,
+      "deferredReason": null,
+      "updatedAt": "2026-08-25T16:03:47.200Z"
+    },
+    "7be6f619-428d-44b5-8a65-e31375aa7b47": {
+      "id": "7be6f619-428d-44b5-8a65-e31375aa7b47",
+      "conceptId": "f42020da-2332-4110-9f49-b4ca6fc07cca",
+      "level": 1,
+      "dueAt": "2026-08-25T16:05:53.636Z",
+      "completed": 1,
+      "status": "scheduled",
+      "claimedBySessionId": null,
+      "claimedAt": null,
+      "deferredReason": null,
+      "updatedAt": "2026-08-24T16:05:53.636Z"
+    },
+    "c2fc01c6-a05f-414c-8c7c-342888c067eb": {
+      "id": "c2fc01c6-a05f-414c-8c7c-342888c067eb",
+      "conceptId": "171b6dfd-bbc0-4601-9161-ddcb5db38f86",
+      "level": 1,
+      "dueAt": "2026-08-25T16:07:36.415Z",
+      "completed": 1,
+      "status": "scheduled",
+      "claimedBySessionId": null,
+      "claimedAt": null,
+      "deferredReason": null,
+      "updatedAt": "2026-08-24T16:07:36.415Z"
+    },
+    "d0fd3514-d602-41fe-b36a-a976fb119607": {
+      "id": "d0fd3514-d602-41fe-b36a-a976fb119607",
+      "conceptId": "f86b2a8a-09e3-4895-9dc3-de3d7445611f",
+      "level": 1,
+      "dueAt": "2026-08-25T16:08:56.239Z",
+      "completed": 1,
+      "status": "scheduled",
+      "claimedBySessionId": null,
+      "claimedAt": null,
+      "deferredReason": null,
+      "updatedAt": "2026-08-24T16:08:56.239Z"
+    }
+  },
+  "reviewCount": 0,
+  "render": {
+    "revision": 0,
+    "status": "stale",
+    "error": null
+  }
+}

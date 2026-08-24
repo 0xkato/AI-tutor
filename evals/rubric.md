@@ -62,8 +62,10 @@ acceptance even when numerical scores are high.
 
 ## Human verdict
 
-A named human reviewer records `pass` or `fail`, a canonical review timestamp,
-and a specific rationale. `pass` means the session was useful and trustworthy
-within the scenario's claim boundary. The human verdict cannot override a
-failed deterministic check, a critical failure, a minimum score failure, or an
-incomplete artifact.
+Before review, the package records `pending`, a null review timestamp, and why
+human review remains outstanding. A named human reviewer replaces that state
+with `pass` or `fail`, a canonical review timestamp, and a specific rationale.
+`pass` means the session was useful and trustworthy within the scenario's claim
+boundary. A pending verdict never satisfies acceptance, and a human verdict
+cannot override a failed deterministic check, a critical failure, a minimum
+score failure, or an incomplete artifact.

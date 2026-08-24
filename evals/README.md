@@ -16,8 +16,9 @@ catalog and rubric are fixed before a live run begins.
    `artifact.json`.
 6. Score all nine rubric dimensions with evidence pointers, record every
    deterministic check, and mark every contaminated question as excluded.
-7. Have a human reviewer record the final verdict. The host model cannot grade
-   its own run as the human verdict.
+7. Set the verdict to `pending` while packaging, then have a human reviewer
+   replace it with `pass` or `fail`. The host model cannot grade its own run as
+   the human verdict.
 8. Validate the artifact:
 
    `node scripts/validate-eval-artifact.mjs artifacts/evals/<run>`
@@ -43,7 +44,9 @@ Do not commit private learner material or credentials.
 
 ## Acceptance boundary
 
-An artifact is accepted only when it is structurally complete, every
+An artifact with a `pending` verdict can be structurally validated with
+`--allow-failed`, but it is never accepted release evidence. An artifact is
+accepted only when it is structurally complete, every
 deterministic check passes, every dimension meets the minimum score, the
 average meets the suite threshold, there are no critical failures, all
 contaminated questions are excluded from evidence, and the human verdict is

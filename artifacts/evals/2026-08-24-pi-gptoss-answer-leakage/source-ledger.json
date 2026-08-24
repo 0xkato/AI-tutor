@@ -1,0 +1,59 @@
+{
+  "formatVersion": 1,
+  "sources": [
+    {
+      "id": "ace5e3aa-c73b-4b5e-a04b-281e188dc578",
+      "title": "PostgreSQL Documentation: Index Uniqueness Checks",
+      "url": "https://www.postgresql.org/docs/current/index-unique-checks.html",
+      "sourceClass": "primary",
+      "supports": "For an immediate unique index, a would-be inserter encountering the same key from an uncommitted transaction waits; rollback removes the conflict, while commit leads to a uniqueness violation after rechecking.",
+      "verification": "Retrieved the official page directly with curl and checked the uncommitted-conflict rules and the statement that uniqueness checking must be integral to index insertion to avoid races.",
+      "createdAt": "2026-08-24T16:00:33.412Z"
+    },
+    {
+      "id": "e382cfe0-a50e-4dfd-b6c0-c88ccf8518fa",
+      "title": "PostgreSQL Documentation: Unique Constraints",
+      "url": "https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-UNIQUE-CONSTRAINTS",
+      "sourceClass": "primary",
+      "supports": "A unique constraint ensures constrained key values are unique across rows and automatically creates a unique B-tree index in PostgreSQL.",
+      "verification": "Retrieved the official constraints page directly with curl and checked the unique-constraint definition, generated index, and NULL portability caveat.",
+      "createdAt": "2026-08-24T16:00:33.589Z"
+    },
+    {
+      "id": "70cbb864-db5c-4795-909e-653616d0c828",
+      "title": "SQLite Documentation: Transactions",
+      "url": "https://www.sqlite.org/lang_transaction.html#read_transactions_versus_write_transactions",
+      "sourceClass": "primary",
+      "supports": "Database engines can enforce writer coordination differently: SQLite permits multiple simultaneous readers but only one simultaneous writer, and a competing write upgrade can fail with SQLITE_BUSY.",
+      "verification": "Retrieved the official SQLite transaction page directly with curl and checked its simultaneous-reader and single-writer rules.",
+      "createdAt": "2026-08-24T16:00:33.766Z"
+    },
+    {
+      "id": "688d8a94-33ff-42f0-bee2-b20d1944ef03",
+      "title": "SQLite Documentation: UNIQUE Constraints",
+      "url": "https://www.sqlite.org/lang_createtable.html#unique_constraints",
+      "sourceClass": "primary",
+      "supports": "SQLite checks UNIQUE constraints as a write-time table invariant and treats duplicate constrained non-NULL value combinations as constraint violations.",
+      "verification": "Retrieved the official SQLite CREATE TABLE page directly with curl and checked the UNIQUE constraint and constraint-violation sections.",
+      "createdAt": "2026-08-24T16:00:33.944Z"
+    },
+    {
+      "id": "f9162136-0f76-4248-8e38-8d48552d5420",
+      "title": "PostgreSQL Documentation: INSERT and ON CONFLICT",
+      "url": "https://www.postgresql.org/docs/current/sql-insert.html#SQL-ON-CONFLICT",
+      "sourceClass": "primary",
+      "supports": "ON CONFLICT turns a unique-constraint conflict into an explicit alternative action; DO NOTHING avoids the second insert, while DO UPDATE guarantees an atomic insert-or-update outcome under high concurrency.",
+      "verification": "Retrieved the official INSERT page directly with curl and checked the ON CONFLICT alternative actions, arbiter constraints, atomic high-concurrency guarantee, and RETURNING behavior.",
+      "createdAt": "2026-08-24T16:06:20.081Z"
+    },
+    {
+      "id": "ac982800-e95b-4ff8-b755-316dcc03a3e1",
+      "title": "PostgreSQL Documentation: Read Committed Isolation",
+      "url": "https://www.postgresql.org/docs/current/transaction-iso.html#XACT-READ-COMMITTED",
+      "sourceClass": "primary",
+      "supports": "Under PostgreSQL Read Committed, ON CONFLICT may resolve against a concurrent row outside the INSERT snapshot; DO NOTHING can suppress insertion even when that row is not visible to the statement, while a later SELECT statement receives a newer snapshot.",
+      "verification": "Retrieved the official transaction-isolation page directly with curl and checked the statement-snapshot rule plus the documented ON CONFLICT DO UPDATE and DO NOTHING concurrency behavior.",
+      "createdAt": "2026-08-24T16:06:20.263Z"
+    }
+  ]
+}

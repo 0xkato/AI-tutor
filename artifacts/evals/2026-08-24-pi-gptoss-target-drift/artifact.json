@@ -1,0 +1,137 @@
+{
+  "formatVersion": 1,
+  "suiteVersion": "1.0.0",
+  "scenario": {
+    "id": "retention-regression",
+    "version": 1
+  },
+  "host": "pi",
+  "sessionId": "9ec51ffd-372e-459d-912f-8d3a42bc78cb",
+  "startedAt": "2026-08-24T17:03:47.494Z",
+  "completedAt": "2026-08-24T17:08:01.534Z",
+  "provenance": {
+    "piSessionFile": "/private/tmp/adaptive-pi-session-gptoss-clean.BLx0FH/2026-08-24T17-03-47-470Z_01a034ba-6b0e-726d-bd8d-eea595a2273c.jsonl",
+    "model": "ollama/gpt-oss:20b",
+    "transcriptScope": "Curated verbatim excerpts covering the requested concept, selected review, checkpoint persistence, learner answer, assessment mutation, and the critical host failure; protocol reads and unrelated tool chatter are omitted.",
+    "claimBoundary": "Structurally complete failed evidence; it does not support Pi release acceptance."
+  },
+  "files": {
+    "transcript": {
+      "path": "transcript.md",
+      "bytes": 3632,
+      "sha256": "f43ca95561cbcfd5bff873b179b5aa6a3e098432269840c6c1c28dd824503d9b"
+    },
+    "stateSnapshot": {
+      "path": "state.json",
+      "bytes": 41234,
+      "sha256": "efc91a84c449a5e173c27969cfc51787fbef393c024bccf44a43dd2f5f5313bb"
+    },
+    "sourceLedger": {
+      "path": "source-ledger.json",
+      "bytes": 4249,
+      "sha256": "b50423079a337acc0527cf7d22b8460f5a7c28b45b0968dc34e71310b929d908"
+    },
+    "renderedNote": {
+      "path": "rendered-note.md",
+      "bytes": 1619,
+      "sha256": "cbf5c968609ada9a7a8c91beb975e62b64995df6cae1de9b2061524106a7da58"
+    }
+  },
+  "rubric": {
+    "dimensions": {
+      "targetFidelity": {
+        "score": 0,
+        "evidence": "The selected concept is uniqueness conflict commit-versus-rollback, but the host replaced it with an inventory transaction question."
+      },
+      "frontierAccuracy": {
+        "score": 0,
+        "evidence": "The persisted question tests generic transaction atomicity rather than the selected concept's causal frontier."
+      },
+      "questionClarity": {
+        "score": 3,
+        "evidence": "The inventory question is understandable in isolation but omits the selected uniqueness-conflict premises."
+      },
+      "leakageAvoidance": {
+        "score": 0,
+        "evidence": "After the incorrect answer, the host reveals that rollback was omitted."
+      },
+      "assessmentAccuracy": {
+        "score": 0,
+        "evidence": "The assessment concerns a different concept and therefore cannot grade the selected review item validly."
+      },
+      "sourceSupport": {
+        "score": 1,
+        "evidence": "The original concept has sources, but the replacement inventory claim was not source-checked or connected to them."
+      },
+      "pacing": {
+        "score": 1,
+        "evidence": "The host asks one question but advances an unrelated mechanism and stops before repair."
+      },
+      "persistence": {
+        "score": 2,
+        "evidence": "The wrong question and assessment were durably recorded, so state matches the flawed conversation but not the selected concept."
+      },
+      "synthesis": {
+        "score": 0,
+        "evidence": "The review did not complete and no valid synthesis was reached."
+      }
+    },
+    "deterministicChecks": [
+      {
+        "name": "canonical-state-valid",
+        "passed": true,
+        "evidence": "The artifact validator validates the schema-version-2 snapshot."
+      },
+      {
+        "name": "selected-one-review",
+        "passed": true,
+        "evidence": "state.json contains one active review item for commit-outcome-branch."
+      },
+      {
+        "name": "question-persisted-before-answer",
+        "passed": true,
+        "evidence": "The exact inventory question is persisted as retention-q5 before the answer."
+      },
+      {
+        "name": "question-matches-selected-concept",
+        "passed": false,
+        "evidence": "The question tests inventory rollback rather than uniqueness-conflict commit-versus-rollback."
+      },
+      {
+        "name": "review-closed",
+        "passed": false,
+        "evidence": "The review remains active with repair-required status."
+      }
+    ],
+    "contaminatedQuestions": [
+      {
+        "questionId": "retention-q5",
+        "reason": "The question replaced the selected concept, and the host then revealed the rollback omission after the first miss.",
+        "excludedFromEvidence": true
+      }
+    ],
+    "criticalFailures": [
+      {
+        "code": "TARGET_REPLACEMENT",
+        "description": "The host replaced the selected uniqueness-conflict review with an unrelated inventory-rollback question.",
+        "evidence": "Compare artifact.json scenario and state.json concept key with transcript.md question."
+      },
+      {
+        "code": "ANSWER_LEAKAGE",
+        "description": "The first-miss response revealed the rollback omission.",
+        "evidence": "transcript.md final assistant response."
+      },
+      {
+        "code": "REVIEW_INCOMPLETE",
+        "description": "The live Pi review did not complete repair, transfer, and closure.",
+        "evidence": "state.json retains an active repair-required review session."
+      }
+    ],
+    "humanVerdict": {
+      "outcome": "pending",
+      "reviewer": "Pending human review",
+      "reviewedAt": null,
+      "rationale": "The evidence package is complete and awaiting the founder's independent verdict."
+    }
+  }
+}

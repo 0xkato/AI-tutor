@@ -213,3 +213,23 @@ test("failed but complete artifacts remain valid records and block acceptance", 
     (error) => error.code === "EVAL_NOT_ACCEPTED",
   );
 });
+
+test("pending human review remains a valid record but cannot satisfy release acceptance", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-eval-pending-"));
+  const artifact = completeArtifact(root);
+  artifact.rubric.humanVerdict = {
+    outcome: "pending",
+    reviewer: "Pending human review",
+    reviewedAt: null,
+    rationale: "The evidence package is complete and awaiting a human verdict.",
+  };
+  fs.writeFileSync(path.join(root, "artifact.json"), `${JSON.stringify(artifact, null, 2)}\n`);
+
+  const record = validateEvalArtifact(root, { requirePass: false });
+  assert.equal(record.valid, true);
+  assert.equal(record.accepted, false);
+  assert.throws(
+    () => validateEvalArtifact(root),
+    (error) => error.code === "EVAL_NOT_ACCEPTED",
+  );
+});

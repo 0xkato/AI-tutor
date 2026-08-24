@@ -147,11 +147,17 @@ function validateRubric(rubric, acceptance) {
   }
 
   const verdict = object(rubric.humanVerdict, "rubric.humanVerdict", "INVALID_HUMAN_VERDICT");
-  if (!new Set(["pass", "fail"]).has(verdict.outcome)) {
-    fail("human verdict outcome must be pass or fail", "INVALID_HUMAN_VERDICT");
+  if (!new Set(["pass", "fail", "pending"]).has(verdict.outcome)) {
+    fail("human verdict outcome must be pass, fail, or pending", "INVALID_HUMAN_VERDICT");
   }
   text(verdict.reviewer, "human verdict reviewer", "INVALID_HUMAN_VERDICT");
-  parseInstant(verdict.reviewedAt, "human verdict reviewedAt");
+  if (verdict.outcome === "pending") {
+    if (verdict.reviewedAt !== null) {
+      fail("pending human verdict reviewedAt must be null", "INVALID_HUMAN_VERDICT");
+    }
+  } else {
+    parseInstant(verdict.reviewedAt, "human verdict reviewedAt");
+  }
   text(verdict.rationale, "human verdict rationale", "INVALID_HUMAN_VERDICT");
 
   const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
