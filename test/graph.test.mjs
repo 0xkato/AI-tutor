@@ -75,7 +75,7 @@ test("nextFrontier starts after demonstrated prerequisites", () => {
 test("mermaidForPlan renders every node and labeled dependency", () => {
   const mermaid = mermaidForPlan(plan());
   assert.match(mermaid, /flowchart TD/);
-  assert.match(mermaid, /vectors\["Vectors"\]/);
-  assert.match(mermaid, /vectors -->\|"Covectors act on vectors"\| covectors/);
-  assert.match(mermaid, /class forms target/);
+  assert.match(mermaid, /n0\["Vectors"\]/);
+  assert.match(mermaid, /n0 -->\|"Covectors act on vectors"\| n1/);
+  assert.match(mermaid, /class n2 target/);
 });

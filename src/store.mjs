@@ -17,6 +17,8 @@ export function pathsFor(root) {
     state: path.join(dataDir, "state.json"),
     lock: path.join(dataDir, "state.lock"),
     backups: path.join(dataDir, "backups"),
+    renderManifest: path.join(dataDir, "render-manifest.json"),
+    renderPending: path.join(dataDir, "render-pending.json"),
   };
 }
 
@@ -278,13 +280,18 @@ export function writeState(root, state, options = {}) {
     writeStateUnlocked(paths, validateState(state), ownership));
 }
 
-export function mutateState(root, mutation, { afterWrite, lockTimeoutMs } = {}) {
+export function mutateState(root, mutation, { lockTimeoutMs } = {}) {
   if (typeof mutation !== "function") throw new TypeError("mutation must be a function");
   return withLock(root, { lockTimeoutMs }, (paths, ownership) => {
     const current = readStateUnlocked(paths, ownership);
     const next = mutation(current);
+    next.revision = current.revision + 1;
+    next.render = {
+      revision: current.render.revision,
+      status: "stale",
+      error: null,
+    };
     const validated = writeStateUnlocked(paths, validateState(next), ownership);
-    if (afterWrite) afterWrite(validated);
     return validated;
   });
 }

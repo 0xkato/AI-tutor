@@ -1,6 +1,7 @@
 import fs from "node:fs";
 
 import { listBackups } from "./backup.mjs";
+import { inspectRenderProjection } from "./render-manifest.mjs";
 import { validateState } from "./schema.mjs";
 import { inspectLock, pathsFor } from "./store.mjs";
 
@@ -52,7 +53,7 @@ function inspectState(statePath) {
   }
 }
 
-function inspectRender(state) {
+function inspectRender(root, state) {
   if (!state) {
     return {
       stateRevision: null,
@@ -62,13 +63,7 @@ function inspectRender(state) {
       error: "Canonical state is invalid",
     };
   }
-  return {
-    stateRevision: state.revision,
-    renderedRevision: state.render.revision,
-    status: state.render.status,
-    current: state.render.status === "current" && state.render.revision === state.revision,
-    error: state.render.error,
-  };
+  return inspectRenderProjection(root, state);
 }
 
 export function doctor(root) {
@@ -76,7 +71,7 @@ export function doctor(root) {
   const inspectedState = inspectState(paths.state);
   const lock = inspectLock(root);
   const backups = listBackups(root);
-  const render = inspectRender(inspectedState.state);
+  const render = inspectRender(root, inspectedState.state);
   const permissions = {
     dataDirectoryOwnerOnly: ownerOnly(paths.dataDir),
     stateOwnerOnly: ownerOnly(paths.state),

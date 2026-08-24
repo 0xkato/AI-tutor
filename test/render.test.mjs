@@ -145,7 +145,9 @@ test("renderVault writes home, session, topic, and review notes", () => {
 
   const vault = path.join(root, "vault");
   assert.equal(fs.existsSync(path.join(vault, "Home.md")), true);
-  assert.equal(fs.existsSync(path.join(vault, "Sessions", "differential-forms-s1.md")), true);
+  const sessionFiles = fs.readdirSync(path.join(vault, "Sessions"));
+  assert.equal(sessionFiles.length, 1);
+  assert.match(sessionFiles[0], /^differential-forms-[a-f0-9]{20}\.md$/);
   const topicFiles = fs.readdirSync(path.join(vault, "Topics"));
   assert.equal(topicFiles.length, 1);
   assert.match(topicFiles[0], /^differential-forms-[a-f0-9]{20}\.md$/);

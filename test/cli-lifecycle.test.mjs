@@ -42,9 +42,9 @@ test("independent CLI invocations initialize, mutate, render, and resume state",
   assert.equal(status.active.target, "Understand one parameter update causally");
   assert.equal(fs.existsSync(path.join(root, ".adaptive-learning", "state.json")), true);
   assert.equal(fs.existsSync(path.join(root, "vault", "Home.md")), true);
-  assert.equal(
-    fs.existsSync(path.join(root, "vault", "Sessions", "gradient-descent-session-1.md")),
-    true,
+  assert.match(
+    fs.readdirSync(path.join(root, "vault", "Sessions"))[0],
+    /^gradient-descent-[a-f0-9]{20}\.md$/,
   );
 });
 

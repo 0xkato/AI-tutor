@@ -17,14 +17,14 @@ import {
   setPlan,
   startSession,
 } from "../src/model.mjs";
-import { renderVault } from "../src/render.mjs";
+import { commitAndRender, repairRender } from "../src/render.mjs";
 import { dueReviews, shouldSynthesize } from "../src/retention.mjs";
 import {
   closeReviewSession,
   deferReviewItem,
   startReviewSession,
 } from "../src/reviews.mjs";
-import { initializeStore, mutateState, readState } from "../src/store.mjs";
+import { initializeStore, readState } from "../src/store.mjs";
 
 const commands = [
   ["init", "Initialize local state and the Obsidian vault"],
@@ -37,6 +37,7 @@ const commands = [
   ["record-step", "Record one motivated teaching step"],
   ["record-assessment", "Record a checkpoint or retention result"],
   ["add-visual", "Attach a verified visual artifact"],
+  ["repair-render", "Reconcile the Obsidian projection with canonical state"],
   ["status", "Show the active session"],
   ["context", "Print runner-ready durable context"],
   ["due", "List due retention reviews"],
@@ -171,23 +172,39 @@ function readJsonFile(file) {
 
 function commandResult(command, options, root) {
   if (command === "init") {
-    initializeStore(root, { now: last(options, "now") });
+    const initial = initializeStore(root, { now: last(options, "now") });
     const vaultDir = last(options, "vault-dir");
-    const state = mutateState(
-      root,
-      (current) => {
-        if (!vaultDir || vaultDir === current.settings.vaultDir) return current;
+    if (vaultDir && vaultDir !== initial.settings.vaultDir) {
+      const outcome = commitAndRender(root, (current) => {
         const next = structuredClone(current);
         next.settings.vaultDir = vaultDir;
         next.updatedAt = last(options, "now") ?? new Date().toISOString();
         return next;
-      },
-      { afterWrite: (next) => renderVault(root, next) },
-    );
-    return statusFor(state);
+      });
+      if (!outcome.render.ok) {
+        return {
+          ok: false,
+          stateCommitted: outcome.stateCommitted,
+          stateRevision: outcome.stateRevision,
+          render: outcome.render,
+        };
+      }
+      return statusFor(outcome.state);
+    }
+    const rendered = repairRender(root);
+    if (!rendered.ok) {
+      return {
+        ok: false,
+        stateCommitted: true,
+        stateRevision: initial.revision,
+        render: rendered,
+      };
+    }
+    return statusFor(initial);
   }
 
   const state = readState(root);
+  if (command === "repair-render") return repairRender(root);
   if (command === "status") return statusFor(state);
   if (command === "due") {
     const reviews = dueReviews(state, { now: last(options, "now") });
@@ -204,7 +221,7 @@ function commandResult(command, options, root) {
     };
   }
 
-  const next = mutateState(root, (current) => {
+  const outcome = commitAndRender(root, (current) => {
     if (command === "start") {
       return startSession(current, {
       id: last(options, "id"),
@@ -297,8 +314,16 @@ function commandResult(command, options, root) {
       });
     }
     throw new LearningError(`Unknown command: ${command}`, "UNKNOWN_COMMAND");
-  }, { afterWrite: (current) => renderVault(root, current) });
-  return statusFor(next);
+  });
+  if (!outcome.render.ok) {
+    return {
+      ok: false,
+      stateCommitted: outcome.stateCommitted,
+      stateRevision: outcome.stateRevision,
+      render: outcome.render,
+    };
+  }
+  return statusFor(outcome.state);
 }
 
 const [command, ...rawOptions] = process.argv.slice(2);
@@ -316,7 +341,9 @@ if (!commands.some(([name]) => name === command)) {
 try {
   const options = parseOptions(rawOptions);
   const root = path.resolve(last(options, "root") ?? process.cwd());
-  emit(commandResult(command, options, root), options.json === true);
+  const result = commandResult(command, options, root);
+  emit(result, options.json === true);
+  if (result?.ok === false) process.exitCode = 1;
 } catch (error) {
   const code = error instanceof LearningError ? error.code : "UNEXPECTED_ERROR";
   process.stderr.write(`[${code}] ${error.message}\n`);

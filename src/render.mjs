@@ -1,8 +1,18 @@
 import { createHash } from "node:crypto";
-import fs from "node:fs";
 import path from "node:path";
 
 import { mermaidForPlan } from "./graph.mjs";
+import {
+  headingText,
+  inlineCode,
+  listValue,
+  markdownLink,
+  obsidianEmbed,
+  obsidianLink,
+  plainParagraph,
+} from "./markdown.mjs";
+import { reconcileRender } from "./render-manifest.mjs";
+import { mutateState, readState } from "./store.mjs";
 
 export function slugify(value) {
   const slug = String(value)
@@ -15,10 +25,6 @@ export function slugify(value) {
   return slug || "untitled";
 }
 
-function heading(value) {
-  return String(value || "Untitled").replace(/[\r\n]+/g, " ").trim();
-}
-
 function titleCase(value) {
   const text = String(value ?? "");
   return text ? `${text[0].toUpperCase()}${text.slice(1)}` : "";
@@ -26,11 +32,11 @@ function titleCase(value) {
 
 function list(values, empty = "None recorded.") {
   if (!values?.length) return empty;
-  return values.map((value) => `- ${value}`).join("\n");
+  return values.map((value) => `- ${listValue(value)}`).join("\n");
 }
 
 function sessionName(session) {
-  return `${slugify(session.topic)}-${slugify(session.id)}`;
+  return `${slugify(session.topic)}-${stableSuffix(session.id)}`;
 }
 
 function stableSuffix(value) {
@@ -47,25 +53,25 @@ function conceptsForSession(state, session) {
 
 export function renderSessionNote(state, session) {
   const lines = [
-    `# ${heading(session.topic)}`,
+    `# ${headingText(session.topic)}`,
     "",
-    `- **Session:** \`${session.id}\``,
-    `- **Phase:** ${titleCase(session.phase)}`,
-    `- **Created:** ${session.createdAt ?? "Unknown"}`,
-    `- **Updated:** ${session.updatedAt ?? "Unknown"}`,
-    `- **Completed:** ${session.completedAt ?? "Not completed"}`,
+    `- **Session:** ${inlineCode(session.id)}`,
+    `- **Phase:** ${listValue(titleCase(session.phase))}`,
+    `- **Created:** ${listValue(session.createdAt ?? "Unknown")}`,
+    `- **Updated:** ${listValue(session.updatedAt ?? "Unknown")}`,
+    `- **Completed:** ${listValue(session.completedAt ?? "Not completed")}`,
     "",
     "## Learning target",
     "",
-    session.target || "Not recorded.",
+    plainParagraph(session.target, "Not recorded."),
     "",
     "## Learner context",
     "",
-    session.learnerContext || "Not recorded.",
+    plainParagraph(session.learnerContext, "Not recorded."),
     "",
     "## Probe conclusion",
     "",
-    session.probeSummary || "Probe is not complete.",
+    plainParagraph(session.probeSummary, "Probe is not complete."),
     "",
     "## Dependency plan",
     "",
@@ -81,11 +87,11 @@ export function renderSessionNote(state, session) {
   if (session.sources?.length) {
     for (const source of session.sources) {
       lines.push(
-        `### [${heading(source.title)}](${source.url})`,
+        `### ${markdownLink(source.title, source.url)}`,
         "",
-        `- **Class:** ${source.sourceClass}`,
-        `- **Supports:** ${source.supports}`,
-        `- **Verification:** ${source.verification}`,
+        `- **Class:** ${listValue(source.sourceClass)}`,
+        `- **Supports:** ${listValue(source.supports)}`,
+        `- **Verification:** ${listValue(source.verification)}`,
         "",
       );
     }
@@ -97,12 +103,12 @@ export function renderSessionNote(state, session) {
   if (session.steps?.length) {
     session.steps.forEach((step, index) => {
       lines.push(
-        `### ${index + 1}. ${heading(step.nodeId)}`,
+        `### ${index + 1}\. ${headingText(step.nodeId)}`,
         "",
-        `- **Foundation:** ${step.foundation}`,
-        `- **Motivation:** ${step.motivation}`,
-        `- **Explanation:** ${step.explanation}`,
-        `- **Checkpoint:** ${step.checkpointQuestion}`,
+        `- **Foundation:** ${listValue(step.foundation)}`,
+        `- **Motivation:** ${listValue(step.motivation)}`,
+        `- **Explanation:** ${listValue(step.explanation)}`,
+        `- **Checkpoint:** ${listValue(step.checkpointQuestion)}`,
         "",
       );
     });
@@ -114,10 +120,10 @@ export function renderSessionNote(state, session) {
   if (session.assessments?.length) {
     for (const assessment of session.assessments) {
       lines.push(
-        `### ${titleCase(assessment.grade)} — ${heading(assessment.nodeId)}`,
+        `### ${headingText(titleCase(assessment.grade))} — ${headingText(assessment.nodeId)}`,
         "",
-        `- **Kind:** ${assessment.kind}`,
-        `- **Evidence:** ${assessment.evidence}`,
+        `- **Kind:** ${listValue(assessment.kind)}`,
+        `- **Evidence:** ${listValue(assessment.evidence)}`,
         `- **Contaminated:** ${assessment.contaminated ? "Yes — excluded from knowledge evidence" : "No"}`,
         "",
       );
@@ -132,7 +138,7 @@ export function renderSessionNote(state, session) {
     for (const concept of concepts) {
       const review = state.reviews?.[concept.reviewId];
       lines.push(
-        `- **${heading(concept.title)}:** ${concept.status}; level ${review?.level ?? 0}; due ${review?.dueAt ?? "not scheduled"}`,
+        `- **${listValue(concept.title)}:** ${listValue(`${concept.status}; level ${review?.level ?? 0}; due ${review?.dueAt ?? "not scheduled"}`)}`,
       );
     }
   } else {
@@ -143,10 +149,10 @@ export function renderSessionNote(state, session) {
   if (session.visuals?.length) {
     for (const visual of session.visuals) {
       lines.push(
-        `![[${visual.path}]]`,
+        obsidianEmbed(visual.path),
         "",
-        `- **Description:** ${visual.description}`,
-        `- **Verification:** ${visual.verification}`,
+        `- **Description:** ${listValue(visual.description)}`,
+        `- **Verification:** ${listValue(visual.verification)}`,
         "",
       );
     }
@@ -157,7 +163,7 @@ export function renderSessionNote(state, session) {
   lines.push(
     "## Whole-system synthesis",
     "",
-    session.synthesis || "Not completed yet.",
+    plainParagraph(session.synthesis, "Not completed yet."),
     "",
     "## Unresolved gaps",
     "",
@@ -174,12 +180,17 @@ function renderHome(state) {
   return [
     "# Adaptive Learning",
     "",
-    `State updated: ${state.updatedAt}`,
+    `State updated: ${plainParagraph(state.updatedAt)}`,
     "",
     "## Sessions",
     "",
     sessions.length
-      ? sessions.map((session) => `- [[Sessions/${sessionName(session)}|${heading(session.topic)}]] — ${titleCase(session.phase)}`).join("\n")
+      ? sessions
+          .map(
+            (session) =>
+              `- ${obsidianLink(`Sessions/${sessionName(session)}`, session.topic)} — ${listValue(titleCase(session.phase))}`,
+          )
+          .join("\n")
       : "No sessions yet.",
     "",
   ].join("\n");
@@ -194,16 +205,16 @@ function renderTopic(state, topic) {
     ),
   );
   const lines = [
-    `# ${heading(topic.name)}`,
+    `# ${headingText(topic.name)}`,
     "",
-    `- **Topic ID:** \`${topic.id}\``,
+    `- **Topic ID:** ${inlineCode(topic.id)}`,
     "",
     "## Session history",
     "",
     ...(sessions.length
       ? sessions.map(
           (session) =>
-            `- [[../Sessions/${sessionName(session)}|${session.createdAt}]] — ${titleCase(session.phase)}`,
+            `- ${obsidianLink(`../Sessions/${sessionName(session)}`, session.createdAt)} — ${listValue(titleCase(session.phase))}`,
         )
       : ["No sessions recorded."]),
     "",
@@ -214,13 +225,13 @@ function renderTopic(state, topic) {
   for (const concept of concepts) {
     const review = state.reviews[concept.reviewId];
     lines.push(
-      `### ${heading(concept.title)}`,
+      `### ${headingText(concept.title)}`,
       "",
-      `- **Concept ID:** \`${concept.id}\``,
-      `- **Key:** \`${concept.key}\``,
-      `- **Status:** ${titleCase(concept.status)}`,
-      `- **Latest grade:** ${concept.latestGrade ? titleCase(concept.latestGrade) : "None"}`,
-      `- **Review:** level ${review?.level ?? 0}; due ${review?.dueAt ?? "not scheduled"}`,
+      `- **Concept ID:** ${inlineCode(concept.id)}`,
+      `- **Key:** ${inlineCode(concept.key)}`,
+      `- **Status:** ${listValue(titleCase(concept.status))}`,
+      `- **Latest grade:** ${listValue(concept.latestGrade ? titleCase(concept.latestGrade) : "None")}`,
+      `- **Review:** ${listValue(`level ${review?.level ?? 0}; due ${review?.dueAt ?? "not scheduled"}`)}`,
       "",
       "#### Evidence history",
       "",
@@ -235,7 +246,7 @@ function renderTopic(state, topic) {
     }
     for (const { assessment, session } of evidence) {
       lines.push(
-        `- ${assessment.createdAt} — **${titleCase(assessment.grade)}** (${assessment.kind}) in [[../Sessions/${sessionName(session)}|session ${session.id}]] — ${assessment.evidence}`,
+        `- ${listValue(assessment.createdAt)} — **${listValue(titleCase(assessment.grade))}** (${listValue(assessment.kind)}) in ${obsidianLink(`../Sessions/${sessionName(session)}`, `session ${session.id}`)} — ${listValue(assessment.evidence)}`,
       );
     }
     lines.push("");
@@ -258,9 +269,9 @@ function renderReviews(state) {
             const topic = state.topics[concept.topicId];
             const session = state.sessions[concept.sourceSessionIds.at(-1)];
             const link = session
-              ? `[[Sessions/${sessionName(session)}|${heading(topic?.name ?? session.topic)}]]`
-              : heading(topic?.name ?? "Unknown topic");
-            return `- ${review.dueAt} — ${link} / ${heading(concept.title)}`;
+              ? obsidianLink(`Sessions/${sessionName(session)}`, topic?.name ?? session.topic)
+              : listValue(topic?.name ?? "Unknown topic");
+            return `- ${listValue(review.dueAt)} — ${link} / ${listValue(concept.title)}`;
           })
           .join("\n")
       : "No reviews scheduled.",
@@ -268,33 +279,79 @@ function renderReviews(state) {
   ].join("\n");
 }
 
-function safeVault(root, vaultDir) {
-  const base = path.resolve(root);
-  const target = path.resolve(base, vaultDir || "vault");
-  if (target !== base && !target.startsWith(`${base}${path.sep}`)) {
-    throw new Error("vaultDir must stay inside the learning root");
-  }
-  return target;
-}
-
 export function renderVault(root, state) {
-  const vault = safeVault(root, state.settings?.vaultDir ?? "vault");
-  const sessionsDir = path.join(vault, "Sessions");
-  const topicsDir = path.join(vault, "Topics");
-  fs.mkdirSync(sessionsDir, { recursive: true });
-  fs.mkdirSync(topicsDir, { recursive: true });
-
-  fs.writeFileSync(path.join(vault, "Home.md"), renderHome(state));
-  fs.writeFileSync(path.join(vault, "Reviews.md"), renderReviews(state));
-
+  const files = [
+    { relativePath: "Home.md", contents: `${renderHome(state).trimEnd()}\n` },
+    { relativePath: "Reviews.md", contents: `${renderReviews(state).trimEnd()}\n` },
+  ];
   for (const session of Object.values(state.sessions ?? {})) {
-    fs.writeFileSync(
-      path.join(sessionsDir, `${sessionName(session)}.md`),
-      renderSessionNote(state, session),
-    );
+    files.push({
+      relativePath: `Sessions/${sessionName(session)}.md`,
+      contents: `${renderSessionNote(state, session).trimEnd()}\n`,
+    });
   }
   for (const topic of Object.values(state.topics ?? {})) {
-    fs.writeFileSync(path.join(topicsDir, `${topicName(topic)}.md`), renderTopic(state, topic));
+    files.push({
+      relativePath: `Topics/${topicName(topic)}.md`,
+      contents: `${renderTopic(state, topic).trimEnd()}\n`,
+    });
   }
-  return vault;
+  const manifest = reconcileRender(root, {
+    vaultDir: state.settings?.vaultDir ?? "vault",
+    stateRevision: state.revision,
+    files,
+  });
+  return {
+    vault: path.resolve(root, manifest.vaultDir),
+    manifest,
+  };
+}
+
+function renderFailure(error) {
+  return {
+    ok: false,
+    code: error instanceof Error && typeof error.code === "string" ? error.code : "RENDER_FAILED",
+    error: error instanceof Error ? error.message : String(error),
+  };
+}
+
+export function commitAndRender(root, mutation, { renderer = renderVault, lockTimeoutMs } = {}) {
+  const state = mutateState(root, mutation, { lockTimeoutMs });
+  try {
+    const rendered = renderer(root, state);
+    return {
+      stateCommitted: true,
+      stateRevision: state.revision,
+      state,
+      render: {
+        ok: true,
+        stateRevision: state.revision,
+        vault: rendered?.vault ?? null,
+      },
+    };
+  } catch (error) {
+    return {
+      stateCommitted: true,
+      stateRevision: state.revision,
+      state,
+      render: renderFailure(error),
+    };
+  }
+}
+
+export function repairRender(root, { renderer = renderVault } = {}) {
+  const state = readState(root);
+  try {
+    const rendered = renderer(root, state);
+    return {
+      ok: true,
+      stateRevision: state.revision,
+      vault: rendered?.vault ?? null,
+    };
+  } catch (error) {
+    return {
+      ...renderFailure(error),
+      stateRevision: state.revision,
+    };
+  }
 }

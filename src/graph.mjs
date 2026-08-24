@@ -1,4 +1,5 @@
 import { LearningError } from "./errors.mjs";
+import { mermaidLabel } from "./markdown.mjs";
 
 function text(value, label) {
   if (typeof value !== "string" || value.trim() === "") {
@@ -130,20 +131,19 @@ export function nextFrontier(value, knowledge = {}) {
   );
 }
 
-function mermaidText(value) {
-  return String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/\|/g, "&#124;");
-}
-
 export function mermaidForPlan(value) {
   const plan = validatePlan(value);
+  const identifiers = new Map(plan.nodes.map((node, index) => [node.id, `n${index}`]));
   const lines = ["flowchart TD"];
   for (const node of plan.nodes) {
-    lines.push(`  ${node.id}["${mermaidText(node.title)}"]`);
+    lines.push(`  ${identifiers.get(node.id)}["${mermaidLabel(node.title)}"]`);
   }
   for (const edge of plan.edges) {
-    lines.push(`  ${edge.from} -->|"${mermaidText(edge.reason)}"| ${edge.to}`);
+    lines.push(
+      `  ${identifiers.get(edge.from)} -->|"${mermaidLabel(edge.reason)}"| ${identifiers.get(edge.to)}`,
+    );
   }
   lines.push("  classDef target stroke-width:3px,stroke:#7c3aed");
-  lines.push(`  class ${plan.targetNodeId} target`);
+  lines.push(`  class ${identifiers.get(plan.targetNodeId)} target`);
   return `${lines.join("\n")}\n`;
 }

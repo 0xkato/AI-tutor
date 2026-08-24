@@ -131,10 +131,9 @@ test("complete adaptive session persists evidence, retry state, review, and Obsi
   assert.equal(session.sources[0].verification.includes("independent"), true);
   assert.equal(session.visuals[0].verification.includes("Inspected"), true);
 
-  const note = fs.readFileSync(
-    path.join(root, "vault", "Sessions", "differential-forms-s1.md"),
-    "utf8",
-  );
+  const sessionFile = fs.readdirSync(path.join(root, "vault", "Sessions"))[0];
+  assert.match(sessionFile, /^differential-forms-[a-f0-9]{20}\.md$/);
+  const note = fs.readFileSync(path.join(root, "vault", "Sessions", sessionFile), "utf8");
   assert.match(note, /```mermaid/);
   assert.match(note, /Primary covector reference/);
   assert.match(note, /Incorrect — covectors/);
