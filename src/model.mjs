@@ -42,6 +42,14 @@ export function createInitialState({ now } = {}) {
     updatedAt: createdAt,
     activeSessionId: null,
     settings: { vaultDir: "vault" },
+    learnerProfile: {
+      teachingPhilosophy: "",
+      explanationPreferences: "",
+      feedbackPreferences: "",
+      visualPreferences: "",
+      sourcePreferences: "",
+      updatedAt: null,
+    },
     sessions: {},
     topics: {},
     concepts: {},
@@ -57,6 +65,35 @@ export function getActiveSession(state) {
     throw new LearningError("No active learning session", "NO_ACTIVE_SESSION");
   }
   return state.sessions[id];
+}
+
+export function updateLearnerProfile(state, input = {}) {
+  const fields = [
+    ["teachingPhilosophy", "teaching philosophy"],
+    ["explanationPreferences", "explanation preferences"],
+    ["feedbackPreferences", "feedback preferences"],
+    ["visualPreferences", "visual preferences"],
+    ["sourcePreferences", "source preferences"],
+  ];
+  const provided = fields.filter(([field]) => input[field] !== undefined);
+  if (provided.length === 0) {
+    throw new LearningError(
+      "At least one learner profile field is required",
+      "PROFILE_UPDATE_REQUIRED",
+    );
+  }
+
+  const changedAt = timestamp(input.now);
+  const next = structuredClone(state);
+  for (const [field, label] of provided) {
+    next.learnerProfile[field] = safeText(input[field], label, {
+      allowEmpty: true,
+      maxLength: 16_384,
+    });
+  }
+  next.learnerProfile.updatedAt = changedAt;
+  next.updatedAt = changedAt;
+  return next;
 }
 
 export function updateActiveSession(state, update, { now } = {}) {

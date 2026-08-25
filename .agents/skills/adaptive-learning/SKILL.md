@@ -14,6 +14,10 @@ The learner supplies the learning target; do not silently replace or broaden it.
 1. Locate this repository's `bin/learn.mjs` and the learning root.
 2. Initialize state if needed. Run `context --json` before probing, resuming, or
    teaching an active session; use `status --json` when no session is active.
+   Read `learnerProfile` from that context before calibration, research,
+   planning, teaching, or review. Apply the learner-authored philosophy and
+   preferences across sessions; do not invent or silently replace preferences
+   that are not recorded. An empty profile uses this protocol's defaults.
 3. Treat `.adaptive-learning/state.json` as canonical. Obsidian Markdown is a
    derived, inspectable view, never the mutation source.
 4. Read [the teaching protocol](references/teaching-protocol.md) before any

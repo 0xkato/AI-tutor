@@ -35,11 +35,12 @@ test("operator quickstart tells a learner what they will see and how to answer",
   assert.match(quickstart, /retention[\s\S]*not[\s\S]*recognition-only multiple choice/i);
 });
 
-test("state format documents schema v3 interactive records and migration", () => {
+test("state format documents schema v4 profile, interactive records, and migration", () => {
   const format = read("docs/operator/state-format.md");
 
-  assert.match(format, /current schema version is `3`/i);
-  assert.match(format, /Version-1[\s\S]*version 2[\s\S]*version 3/i);
+  assert.match(format, /current schema version is `4`/i);
+  assert.match(format, /Version-1[\s\S]*version 2[\s\S]*version 3[\s\S]*version 4/i);
+  assert.match(format, /learnerProfile[\s\S]*teaching[\s\S]*preferences/i);
   assert.match(format, /question[\s\S]*response[\s\S]*learner note/i);
   assert.match(format, /answer key[\s\S]*redact/i);
 });

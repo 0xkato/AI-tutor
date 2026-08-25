@@ -22,6 +22,22 @@ steps. The release matrix is Node.js 20 and 22. Newer Node versions may satisfy
 the minimum runtime check but are outside that qualified matrix until CI covers
 them.
 
+## Set your learner profile
+
+Before the first target, record the teaching philosophy and preferences you
+want reused across sessions. In Pi, start with:
+
+```text
+/learn-profile teaching :: Build causal understanding before testing; use transfer rather than repetition.
+/learn-profile explanations :: Teach one motivated reasoning step at a time.
+/learn-profile feedback :: Assess only the explicit question and name the exact missing mechanism.
+```
+
+`/learn-profile` with no argument shows the current profile. Codex can update
+the same canonical fields through `set-profile`; both hosts read them from
+durable context before calibration or teaching. The profile is also visible in
+Obsidian as `Profile.md`.
+
 ## What the learner does
 
 State the understanding you want. The agent owns the rest of the workflow:
@@ -70,6 +86,7 @@ Launch Pi from this repository, then use:
 ```text
 /teach Understand why gradient descent subtracts the gradient
 /teach Optimization :: Understand why subtracting the gradient lowers loss locally
+/learn-profile
 /learn-status
 /learn-review
 ```
@@ -96,6 +113,7 @@ vault/
 The vault contains:
 
 - `Home.md` for session navigation;
+- `Profile.md` for the durable learner teaching philosophy and preferences;
 - `Sessions/` for the complete target, probe conclusion, graph, sources,
   teaching steps, question choices and answers, learner notes, assessments,
   visuals, synthesis, and gaps;
@@ -115,7 +133,8 @@ node bin/learn.mjs --help
 npm test
 ```
 
-The full lifecycle is `init`, `start`, `start-question`, `pending-question`,
+The full lifecycle is `init`, `profile`, `set-profile`, `start`,
+`start-question`, `pending-question`,
 `submit-question` (`answer-question` is the lower-level split operation),
 `cancel-question`, `add-note`, `record-probe` or
 `record-admitted-gap`, `finish-probe`,
@@ -146,6 +165,7 @@ skill's `references/cli-reference.md`.
 - [Recovery and backups](docs/operator/recovery.md)
 - [Privacy boundary](docs/operator/privacy.md)
 - [State and export format](docs/operator/state-format.md)
+- [Source-backed video parity](docs/product/video-parity.md)
 
 Before distributing a release, run:
 

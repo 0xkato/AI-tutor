@@ -22,6 +22,7 @@ import {
   recordAdmittedGap,
   setPlan,
   startSession,
+  updateLearnerProfile,
 } from "../src/model.mjs";
 import { commitAndRender, repairRender } from "../src/render.mjs";
 import {
@@ -50,6 +51,8 @@ const PRODUCT_VERSION = packageJson.version;
 
 const commands = [
   ["init", "Initialize local state and the Obsidian vault"],
+  ["profile", "Show the durable cross-session learner profile"],
+  ["set-profile", "Update one or more learner teaching preferences"],
   ["start", "Start a learning session from a learner-supplied target"],
   ["record-probe", "Record one diagnostic question and assessment"],
   ["record-admitted-gap", "Record a learner-stated gap without grading it"],
@@ -86,6 +89,14 @@ const commands = [
 const GLOBAL_OPTIONS = ["root", "json", "now", "help"];
 const COMMAND_OPTIONS = {
   init: ["vault-dir"],
+  profile: [],
+  "set-profile": [
+    "teaching-philosophy",
+    "explanation-preferences",
+    "feedback-preferences",
+    "visual-preferences",
+    "source-preferences",
+  ],
   start: ["id", "topic", "target", "context", "topic-id", "reuse-concept"],
   "record-probe": [
     "id",
@@ -201,6 +212,11 @@ const OPTION_DESCRIPTIONS = {
   now: "Canonical ISO-8601 event time (optional)",
   help: "Show help for this command",
   "vault-dir": "Relative vault directory inside the learning root",
+  "teaching-philosophy": "Learner-authored principles that govern teaching",
+  "explanation-preferences": "Preferred explanation structure, pace, and detail",
+  "feedback-preferences": "Preferred assessment and correction behavior",
+  "visual-preferences": "When and how visuals should support learning",
+  "source-preferences": "Preferred research sources and evidence standards",
   id: "Stable record identifier",
   topic: "Learning topic",
   target: "Learner-owned target",
@@ -492,6 +508,7 @@ function commandResult(command, options, root) {
 
   const state = readState(root);
   if (command === "repair-render") return repairRender(root);
+  if (command === "profile") return structuredClone(state.learnerProfile);
   if (command === "status") return statusFor(state);
   if (command === "pending-question") {
     const session = getActiveSession(state);
@@ -511,6 +528,7 @@ function commandResult(command, options, root) {
     const session = getActiveSession(state);
     const reviews = dueReviews(state, { now: last(options, "now") });
     return {
+      learnerProfile: structuredClone(state.learnerProfile),
       session: publicSession(session),
       retry: retryList(state, session),
       dueReviews: reviews,
@@ -519,6 +537,16 @@ function commandResult(command, options, root) {
   }
 
   const outcome = commitAndRender(root, (current) => {
+    if (command === "set-profile") {
+      return updateLearnerProfile(current, {
+        teachingPhilosophy: last(options, "teaching-philosophy"),
+        explanationPreferences: last(options, "explanation-preferences"),
+        feedbackPreferences: last(options, "feedback-preferences"),
+        visualPreferences: last(options, "visual-preferences"),
+        sourcePreferences: last(options, "source-preferences"),
+        now: last(options, "now"),
+      });
+    }
     if (command === "start") {
       return startSession(current, {
       id: last(options, "id"),
@@ -714,6 +742,7 @@ function commandResult(command, options, root) {
       render: outcome.render,
     };
   }
+  if (command === "set-profile") return structuredClone(outcome.state.learnerProfile);
   return statusFor(outcome.state);
 }
 

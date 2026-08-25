@@ -295,6 +295,9 @@ function renderHome(state) {
     "",
     `State updated: ${plainParagraph(state.updatedAt)}`,
     "",
+    `- ${obsidianLink("Profile", "Learner profile")}`,
+    `- ${obsidianLink("Reviews", "Review queue")}`,
+    "",
     "## Sessions",
     "",
     sessions.length
@@ -305,6 +308,36 @@ function renderHome(state) {
           )
           .join("\n")
       : "No sessions yet.",
+    "",
+  ].join("\n");
+}
+
+function renderProfile(state) {
+  const profile = state.learnerProfile;
+  return [
+    "# Learner profile",
+    "",
+    `- **Updated:** ${listValue(profile.updatedAt ?? "Not configured")}`,
+    "",
+    "## Teaching philosophy",
+    "",
+    plainParagraph(profile.teachingPhilosophy, "Not recorded."),
+    "",
+    "## Explanation preferences",
+    "",
+    plainParagraph(profile.explanationPreferences, "Not recorded."),
+    "",
+    "## Feedback preferences",
+    "",
+    plainParagraph(profile.feedbackPreferences, "Not recorded."),
+    "",
+    "## Visual preferences",
+    "",
+    plainParagraph(profile.visualPreferences, "Not recorded."),
+    "",
+    "## Source preferences",
+    "",
+    plainParagraph(profile.sourcePreferences, "Not recorded."),
     "",
   ].join("\n");
 }
@@ -395,6 +428,7 @@ function renderReviews(state) {
 export function renderVault(root, state) {
   const files = [
     { relativePath: "Home.md", contents: `${renderHome(state).trimEnd()}\n` },
+    { relativePath: "Profile.md", contents: `${renderProfile(state).trimEnd()}\n` },
     { relativePath: "Reviews.md", contents: `${renderReviews(state).trimEnd()}\n` },
   ];
   for (const session of Object.values(state.sessions ?? {})) {

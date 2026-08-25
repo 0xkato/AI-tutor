@@ -1,25 +1,31 @@
 # Verification Record
 
-Date: 2026-08-24
+Date: 2026-08-25
 
 ## Current release-grade audit
 
-Status: **not release-ready**
+Status: **release candidate verified locally; stable release not accepted**
 
-The hardened implementation has moved materially beyond the version-1
-prototype described below, but the release decision is still negative. The
-current evidence is reconciled in
+The `0.2.0-rc.1` implementation now covers the source-backed reference-video
+workflow, including interactive multiple choice, **I don't know**, learner
+notes, adaptive prerequisite branches, a cross-session learner profile, and
+the shared Codex/Pi/Obsidian evidence path. The current evidence is reconciled in
 [`docs/release/first-local-release.md`](release/first-local-release.md), and the
 live-host evidence is recorded in
 [`docs/verification/live-host-acceptance.md`](verification/live-host-acceptance.md).
 
 Current local evidence includes:
 
-- 146 automated tests and the repository release-check path;
+- 196 automated tests and the repository release-check path;
 - complete release checks on official Node `v20.20.2` and `v22.23.2` macOS
-  arm64 runtimes, including 146 of 146 automated tests, 7 of 7 end-to-end
+  arm64 runtimes, including 196 of 196 automated tests, 7 of 7 end-to-end
   fixtures, fresh-path setup, syntax and JSON checks, and a healthy fresh-path
   `doctor` result under each runtime;
+- a complete integrated acceptance fixture that starts from the learner
+  profile, persists a Pi multiple-choice probe and note, branches to an
+  adaptive child, records **I don't know**, builds the verified dependency
+  plan, persists a teaching checkpoint and visual, and renders the resulting
+  Obsidian vault including `Profile.md`;
 - destructive coverage for migration, corrupt and future state, backup and
   restore-check, stale locks, renderer recovery, render-target safety, setup,
   CLI lifecycle, review lifecycle, pre-initialization vault validation, and
@@ -31,18 +37,23 @@ Current local evidence includes:
   packages and two fresh byte-exact Codex/Pi candidates that validate
   structurally with no critical failures but still have pending human verdicts.
 
-Those facts do not satisfy the release definition of done. The Codex artifact
-and Pi-to-OpenAI-Codex artifact now preserve their original final state bytes,
-pass every deterministic check, and contain no critical failures. They remain
-pending because neither has an independent human `pass` verdict. The two older
-local Pi behavioral artifacts retain their critical failures as regression
-evidence. The supported Node 20/22 matrix is verified locally on macOS arm64.
-The uncached GitHub Actions workflow is present and contract-tested, but this
-repository has no GitHub remote, so it has not run in hosted CI. Accepted human
-verdicts, changelog/version discipline, clean release commit, and release tag
-are still unproved or absent.
+Those facts establish a locally verified release candidate, not a stable
+release. The Codex artifact and Pi-to-OpenAI-Codex artifact preserve their
+original final state bytes, pass every deterministic check, and contain no
+critical failures, but neither has an independent human `pass` verdict. The
+two older local Pi behavioral artifacts retain their critical failures as
+regression evidence. The supported Node 20/22 matrix is verified locally on
+macOS arm64. Private GitHub remote `0xkato/AI-tutor` exists; its hosted matrix
+was attempted on the previous candidate commit but GitHub rejected both jobs
+before any step because recent account payments failed or the spending limit
+must be increased. That is an external CI gate, not a code-test failure.
+Version `0.2.0-rc.1` and its changelog now exist. A stable release tag remains
+blocked on the independent human verdicts and an actually executed hosted
+matrix.
 
-No production-ready, Pi-support, cross-host, or tagged-release claim is made.
+No stable-production or tagged-release claim is made. Codex and Pi support are
+implemented and mechanically verified within the host-quality boundaries
+above.
 
 ## Archived version-1 prototype verification
 

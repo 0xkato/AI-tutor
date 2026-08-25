@@ -21,16 +21,24 @@ test("parseInstant accepts only canonical ISO instants", () => {
   }
 });
 
-test("validateState accepts and clones a complete version-3 initial state", () => {
+test("validateState accepts and clones a complete version-4 initial state with a learner profile", () => {
   const state = createInitialState({ now: NOW });
   const validated = validateState(state);
 
   assert.deepEqual(validated, state);
   assert.notEqual(validated, state);
-  assert.equal(validated.schemaVersion, 3);
+  assert.equal(validated.schemaVersion, 4);
+  assert.deepEqual(validated.learnerProfile, {
+    teachingPhilosophy: "",
+    explanationPreferences: "",
+    feedbackPreferences: "",
+    visualPreferences: "",
+    sourcePreferences: "",
+    updatedAt: null,
+  });
 });
 
-test("validateState additively upgrades version-3 sessions created before later session fields", () => {
+test("validateState additively upgrades sessions created before later session fields", () => {
   let state = createInitialState({ now: NOW });
   state = startSession(state, {
     id: "legacy-v2-session",
@@ -53,10 +61,26 @@ test("validateState additively upgrades version-3 sessions created before later 
   assert.deepEqual(validated.sessions["legacy-v2-session"].notes, []);
 });
 
-test("validateState rejects structurally incomplete version-3 state", () => {
+test("validateState rejects structurally incomplete version-4 state", () => {
   assert.throws(
-    () => validateState({ schemaVersion: 3, sessions: {} }),
+    () => validateState({ schemaVersion: 4, sessions: {} }),
     (error) => error.code === "INVALID_STATE" && /createdAt/.test(error.message),
+  );
+});
+
+test("validateState rejects a missing or malformed learner profile", () => {
+  const missing = createInitialState({ now: NOW });
+  delete missing.learnerProfile;
+  assert.throws(
+    () => validateState(missing),
+    (error) => error.code === "INVALID_STATE" && /learnerProfile/.test(error.message),
+  );
+
+  const malformed = createInitialState({ now: NOW });
+  malformed.learnerProfile.teachingPhilosophy = 42;
+  assert.throws(
+    () => validateState(malformed),
+    (error) => error.code === "INVALID_STATE" && /teachingPhilosophy/.test(error.message),
   );
 });
 

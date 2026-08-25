@@ -94,8 +94,8 @@ test("export creates a deterministic portable record with generated notes and ve
 
   const manifest = JSON.parse(fs.readFileSync(path.join(first, "export-manifest.json"), "utf8"));
   assert.equal(manifest.formatVersion, 1);
-  assert.equal(manifest.productVersion, "0.1.0");
-  assert.equal(manifest.schemaVersion, 3);
+  assert.equal(manifest.productVersion, "0.2.0-rc.1");
+  assert.equal(manifest.schemaVersion, 4);
   assert.equal(manifest.stateRevision, 2);
   assert.deepEqual(manifest.files.map((entry) => entry.path), expected.slice(1));
   assert.equal(manifest.files.every((entry) => /^[0-9a-f]{64}$/.test(entry.sha256)), true);

@@ -49,7 +49,7 @@ function harness(responses = {}) {
 
 test("Pi extension registers the chat-first learning commands", () => {
   const { commands, tools } = harness();
-  assert.deepEqual([...commands.keys()], ["teach", "learn-status", "learn-review"]);
+  assert.deepEqual([...commands.keys()], ["teach", "learn-profile", "learn-status", "learn-review"]);
   for (const command of commands.values()) {
     assert.equal(typeof command.description, "string");
     assert.equal(typeof command.handler, "function");
@@ -76,7 +76,7 @@ test("/teach creates a new learner-owned target and expands the shared skill", a
     .get("teach")
     .handler("Optimization :: Understand why subtracting the gradient lowers loss locally", h.ctx);
 
-  assert.deepEqual(h.calls.map((call) => call.command), ["status", "init", "start"]);
+  assert.deepEqual(h.calls.map((call) => call.command), ["status", "init", "start", "context"]);
   assert.deepEqual(h.calls[2], {
     command: "start",
     args: [
@@ -92,6 +92,44 @@ test("/teach creates a new learner-owned target and expands the shared skill", a
       message:
         "/skill:adaptive-learning Start the active learning session from its durable context. The learner supplied this target: Understand why subtracting the gradient lowers loss locally",
       options: { expandPromptTemplates: true },
+    },
+  ]);
+});
+
+test("/learn-profile shows and updates the shared learner-authored preferences", async () => {
+  const profile = {
+    teachingPhilosophy: "Build causal understanding before recall.",
+    explanationPreferences: "One reasoning step at a time.",
+    feedbackPreferences: "Assess only the explicit question.",
+    visualPreferences: "Use visuals when they clarify relationships.",
+    sourcePreferences: "Prefer primary sources.",
+    updatedAt: "2026-08-25T08:00:00.000Z",
+  };
+  const h = harness({
+    profile,
+    "set-profile": ({ args }) => ({
+      ...profile,
+      feedbackPreferences: args[args.indexOf("--feedback-preferences") + 1],
+    }),
+  });
+
+  await h.commands.get("learn-profile").handler("", h.ctx);
+  await h.commands
+    .get("learn-profile")
+    .handler("feedback :: Name the exact correct part and exact missing part.", h.ctx);
+
+  assert.match(h.notifications[0].message, /Build causal understanding/);
+  assert.match(h.notifications[1].message, /Learner profile updated/i);
+  assert.deepEqual(h.calls, [
+    { command: "profile", args: [], root: h.ctx.cwd },
+    { command: "profile", args: [], root: h.ctx.cwd },
+    {
+      command: "set-profile",
+      args: [
+        "--feedback-preferences",
+        "Name the exact correct part and exact missing part.",
+      ],
+      root: h.ctx.cwd,
     },
   ]);
 });
@@ -183,7 +221,7 @@ test("command handlers await asynchronous CLI state before dispatching the skill
 
   await h.commands.get("teach").handler("Vectors :: Explain vector addition causally", h.ctx);
 
-  assert.deepEqual(h.calls.map((call) => call.command), ["status", "init", "start"]);
+  assert.deepEqual(h.calls.map((call) => call.command), ["status", "init", "start", "context"]);
   assert.equal(h.messages.length, 1);
   assert.match(h.messages[0].message, /Explain vector addition causally/);
 });

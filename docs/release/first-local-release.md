@@ -1,10 +1,10 @@
 # First Local Release Audit
 
-Date: 2026-08-24
+Date: 2026-08-25
 
-Status: **not released**
+Status: **locally verified release candidate; not a stable release**
 
-Package version: `0.1.0`
+Package version: `0.2.0-rc.1`
 
 Release tag: none
 
@@ -20,11 +20,11 @@ smoke test is not treated as release acceptance.
 | 1 | Multi-day Codex-to-Pi retention passes end to end | [`live-host-acceptance.md`](../verification/live-host-acceptance.md), `artifacts/evals/2026-08-24-codex-novice-branches-byte-exact/`, and `artifacts/evals/2026-08-25-pi-retry-repair-transfer-openai-byte-exact/` | **Partially verified / unproved.** Fresh Codex and Pi-to-OpenAI-Codex sessions used the same canonical root and completed the required learning, due-review, bounded repair, transfer, and closure lifecycle with byte-exact final snapshots and no critical failures. Both independent human verdicts remain pending. |
 | 2 | Migration, backup, restore-check, stale-lock recovery, renderer repair, and corrupted-state diagnostics pass destructive checks | Focused recovery/migration/render/setup/CLI/review tests; manual malformed-state check; actual permission-failure audit | **Verified locally.** The actual permission audit committed canonical revision 1 despite `EACCES`; after permissions were restored, `repair-render` preserved the exact state bytes and `doctor` reported the projection current. Export and evaluation capture also refuse source files swapped to symlinks between validation and opening. |
 | 3 | Hostile identifiers, Markdown, sources, paths, timestamps, and visuals cannot corrupt state or notes | Schema, CLI-options, render-safety, source, visual, graph, and protocol-invariant tests in the full suite | **Verified locally** for the defined macOS implementation contract. Unsafe custom vault paths are rejected before canonical state is created and are rejected again during state validation. |
-| 4 | Fresh-clone setup and first session succeed outside the development path | `npm run release-check`, including disposable fresh-path setup and E2E fixtures | **Verified locally** with the complete release check on official Node `v20.20.2` and `v22.23.2` macOS arm64 runtimes. |
+| 4 | Fresh-clone setup and first session succeed outside the development path | `npm run release-check`, including disposable fresh-path setup and E2E fixtures | **Verified locally** with the complete release check on official Node `v20.20.2` and `v22.23.2` macOS arm64 runtimes. Setup exposes `Profile.md` and the Pi `/learn-profile` entry point before `/teach`. |
 | 5 | Behavioral scenario suite has no critical failure | Five preserved live-host packages plus the release validator | **Partially verified.** The two fresh release candidates have no contaminated questions or critical failures and pass every deterministic check. Their human verdicts remain pending. The earlier Pi failures remain preserved as historical regression evidence rather than being overwritten. |
-| 6 | Complete suite passes on macOS with Node 20 and 22 | Local runtime and GitHub Actions matrix | **Partially verified.** The complete release check passed locally on official Node `v20.20.2` and `v22.23.2` macOS arm64 runtimes. The uncached macOS workflow is committed and contract-tested, but it cannot produce hosted evidence until this local repository has a GitHub remote and the workflow runs there. |
-| 7 | Documentation, privacy, recovery, changelog, and verification match the shipped version | Operator documentation and this audit | **Unproved.** Privacy and recovery documentation now include the scoped external-transmission approval boundary, but an accepted version, changelog entry, final versioned verification record, and hosted CI evidence do not. |
-| 8 | Repository is clean, committed, and has a release tag | Git status, commit history, and tag list | **Partially verified.** The release-hardening work is committed through the evidence update before tagging. No release tag exists. |
+| 6 | Complete suite passes on macOS with Node 20 and 22 | Local runtime and GitHub Actions matrix | **Partially verified.** The complete release check passed locally on official Node `v20.20.2` and `v22.23.2` macOS arm64 runtimes. The uncached macOS workflow is committed and contract-tested. Private remote `0xkato/AI-tutor` exists, but GitHub rejected both hosted jobs before any step because of an account billing/spending-limit block. |
+| 7 | Documentation, privacy, recovery, changelog, and verification match the shipped version | Operator documentation and this audit | **Verified for the release candidate.** Privacy, recovery, scoped transmission approval, version `0.2.0-rc.1`, changelog, source-backed parity contract, operator setup, and current local verification are reconciled. Human acceptance and hosted CI remain separate release gates. |
+| 8 | Repository is clean, committed, and has a release tag | Git status, commit history, and tag list | **Partially verified.** The candidate is prepared on an isolated branch for a clean intended commit. No release tag exists, by design, while human acceptance and hosted CI remain incomplete. |
 
 ## Destructive evidence completed locally
 
@@ -51,7 +51,7 @@ Official macOS arm64 archives for Node `v20.20.2` and `v22.23.2` were checked
 against their published `SHASUMS256.txt` entries before use. The complete
 `scripts/release-check.mjs` path then exited `0` under each runtime with:
 
-- 146 of 146 automated tests passing;
+- 196 of 196 automated tests passing;
 - JavaScript syntax and JSON document checks passing;
 - disposable fresh-path setup passing;
 - 7 of 7 end-to-end learning and review fixtures passing;
@@ -86,11 +86,10 @@ evidence without that flag.
 1. Obtain independent human `pass` verdicts for the fresh Codex and Pi packages
    and validate the accepted packages
    without `--allow-failed`.
-2. Create or attach the intended GitHub remote, then run the committed uncached
-   macOS Node 20/22 CI matrix and retain the hosted receipts.
-3. Only after live acceptance, choose the hardened prerelease version, add the
-   changelog and exact version record, rerun the full destructive audit, land a
-   clean commit, and create the annotated tag.
+2. Resolve the GitHub billing/spending-limit block, then rerun the committed
+   uncached macOS Node 20/22 CI matrix and retain executed hosted receipts.
+3. The hardened prerelease version, changelog, and local matrix now exist.
+   Create the annotated stable tag only after the two remaining gates pass.
 
 Until every item passes, do not create a release tag or describe this build as
 fully production-ready.

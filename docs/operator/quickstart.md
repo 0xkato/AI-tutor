@@ -30,7 +30,7 @@ The command:
 2. checks the Codex skill and Pi extension discovery files;
 3. creates `.adaptive-learning/state.json` with owner-only permissions;
 4. creates the repository-relative `vault/` directory;
-5. renders the initial `Home.md` and `Reviews.md` files;
+5. renders the initial `Home.md`, `Profile.md`, and `Reviews.md` files;
 6. runs the same diagnostics exposed by `npm run doctor`;
 7. prints the next Codex and Pi commands.
 
@@ -44,6 +44,24 @@ npm run doctor -- --json
 ```
 
 The command exits successfully only when its `ok` field is `true`.
+
+## Configure the learner profile
+
+The learner profile makes your teaching philosophy and preferences reusable
+instead of forcing you to restate them for every target. In Pi:
+
+```text
+/learn-profile teaching :: Build causal understanding before testing; use transfer rather than repetition.
+/learn-profile explanations :: Teach one motivated reasoning step at a time.
+/learn-profile feedback :: Assess only the explicit question and identify the exact missing mechanism.
+/learn-profile visuals :: Use a diagram when it materially clarifies a relationship.
+/learn-profile sources :: Prefer primary sources and preserve uncertainty.
+```
+
+Run `/learn-profile` without an argument to inspect the current values. Codex
+uses the same `profile` and `set-profile` engine commands. The profile is saved
+in canonical state and rendered to Obsidian as `Profile.md`; leaving a field
+empty uses the protocol default.
 
 ## Start in Codex
 
@@ -72,6 +90,7 @@ Launch Pi from the repository root, then use:
 
 ```text
 /teach Understand why gradient descent subtracts the gradient
+/learn-profile
 /learn-status
 /learn-review
 ```
@@ -89,7 +108,8 @@ missing mechanism before asking a new transfer question.
 Open `vault/` as the Obsidian vault. Obsidian is a viewer, not a state
 dependency. Generated Markdown must not be treated as canonical input. Session
 notes show each persisted question, its response, adaptive parent and reason,
-and any learner note attached to that question.
+and any learner note attached to that question. `Profile.md` shows the durable
+teaching philosophy and preferences applied by both hosts.
 
 ## Exact local data locations
 

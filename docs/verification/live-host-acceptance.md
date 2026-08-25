@@ -1,6 +1,6 @@
 # Live Host Acceptance Record
 
-Date: 2026-08-24
+Date: 2026-08-25
 
 Status: **not release-accepted**
 
@@ -91,7 +91,8 @@ second approval was required.
 1. Have the founder independently review the fresh Codex and Pi packages and
    replace each `pending` verdict with a justified `pass` or `fail`.
 2. Validate both accepted packages without `--allow-failed`.
-3. Run the committed macOS Node 20/22 matrix in hosted GitHub Actions after an
-   intended remote exists, and retain the hosted receipts.
-4. Only after those gates pass, choose the release version, add the changelog,
-   rerun the release check from a clean commit, and create the annotated tag.
+3. Resolve the GitHub account billing/spending-limit block and rerun the
+   committed macOS Node 20/22 matrix. The existing hosted jobs were rejected
+   before any workflow step, so they are not code evidence.
+4. Version `0.2.0-rc.1` and its changelog are present. Create an annotated
+   stable tag only after the human verdicts and hosted matrix pass.

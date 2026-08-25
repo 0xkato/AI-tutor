@@ -2,7 +2,7 @@ import { LearningError } from "./errors.mjs";
 import { validatePlan } from "./graph.mjs";
 import { safeRelativeVaultPath, safeVaultDir, validateSourceReference } from "./inputs.mjs";
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 const SESSION_PHASES = new Set(["probe", "plan", "teach", "review", "complete"]);
 const SESSION_KINDS = new Set(["learn", "review"]);
@@ -105,6 +105,16 @@ function uniqueTextArray(value, label) {
   const items = array(value, label).map((item, index) => text(item, `${label}[${index}]`));
   if (new Set(items).size !== items.length) invalid(`${label} contains duplicate IDs`);
   return items;
+}
+
+function validateLearnerProfile(profile) {
+  const value = object(profile, "learnerProfile");
+  text(value.teachingPhilosophy, "learnerProfile.teachingPhilosophy", { allowEmpty: true });
+  text(value.explanationPreferences, "learnerProfile.explanationPreferences", { allowEmpty: true });
+  text(value.feedbackPreferences, "learnerProfile.feedbackPreferences", { allowEmpty: true });
+  text(value.visualPreferences, "learnerProfile.visualPreferences", { allowEmpty: true });
+  text(value.sourcePreferences, "learnerProfile.sourcePreferences", { allowEmpty: true });
+  nullableInstant(value.updatedAt, "learnerProfile.updatedAt");
 }
 
 function validateRetry(retry, label) {
@@ -713,6 +723,7 @@ export function validateState(value) {
   } catch (error) {
     invalid(error.message);
   }
+  validateLearnerProfile(state.learnerProfile);
   object(state.sessions, "sessions");
   object(state.concepts, "concepts");
   object(state.reviews, "reviews");

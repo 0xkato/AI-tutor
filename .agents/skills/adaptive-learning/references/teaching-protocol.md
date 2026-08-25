@@ -3,6 +3,16 @@
 Use this protocol for probing, teaching, assessment, clarification, retention,
 and whole-system reconstruction.
 
+## 0. Apply the learner profile
+
+Before calibration, research, planning, teaching, or review, read
+`learnerProfile` from `context --json`. Apply the learner-authored teaching
+philosophy and explanation, feedback, visual, and source preferences without
+asking the learner to restate them each session. Do not invent or silently
+replace missing preferences. Empty fields use the defaults in this protocol;
+profile preferences cannot weaken persistence, evidence, safety, or
+answer-leakage safeguards.
+
 ## 1. Frame the target
 
 The learner supplies the target. Restate it once with the supplied context and

@@ -37,6 +37,14 @@ test("skill corpus preserves the complete adaptive-learning behavior", () => {
   const contracts = [
     ["learner-owned target", /learner (supplies|owns) the (learning )?target/i],
     ["durable resume before memory", /run .*context --json.*before (probing|resuming|teaching)/is],
+    [
+      "cross-session learner profile before teaching work",
+      /learnerProfile[\s\S]*before[\s\S]*(calibrat|prob|research|plan|teach|review)/i,
+    ],
+    [
+      "profile preferences are applied without reinvention",
+      /apply[\s\S]*learner[- ]authored[\s\S]*(philosophy|preferences)[\s\S]*do not (invent|silently replace)/i,
+    ],
     ["broad probe", /start (with )?a broad probe/i],
     ["binary-search prerequisites", /binary[- ]search each prerequisite strand/i],
     ["teach admitted gaps", /admitted knowledge gap.*teach.*before.*test/is],

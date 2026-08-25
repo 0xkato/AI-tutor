@@ -48,6 +48,61 @@ test("independent CLI invocations initialize, mutate, render, and resume state",
   );
 });
 
+test("learner profile commands persist preferences atomically and render them to Obsidian", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-profile-cli-"));
+  run(root, "init", "--now", "2026-08-24T08:00:00.000Z");
+
+  const initial = JSON.parse(run(root, "profile", "--json"));
+  assert.equal(initial.teachingPhilosophy, "");
+  assert.equal(initial.updatedAt, null);
+
+  const updated = JSON.parse(
+    run(
+      root,
+      "set-profile",
+      "--teaching-philosophy",
+      "Build causal understanding before testing; use transfer rather than repetition.",
+      "--explanation-preferences",
+      "One motivated reasoning step at a time with exact premises.",
+      "--feedback-preferences",
+      "Grade only the explicit question and identify the exact missing mechanism.",
+      "--visual-preferences",
+      "Use a diagram only when it materially clarifies a relationship.",
+      "--source-preferences",
+      "Prefer primary sources and preserve uncertainty.",
+      "--now",
+      "2026-08-24T08:01:00.000Z",
+      "--json",
+    ),
+  );
+  assert.match(updated.teachingPhilosophy, /causal understanding/);
+  assert.equal(updated.updatedAt, "2026-08-24T08:01:00.000Z");
+
+  const state = JSON.parse(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+  );
+  assert.equal(state.revision, 1);
+  assert.deepEqual(JSON.parse(run(root, "profile", "--json")), state.learnerProfile);
+  assert.match(fs.readFileSync(path.join(root, "vault", "Profile.md"), "utf8"), /causal understanding/);
+  assert.match(fs.readFileSync(path.join(root, "vault", "Home.md"), "utf8"), /\[\[Profile\|Learner profile\]\]/);
+});
+
+test("an invalid learner profile update preserves canonical state", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-profile-invalid-"));
+  run(root, "init", "--now", "2026-08-24T08:00:00.000Z");
+  const before = fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8");
+
+  const result = spawnSync(
+    process.execPath,
+    [cli, "set-profile", "--root", root, "--json"],
+    { cwd: repository, encoding: "utf8" },
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /PROFILE_UPDATE_REQUIRED/);
+  assert.equal(fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"), before);
+});
+
 test("CLI failures preserve state and return structured error text", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-cli-error-"));
   run(root, "init");

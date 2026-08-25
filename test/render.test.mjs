@@ -316,6 +316,14 @@ test("renderSessionNote preserves interactive choices, adaptive links, responses
 
 test("renderVault writes home, session, topic, and review notes", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-vault-"));
+  state.learnerProfile = {
+    teachingPhilosophy: "Build causal understanding before recall.",
+    explanationPreferences: "One reasoning step at a time.",
+    feedbackPreferences: "Assess only the explicit question.",
+    visualPreferences: "Use visuals for relationships that prose obscures.",
+    sourcePreferences: "Prefer primary sources.",
+    updatedAt: "2026-08-24T09:00:00.000Z",
+  };
   renderVault(root, state);
 
   const vault = path.join(root, "vault");
@@ -327,7 +335,10 @@ test("renderVault writes home, session, topic, and review notes", () => {
   assert.equal(topicFiles.length, 1);
   assert.match(topicFiles[0], /^differential-forms-[a-f0-9]{20}\.md$/);
   assert.equal(fs.existsSync(path.join(vault, "Reviews.md")), true);
+  assert.equal(fs.existsSync(path.join(vault, "Profile.md")), true);
   assert.match(fs.readFileSync(path.join(vault, "Home.md"), "utf8"), /Differential Forms/);
+  assert.match(fs.readFileSync(path.join(vault, "Home.md"), "utf8"), /Learner profile/);
+  assert.match(fs.readFileSync(path.join(vault, "Profile.md"), "utf8"), /Build causal understanding/);
   assert.match(
     fs.readFileSync(path.join(vault, "Topics", topicFiles[0]), "utf8"),
     /Evidence history/,

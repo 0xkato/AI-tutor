@@ -64,6 +64,7 @@ function copyReleaseFixture(destination) {
     "scripts",
     "src",
     "AGENTS.md",
+    "CHANGELOG.md",
     "README.md",
     "package-lock.json",
     "package.json",

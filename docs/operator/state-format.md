@@ -3,7 +3,7 @@
 ## Canonical state
 
 `.adaptive-learning/state.json` is the only canonical learner record. The
-current schema version is `3`. Every read and every write validates the full
+current schema version is `4`. Every read and every write validates the full
 structure. Unsupported future versions are rejected.
 
 Canonical state owns a monotonically increasing `revision`. A successful
@@ -11,8 +11,9 @@ mutation commits JSON first and marks rendering stale. Rendering then catches
 up to that exact revision. A render failure cannot roll back already committed
 learning evidence.
 
-Version-1 state migrates deterministically through version 2 to version 3;
-version-2 state migrates directly to version 3. The original is preserved under
+Version-1 state migrates deterministically through version 2, version 3, and version 4;
+version-2 state migrates through version 3 to version 4; version-3 state
+migrates directly to version 4. The original is preserved under
 `.adaptive-learning/backups/` before canonical state changes. Visuals migrated
 from version 1 are marked `legacy-unverified`; newly registered visuals store
 byte count, media type, and SHA-256 as verified identity.
@@ -25,6 +26,13 @@ host feedback may show the supplied explanation only after the persisted retry
 state permits it. A learner note can target the session, a question, a concept,
 or a teaching step; notes entered with an answer commit atomically with that
 response.
+
+Version 4 adds the top-level `learnerProfile`: learner-authored teaching
+philosophy and explanation, feedback, visual, and source preferences shared
+across sessions. `updatedAt` is null until the learner first updates a field.
+Unspecified fields survive later partial updates. Both hosts receive the
+profile through `context --json`, and the derived vault renders it to
+`Profile.md`.
 
 Do not edit canonical JSON by hand. Use the CLI or the shared host skill.
 

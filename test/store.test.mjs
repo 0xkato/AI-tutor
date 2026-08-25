@@ -25,12 +25,13 @@ test("initializeStore creates versioned canonical state", () => {
   const root = tempRoot();
   const state = initializeStore(root, { now: "2026-08-24T08:00:00.000Z" });
 
-  assert.equal(state.schemaVersion, 3);
+  assert.equal(state.schemaVersion, 4);
   assert.equal(state.revision, 0);
   assert.equal(state.activeSessionId, null);
   assert.deepEqual(state.sessions, {});
   assert.deepEqual(state.concepts, {});
   assert.deepEqual(state.reviews, {});
+  assert.equal(state.learnerProfile.updatedAt, null);
   assert.deepEqual(readState(root), state);
 });
 

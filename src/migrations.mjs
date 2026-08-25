@@ -186,5 +186,28 @@ export function migrateV2ToV3(value) {
     session.questions = [];
     session.notes = [];
   }
+  return next;
+}
+
+export function migrateV3ToV4(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new LearningError("Version-3 state must be an object", "INVALID_STATE");
+  }
+  if (value.schemaVersion !== 3) {
+    throw new LearningError(`Cannot migrate schema version: ${value.schemaVersion}`, "UNSUPPORTED_SCHEMA");
+  }
+
+  const next = structuredClone(value);
+  next.schemaVersion = 4;
+  next.revision = (next.revision ?? 0) + 1;
+  next.learnerProfile = {
+    teachingPhilosophy: "",
+    explanationPreferences: "",
+    feedbackPreferences: "",
+    visualPreferences: "",
+    sourcePreferences: "",
+    updatedAt: null,
+  };
+  next.render = { revision: next.render?.revision ?? 0, status: "stale", error: null };
   return validateState(next);
 }

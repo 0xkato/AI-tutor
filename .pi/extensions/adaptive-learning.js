@@ -221,6 +221,48 @@ function parseTarget(raw) {
   return { topic, target };
 }
 
+const PROFILE_FIELDS = new Map([
+  ["teaching", "--teaching-philosophy"],
+  ["philosophy", "--teaching-philosophy"],
+  ["explanations", "--explanation-preferences"],
+  ["explanation", "--explanation-preferences"],
+  ["feedback", "--feedback-preferences"],
+  ["visuals", "--visual-preferences"],
+  ["visual", "--visual-preferences"],
+  ["sources", "--source-preferences"],
+  ["source", "--source-preferences"],
+]);
+
+function parseProfileUpdate(raw) {
+  const input = raw.trim();
+  if (!input) return null;
+  const separator = input.indexOf("::");
+  if (separator === -1) return ["--teaching-philosophy", input];
+  const field = input.slice(0, separator).trim().toLowerCase();
+  const value = input.slice(separator + 2).trim();
+  const flag = PROFILE_FIELDS.get(field);
+  if (!flag || !value) {
+    throw new AdaptiveLearningCliError(
+      "Use /learn-profile <teaching philosophy> or /learn-profile <teaching|explanations|feedback|visuals|sources> :: <preference>.",
+      "INVALID_PROFILE_UPDATE",
+    );
+  }
+  return [flag, value];
+}
+
+function profileSummary(profile) {
+  const entries = [
+    ["Teaching", profile.teachingPhilosophy],
+    ["Explanations", profile.explanationPreferences],
+    ["Feedback", profile.feedbackPreferences],
+    ["Visuals", profile.visualPreferences],
+    ["Sources", profile.sourcePreferences],
+  ];
+  return entries
+    .map(([label, value]) => `${label}: ${value || "Not configured"}`)
+    .join("\n");
+}
+
 function notifyError(ctx, error) {
   const message = error instanceof Error ? error.message : String(error);
   ctx.ui.notify(message, error?.stateCommitted === true ? "warning" : "error");
@@ -700,10 +742,43 @@ export function createAdaptiveLearningExtension({
             ctx.cwd,
             runOptions(ctx),
           );
+          await runCli("context", [], ctx.cwd, runOptions(ctx));
           dispatchSkill(
             pi,
             `Start the active learning session from its durable context. The learner supplied this target: ${supplied.target}`,
           );
+        } catch (error) {
+          notifyError(ctx, error);
+        }
+      },
+    });
+
+    pi.registerCommand("learn-profile", {
+      description: "Show or update the durable learner teaching profile",
+      handler: async (args, ctx) => {
+        if (!ctx.isIdle()) {
+          ctx.ui.notify(
+            "The agent is busy. Run /learn-profile again when the current turn finishes.",
+            "warning",
+          );
+          return;
+        }
+        try {
+          let profile;
+          try {
+            profile = await runCli("profile", [], ctx.cwd, runOptions(ctx));
+          } catch (error) {
+            if (error?.code !== "STATE_NOT_INITIALIZED") throw error;
+            await runCli("init", [], ctx.cwd, runOptions(ctx));
+            profile = await runCli("profile", [], ctx.cwd, runOptions(ctx));
+          }
+          const update = parseProfileUpdate(args);
+          if (!update) {
+            ctx.ui.notify(profileSummary(profile), "info");
+            return;
+          }
+          const updated = await runCli("set-profile", update, ctx.cwd, runOptions(ctx));
+          ctx.ui.notify(`Learner profile updated.\n${profileSummary(updated)}`, "info");
         } catch (error) {
           notifyError(ctx, error);
         }

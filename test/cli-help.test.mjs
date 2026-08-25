@@ -78,7 +78,7 @@ test("version and command-specific help are available without reading state", ()
     encoding: "utf8",
   });
   assert.equal(version.status, 0, version.stderr);
-  assert.equal(version.stdout.trim(), "0.1.0");
+  assert.equal(version.stdout.trim(), "0.2.0-rc.1");
 
   const commandHelp = spawnSync(process.execPath, [cli, "start", "--help"], {
     cwd: repoRoot,

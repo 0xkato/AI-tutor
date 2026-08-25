@@ -20,7 +20,30 @@ node bin/learn.mjs due --root <root> --json
 ```
 
 Run `context --json` before probing, resuming, or teaching an active session.
-It returns the durable session, retries, due reviews, and synthesis flag.
+It returns the cross-session `learnerProfile`, durable session, retries, due
+reviews, and synthesis flag.
+
+## Learner profile
+
+The profile belongs to canonical state and is shared by Codex, Pi, and the
+Obsidian projection. Read it before learning work and update only fields the
+learner actually supplied:
+
+```bash
+node bin/learn.mjs profile --root <root> --json
+
+node bin/learn.mjs set-profile --root <root> \
+  --teaching-philosophy "<learner-authored learning principles>" \
+  --explanation-preferences "<pace, structure, and detail>" \
+  --feedback-preferences "<assessment and correction preferences>" \
+  --visual-preferences "<when and how visuals help>" \
+  --source-preferences "<research and evidence preferences>"
+```
+
+Unspecified fields are preserved. Pi exposes the same state through
+`/learn-profile`; `field :: value` updates `teaching`, `explanations`,
+`feedback`, `visuals`, or `sources`, while text without a field updates the
+teaching philosophy.
 
 ## Review lifecycle
 

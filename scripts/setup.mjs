@@ -42,9 +42,10 @@ try {
       `Runtime: Node.js ${report.runtime.major} on macOS (release matrix: ${matrix}).`,
       "State: .adaptive-learning/state.json",
       "Obsidian vault: vault/",
+      "Learner profile: vault/Profile.md",
       "Diagnostics: npm run doctor",
-      "Codex: open this repository and ask it to teach a specific target.",
-      "Pi: launch Pi here, then run /teach <your learning target>.",
+      "Codex: open this repository, describe how you learn best, and ask it to teach a specific target.",
+      "Pi: launch Pi here, run /learn-profile, then /teach <your learning target>.",
       "",
     ].join("\n"),
   );

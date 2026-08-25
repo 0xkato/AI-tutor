@@ -40,4 +40,5 @@ test("release check selects test modules without executing process fixtures as t
 test("fresh release fixture includes the locked runtime dependency graph", () => {
   const source = fs.readFileSync(script, "utf8");
   assert.match(source, /"package-lock\.json"/);
+  assert.match(source, /"CHANGELOG\.md"/);
 });

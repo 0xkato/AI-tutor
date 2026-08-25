@@ -49,6 +49,8 @@ test("one-command setup works from a fresh path with spaces and prints portable 
   assert.match(setup.stdout, /macOS/);
   assert.match(setup.stdout, /Codex/);
   assert.match(setup.stdout, /Pi/);
+  assert.match(setup.stdout, /Profile\.md/);
+  assert.match(setup.stdout, /learn-profile/);
   assert.match(setup.stdout, /npm run doctor/);
   assert.doesNotMatch(setup.stdout, new RegExp(sourceRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.doesNotMatch(setup.stdout, /\/Users\/0xkato/);

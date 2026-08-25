@@ -47,6 +47,16 @@ test("real Pi quiz path persists graded choice, learner notes, and adaptive gap 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learning-interactive-acceptance-"));
   await runAdaptiveLearningCli("init", [], root);
   await runAdaptiveLearningCli(
+    "set-profile",
+    [
+      "--teaching-philosophy",
+      "Build causal understanding before testing and use new transfer after teaching.",
+      "--explanation-preferences",
+      "Teach one motivated reasoning step at a time.",
+    ],
+    root,
+  );
+  await runAdaptiveLearningCli(
     "start",
     ["--id", "session-1", "--topic", "Transformers", "--target", "Understand Transformers"],
     root,
@@ -60,6 +70,13 @@ test("real Pi quiz path persists graded choice, learner notes, and adaptive gap 
           selectedChoiceValues: ["context"],
           dontKnow: false,
           note: "A token representation becomes contextual here.",
+        });
+      }
+      if (item.id === "teach-q1") {
+        return submit({
+          selectedChoiceValues: ["query"],
+          dontKnow: false,
+          note: "The query represents what the current token is looking for.",
         });
       }
       return submit({
@@ -98,9 +115,82 @@ test("real Pi quiz path persists graded choice, learner notes, and adaptive gap 
   const second = await tool.execute("call-2", secondQuestion, undefined, undefined, ctx);
   assert.match(second.content[0].text, /I don't know/i);
 
+  await runAdaptiveLearningCli(
+    "finish-probe",
+    ["--summary", "Contextual representations are recognized; query, key, and value roles are the first admitted gap."],
+    root,
+  );
+  await runAdaptiveLearningCli(
+    "add-source",
+    [
+      "--id", "attention-source",
+      "--title", "Transformer attention reference",
+      "--url", "https://arxiv.org/abs/1706.03762",
+      "--source-class", "primary",
+      "--supports", "Attention uses learned query, key, and value projections.",
+      "--verification", "Checked the attention equations and projection roles in the original paper.",
+    ],
+    root,
+  );
+  const planPath = path.join(root, "attention-plan.json");
+  fs.writeFileSync(planPath, `${JSON.stringify({
+    targetNodeId: "query-key-value",
+    nodes: [{ id: "query-key-value", title: "Query, key, and value roles" }],
+    edges: [],
+  }, null, 2)}\n`);
+  await runAdaptiveLearningCli("set-plan", ["--file", planPath], root);
+  await runAdaptiveLearningCli("begin-teach", [], root);
+  await runAdaptiveLearningCli(
+    "record-step",
+    [
+      "--id", "attention-step-1",
+      "--node", "query-key-value",
+      "--foundation", "Each token has a current representation that can be linearly projected.",
+      "--motivation", "A token needs separate roles for what it seeks, what it offers for matching, and what information it contributes.",
+      "--explanation", "The query seeks, keys are matched against it, and values carry the information that matching weights combine.",
+      "--question-id", "teach-q1",
+      "--kind", "multiple-choice",
+      "--question", "Which learned object represents what the current token is looking for?",
+    ],
+    root,
+  );
+  const teachQuestion = question({
+    id: "teach-q1",
+    stage: "teach",
+    nodeId: "query-key-value",
+    question: "Which learned object represents what the current token is looking for?",
+    choices: [
+      { value: "query", label: "Its query" },
+      { value: "value", label: "Its value" },
+    ],
+    correctChoiceValues: ["query"],
+    explanation: "The query represents what the current token seeks from other tokens.",
+    parentQuestionId: "probe-q2",
+    adaptationReason: "The admitted gap is now taught; check recognition before a new transfer task.",
+  });
+  const taught = await tool.execute("call-3", teachQuestion, undefined, undefined, ctx);
+  assert.match(taught.content[0].text, /answered correctly/i);
+
+  fs.mkdirSync(path.join(root, "vault", "Assets"), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, "vault", "Assets", "attention-flow.svg"),
+    '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="32"><text x="1" y="20">Q → K → V</text></svg>\n',
+  );
+  await runAdaptiveLearningCli(
+    "add-visual",
+    [
+      "--id", "attention-visual",
+      "--path", "Assets/attention-flow.svg",
+      "--description", "The query-to-key match controls how value information is combined.",
+      "--verification", "Inspected labels, arrow direction, and consistency with the recorded explanation.",
+    ],
+    root,
+  );
+
   const state = readState(root);
   const session = state.sessions["session-1"];
-  assert.equal(session.questions.length, 2);
+  assert.equal(state.learnerProfile.teachingPhilosophy.includes("causal understanding"), true);
+  assert.equal(session.questions.length, 3);
   assert.equal(session.questions[0].status, "resolved");
   assert.equal(session.questions[0].responses[0].correct, true);
   assert.equal(session.questions[0].responses[0].assessmentId !== null, true);
@@ -113,10 +203,16 @@ test("real Pi quiz path persists graded choice, learner notes, and adaptive gap 
     [
       "A token representation becomes contextual here.",
       "I need query, key, and value roles taught before this boundary.",
+      "The query represents what the current token is looking for.",
     ],
   );
-  assert.equal(session.assessments.length, 1);
+  assert.equal(session.assessments.length, 2);
   assert.equal(session.admittedGaps.length, 1);
+  assert.equal(session.plan.targetNodeId, "query-key-value");
+  assert.equal(session.steps[0].checkpointQuestionId, "teach-q1");
+  assert.equal(session.questions[2].status, "resolved");
+  assert.equal(session.checkpoint.status, "new-transfer-required");
+  assert.equal(session.visuals[0].id, "attention-visual");
 
   const sessionFile = fs.readdirSync(path.join(root, "vault", "Sessions"))[0];
   const rendered = fs.readFileSync(path.join(root, "vault", "Sessions", sessionFile), "utf8");
@@ -125,6 +221,10 @@ test("real Pi quiz path persists graded choice, learner notes, and adaptive gap 
   assert.match(rendered, /Which learned object decides what this token is looking for\?/);
   assert.match(rendered, /\*\*Parent question:\*\* `probe-q1`/);
   assert.match(rendered, /I need query, key, and value roles taught/);
+  assert.match(rendered, /```mermaid/);
+  assert.match(rendered, /Which learned object represents what the current token is looking for\?/);
+  assert.match(rendered, /!\[\[Assets\/attention-flow\.svg\]\]/);
+  assert.match(fs.readFileSync(path.join(root, "vault", "Profile.md"), "utf8"), /causal understanding/);
 });
 
 test("Pi retries the exact persisted question without trying to create it again", async () => {

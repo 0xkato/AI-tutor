@@ -4,7 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { conceptIdForV1, migrateV1ToV2, migrateV2ToV3 } from "../src/migrations.mjs";
+import {
+  conceptIdForV1,
+  migrateV1ToV2,
+  migrateV2ToV3,
+  migrateV3ToV4,
+} from "../src/migrations.mjs";
 import { pathsFor, readState } from "../src/store.mjs";
 
 const CREATED = "2026-08-20T08:00:00.000Z";
@@ -120,8 +125,8 @@ test("readState backs up and migrates version-1 state before returning it", () =
 
   const state = readState(root);
 
-  assert.equal(state.schemaVersion, 3);
-  assert.equal(JSON.parse(fs.readFileSync(paths.state, "utf8")).schemaVersion, 3);
+  assert.equal(state.schemaVersion, 4);
+  assert.equal(JSON.parse(fs.readFileSync(paths.state, "utf8")).schemaVersion, 4);
   const backups = fs.readdirSync(paths.backups);
   assert.equal(backups.length, 1);
   assert.equal(JSON.parse(fs.readFileSync(path.join(paths.backups, backups[0]), "utf8")).schemaVersion, 1);
@@ -140,6 +145,29 @@ test("migrateV2ToV3 deterministically adds empty interaction collections", () =>
   assert.deepEqual(versionTwo, migrateV1ToV2(versionOneFixture()), "migration must not mutate version 2");
 });
 
+test("migrateV3ToV4 deterministically adds an empty cross-session learner profile", () => {
+  const versionThree = migrateV2ToV3(migrateV1ToV2(versionOneFixture()));
+
+  const first = migrateV3ToV4(versionThree);
+  const second = migrateV3ToV4(versionThree);
+
+  assert.deepEqual(first, second);
+  assert.equal(first.schemaVersion, 4);
+  assert.deepEqual(first.learnerProfile, {
+    teachingPhilosophy: "",
+    explanationPreferences: "",
+    feedbackPreferences: "",
+    visualPreferences: "",
+    sourcePreferences: "",
+    updatedAt: null,
+  });
+  assert.deepEqual(
+    versionThree,
+    migrateV2ToV3(migrateV1ToV2(versionOneFixture())),
+    "migration must not mutate version 3",
+  );
+});
+
 test("readState backs up and migrates version-2 state before returning it", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-migrate-v2-"));
   const paths = pathsFor(root);
@@ -149,10 +177,33 @@ test("readState backs up and migrates version-2 state before returning it", () =
 
   const state = readState(root);
 
-  assert.equal(state.schemaVersion, 3);
+  assert.equal(state.schemaVersion, 4);
   assert.deepEqual(state.sessions.s1.questions, []);
   assert.deepEqual(state.sessions.s1.notes, []);
   const backups = fs.readdirSync(paths.backups);
   assert.equal(backups.length, 1);
   assert.equal(JSON.parse(fs.readFileSync(path.join(paths.backups, backups[0]), "utf8")).schemaVersion, 2);
+});
+
+test("readState backs up and migrates version-3 state before returning it", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-migrate-v3-"));
+  const paths = pathsFor(root);
+  const versionThree = migrateV2ToV3(migrateV1ToV2(versionOneFixture()));
+  fs.mkdirSync(paths.dataDir, { recursive: true });
+  fs.writeFileSync(paths.state, `${JSON.stringify(versionThree, null, 2)}\n`);
+
+  const state = readState(root);
+
+  assert.equal(state.schemaVersion, 4);
+  assert.deepEqual(state.learnerProfile, {
+    teachingPhilosophy: "",
+    explanationPreferences: "",
+    feedbackPreferences: "",
+    visualPreferences: "",
+    sourcePreferences: "",
+    updatedAt: null,
+  });
+  const backups = fs.readdirSync(paths.backups);
+  assert.equal(backups.length, 1);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(paths.backups, backups[0]), "utf8")).schemaVersion, 3);
 });
