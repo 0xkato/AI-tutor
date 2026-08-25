@@ -320,7 +320,7 @@ function lastCodePoint(value) {
   return points.join("");
 }
 
-export function createQuizController({ question, requestRender, done, submit }) {
+export function createQuizController({ question, requestRender, done, submit, keybindings }) {
   let optionIndex = 0;
   let focus = "options";
   let note = "";
@@ -394,12 +394,12 @@ export function createQuizController({ question, requestRender, done, submit }) 
       return;
     }
 
-    if (data === "\x1b[A") {
+    if (keybindings?.matches?.(data, "tui.select.up") || data === "\x1b[A") {
       optionIndex = Math.max(0, optionIndex - 1);
       refresh();
       return;
     }
-    if (data === "\x1b[B") {
+    if (keybindings?.matches?.(data, "tui.select.down") || data === "\x1b[B") {
       optionIndex = Math.min(finalIndex, optionIndex + 1);
       refresh();
       return;
@@ -497,12 +497,13 @@ export function showAdaptiveQuiz({ ctx, question, submit }) {
       "QUIZ_UI_UNAVAILABLE",
     );
   }
-  return ctx.ui.custom((tui, _theme, _keybindings, done) =>
+  return ctx.ui.custom((tui, _theme, keybindings, done) =>
     createQuizController({
       question,
       requestRender: () => tui.requestRender(),
       done,
       submit,
+      keybindings,
     }));
 }
 

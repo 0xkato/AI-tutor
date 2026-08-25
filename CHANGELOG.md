@@ -15,6 +15,11 @@
 - A timestamped source-backed parity contract for the complete reference-video
   workflow.
 
+### Fixed
+
+- Pi quiz Up/Down navigation now uses Pi's injected keybindings, including
+  modern terminal keyboard-protocol sequences and user-configured bindings.
+
 ### Changed
 
 - Canonical state is schema version 4; versions 1, 2, and 3 migrate

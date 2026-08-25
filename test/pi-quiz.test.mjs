@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   createAdaptiveLearningExtension,
   createQuizController,
+  showAdaptiveQuiz,
 } from "../.pi/extensions/adaptive-learning.js";
 
 function question(overrides = {}) {
@@ -228,6 +229,47 @@ test("quiz controller keeps choices, I don't know, and optional notes on one sur
 
   controller.handleInput("\r");
   assert.equal(completed.status, "resolved");
+});
+
+test("Pi quiz navigation uses the injected keybindings for modern arrow input", async () => {
+  let controller = null;
+  const matchedActions = [];
+  const keybindings = {
+    matches(data, action) {
+      matchedActions.push(action);
+      return data === "\x1b[1;1B" && action === "tui.select.down";
+    },
+  };
+  const ctx = {
+    mode: "tui",
+    hasUI: true,
+    ui: {
+      custom(factory) {
+        return new Promise((resolve) => {
+          controller = factory(
+            { requestRender() {} },
+            {},
+            keybindings,
+            resolve,
+          );
+        });
+      },
+    },
+  };
+
+  const quiz = showAdaptiveQuiz({
+    ctx,
+    question: question(),
+    submit: async (response) => ({ status: "resolved", response }),
+  });
+  controller.handleInput("\x1b[1;1B");
+  controller.handleInput("\r");
+  await new Promise((resolve) => setImmediate(resolve));
+  controller.handleInput("\r");
+
+  const result = await quiz;
+  assert.deepEqual(result.response.selectedChoiceValues, ["context"]);
+  assert.ok(matchedActions.includes("tui.select.down"));
 });
 
 test("quiz controller withholds answer and explanation on a first miss", async () => {
