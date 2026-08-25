@@ -10,24 +10,20 @@ function read(relative) {
   return fs.readFileSync(path.join(root, relative), "utf8");
 }
 
-test("README explains the interactive learning experience in both hosts", () => {
+test("README provides a concise public quickstart with honest boundaries", () => {
   const readme = read("README.md");
 
-  assert.match(readme, /built-in defaults/i);
-  assert.match(readme, /Node\.js 20[\s\S]*engine[\s\S]*Codex/i);
-  assert.match(readme, /Pi 0\.84[\s\S]*requires Node\.js[\s\S]*22\.19/i);
-  assert.match(readme, /Profile customization is optional/i);
-  assert.ok(readme.indexOf("/teach") < readme.indexOf("/learn-profile"));
-  assert.match(readme, /first broad probe[\s\S]*multiple[- ]choice/i);
-  assert.match(readme, /I don['’]t know[\s\S]*optional note/i);
-  assert.match(readme, /Pi[\s\S]*interactive[\s\S]*(quiz|modal)/i);
-  assert.match(readme, /native Pi (quiz|modal)[\s\S]*live\s+human\s+acceptance[\s\S]*pending/i);
-  assert.match(readme, /Codex[\s\S]*numbered[\s\S]*(card|fallback)/i);
-  assert.match(readme, /adaptive[\s\S]*parent[\s\S]*reason/i);
-  assert.match(readme, /Obsidian[\s\S]*question[\s\S]*note/i);
-  assert.match(readme, /recognition alone[\s\S]*not durable retention/i);
-  assert.match(readme, /open-ended teaching or retention checkpoint[\s\S]*I don['’]t know[\s\S]*without a grade/i);
-  assert.doesNotMatch(readme, /implementation is dependency-free/i);
+  assert.match(readme, /^# AI Tutor/m);
+  assert.match(readme, /Node\.js 22\.19 or newer/i);
+  assert.ok(readme.indexOf("npm ci") < readme.indexOf("npm run setup"));
+  assert.ok(readme.indexOf("npm run setup") < readme.indexOf("npm run pi"));
+  assert.match(readme, /Codex and Pi use the same saved learning state/i);
+  assert.match(readme, /I don['’]t know[^\n]*ungraded gap/i);
+  assert.match(readme, /\.adaptive-learning\/[\s\S]*vault\/[\s\S]*ignored by Git/i);
+  assert.match(readme, /no telemetry/i);
+  assert.match(readme, /release candidate/i);
+  assert.match(readme, /Native\s+Pi quiz behavior[\s\S]*human acceptance/i);
+  assert.match(readme, /docs\/operator\/quickstart\.md/);
 });
 
 test("operator quickstart tells a learner what they will see and how to answer", () => {
