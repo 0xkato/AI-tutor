@@ -36,6 +36,13 @@ the fresh release candidate.
 
 ## Fresh Pi-to-OpenAI-Codex candidate
 
+**Scope correction:** this candidate exercised Pi's model/tool path and the
+durable review, retry, repair, transfer, and closure lifecycle. It did not open
+or operate the native `adaptive_learning_quiz` multiple-choice modal. It is
+therefore evidence for the Pi adapter and learning-state lifecycle, not evidence
+that the modal's keyboard controls work in a learner's terminal. Earlier
+wording that treated this artifact as general live Pi UI evidence was too broad.
+
 After the founder approved sending the adaptive-learning skill/protocol and
 synthetic acceptance state/transcript to OpenAI Codex through Pi, a live Pi
 session used `@earendil-works/pi-coding-agent@0.84.2` with provider
@@ -88,13 +95,17 @@ second approval was required.
 
 ## Remaining acceptance work
 
-1. Have the founder independently review the fresh Codex and Pi packages and
+1. Restart Pi and complete a native quiz acceptance pass covering arrow
+   navigation, Enter submission, Tab note focus, printable note input,
+   Backspace, Ctrl+J newline, Escape cancellation, and feedback dismissal;
+   confirm that the persisted response count advances exactly once.
+2. Have the founder independently review the fresh Codex and Pi packages and
    replace each `pending` verdict with a justified `pass` or `fail`.
-2. Validate both accepted packages without `--allow-failed`.
-3. Resolve the GitHub account billing/spending-limit block and rerun the
+3. Validate both accepted packages without `--allow-failed`.
+4. Resolve the GitHub account billing/spending-limit block and rerun the
    committed macOS Node 20/22 matrix. Workflow run
    [`32833414368`](https://github.com/0xkato/AI-tutor/actions/runs/32833414368)
    created zero-step jobs for release-candidate commit `c827024`; both were
    rejected before any workflow step, so they are not code evidence.
-4. Version `0.2.0-rc.1` and its changelog are present. Create an annotated
+5. Version `0.2.0-rc.2` and its changelog are present. Create an annotated
    stable tag only after the human verdicts and hosted matrix pass.

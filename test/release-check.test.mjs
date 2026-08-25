@@ -17,6 +17,7 @@ test("release check declares every release gate from one executable plan", () =>
   const stages = JSON.parse(result.stdout);
   assert.deepEqual(stages, [
     "automated test suite",
+    "Pi host input contract",
     "JavaScript syntax",
     "JSON documents",
     "fresh-path setup",

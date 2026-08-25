@@ -4,8 +4,10 @@ A local, chat-first learning system for Codex and Pi. It diagnoses current
 understanding, builds a verified dependency plan, teaches one motivated step at
 a time, schedules retention, and renders every session into an Obsidian vault.
 
-The engine requires Node.js 20 or newer. The Pi quiz schema uses the pinned
-`typebox` package; no model SDK or hosted database is required.
+Node.js 20 or newer runs the engine and Codex path. Pi 0.84 requires Node.js
+22.19 or newer. Pi supplies the runtime extension packages; this repository
+pins matching `typebox` and Pi TUI versions for its contract tests. No model SDK
+or hosted database is required.
 
 ## Install and verify
 
@@ -18,8 +20,9 @@ npm run doctor -- --json
 
 Setup validates the runtime and host-discovery files, creates protected local
 state, renders the initial Obsidian view, and prints the exact Codex and Pi next
-steps. The release matrix is Node.js 20 and 22. Newer Node versions may satisfy
-the minimum runtime check but are outside that qualified matrix until CI covers
+steps. The engine/Codex release matrix is Node.js 20 and 22; only Node 22.19 or
+newer in that matrix can host Pi 0.84. Newer Node versions may satisfy the
+minimum runtime check but are outside that qualified matrix until CI covers
 them.
 
 ## Start learning
@@ -92,11 +95,16 @@ as Pi.
 
 ## Use with Pi
 
-Pi integration is included, but it is not yet release-qualified. The adapter
-and commands below are locally verified. A fresh live Pi-to-OpenAI-Codex
-behavioral run is mechanically complete with no critical failures, but its
-independent human verdict remains pending. Do not claim Pi support until that
-artifact is accepted.
+Pi integration is included, but it is not yet release-qualified. The adapter,
+commands, and Pi 0.84 input contract are locally verified. The older live
+Pi-to-OpenAI-Codex behavioral artifact exercised the durable review lifecycle;
+it did **not** exercise the native multiple-choice modal. Native Pi quiz live
+human acceptance is still pending, so do not claim Pi support yet.
+
+Project settings default Pi to OpenAI Codex with model `gpt-5.5`. A command-line
+model choice or `/model` still overrides that default. Pi authentication is
+host state and is not checked by `npm run setup`; use Pi's login flow if the
+provider is not already authenticated.
 
 Launch Pi from this repository, then use:
 
@@ -112,7 +120,9 @@ The `topic :: target` form is optional. `/teach` with no argument resumes the
 active target. A different target cannot silently overwrite an active session.
 When the model calls `adaptive_learning_quiz`, Pi opens an interactive quiz
 modal. Use the arrow keys to choose, Tab to move to the optional note editor,
-and Enter to submit. The modal saves the question and response before feedback.
+Enter to submit or leave the note editor, Ctrl+J to insert a note newline,
+Backspace to edit, and Escape to cancel. The modal saves the question and
+response before feedback.
 
 Pi is not bundled with this repository. The adapter follows Pi's project-local
 `.agents/skills`, `.pi/extensions`, and `enableSkillCommands` conventions; see
@@ -193,10 +203,11 @@ npm run release-check
 ## Claim boundary
 
 Passing the repository tests proves the deterministic engine, persistence,
-skill contract, Pi adapter behavior, and generated artifacts match the stated
-protocol. It does not prove that every host model will teach well, that a source
-is true merely because it was recorded, or that the learner has mastered a
-topic. Those claims still require the recorded evidence.
+skill contract, Pi adapter behavior, Pi input parsing contract, and generated
+artifacts match the stated protocol. It does not prove the native modal works
+in the learner's exact terminal, that every host model will teach well, that a
+source is true merely because it was recorded, or that the learner has mastered
+a topic. Those claims still require the recorded evidence.
 
 See `docs/plans/2026-08-24-adaptive-learning-agent-design.md` for the design and
 `docs/verification.md` for the exact verification record.

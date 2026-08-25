@@ -14,11 +14,14 @@ test("README explains the interactive learning experience in both hosts", () => 
   const readme = read("README.md");
 
   assert.match(readme, /built-in defaults/i);
+  assert.match(readme, /Node\.js 20[\s\S]*engine[\s\S]*Codex/i);
+  assert.match(readme, /Pi 0\.84[\s\S]*requires Node\.js[\s\S]*22\.19/i);
   assert.match(readme, /Profile customization is optional/i);
   assert.ok(readme.indexOf("/teach") < readme.indexOf("/learn-profile"));
   assert.match(readme, /first broad probe[\s\S]*multiple[- ]choice/i);
   assert.match(readme, /I don['’]t know[\s\S]*optional note/i);
   assert.match(readme, /Pi[\s\S]*interactive[\s\S]*(quiz|modal)/i);
+  assert.match(readme, /native Pi (quiz|modal)[\s\S]*live\s+human\s+acceptance[\s\S]*pending/i);
   assert.match(readme, /Codex[\s\S]*numbered[\s\S]*(card|fallback)/i);
   assert.match(readme, /adaptive[\s\S]*parent[\s\S]*reason/i);
   assert.match(readme, /Obsidian[\s\S]*question[\s\S]*note/i);
@@ -30,12 +33,16 @@ test("operator quickstart tells a learner what they will see and how to answer",
   const quickstart = read("docs/operator/quickstart.md");
 
   assert.match(quickstart, /built-in defaults/i);
+  assert.match(quickstart, /engine and Codex[\s\S]*Node\.js 20/i);
+  assert.match(quickstart, /Pi 0\.84[\s\S]*requires Node\.js 22\.19/i);
   assert.match(quickstart, /learner profile stores optional/i);
   assert.ok(quickstart.indexOf("/teach") < quickstart.indexOf("/learn-profile"));
   assert.match(quickstart, /multiple[- ]choice/i);
   assert.match(quickstart, /I don['’]t know/i);
   assert.match(quickstart, /Note:/i);
   assert.match(quickstart, /Pi[\s\S]*(Tab|arrow)[\s\S]*optional note/i);
+  assert.match(quickstart, /OpenAI Codex[\s\S]*project default[\s\S]*gpt-5\.5/i);
+  assert.match(quickstart, /native Pi (quiz|modal)[\s\S]*live\s+human\s+acceptance[\s\S]*pending/i);
   assert.match(quickstart, /Codex[\s\S]*numbered/i);
   assert.match(quickstart, /vault[\s\S]*question[\s\S]*note/i);
   assert.match(quickstart, /retention[\s\S]*not[\s\S]*recognition-only multiple choice/i);

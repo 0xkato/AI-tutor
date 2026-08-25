@@ -67,20 +67,32 @@ function inspectRender(root, state) {
   return inspectRenderProjection(root, state);
 }
 
+export function runtimeCompatibility(version) {
+  const [major, minor] = String(version)
+    .split(".")
+    .slice(0, 2)
+    .map((part) => Number.parseInt(part, 10));
+  return {
+    version,
+    major,
+    minimumSatisfied: Number.isInteger(major) && major >= 20,
+    releaseMatrix: [20, 22],
+    releaseMatrixMember: [20, 22].includes(major),
+    piMinimumVersion: "22.19.0",
+    piMinimumSatisfied:
+      Number.isInteger(major)
+      && Number.isInteger(minor)
+      && (major > 22 || (major === 22 && minor >= 19)),
+  };
+}
+
 export function doctor(root) {
   const paths = pathsFor(root);
   const inspectedState = inspectState(paths.state);
   const lock = inspectLock(root);
   const backups = listBackups(root);
   const render = inspectRender(root, inspectedState.state);
-  const nodeMajor = Number.parseInt(process.versions.node.split(".")[0], 10);
-  const runtime = {
-    version: process.versions.node,
-    major: nodeMajor,
-    minimumSatisfied: Number.isInteger(nodeMajor) && nodeMajor >= 20,
-    releaseMatrix: [20, 22],
-    releaseMatrixMember: [20, 22].includes(nodeMajor),
-  };
+  const runtime = runtimeCompatibility(process.versions.node);
   const platform = {
     value: process.platform,
     supported: process.platform === "darwin",
@@ -89,18 +101,31 @@ export function doctor(root) {
   const codexSkill = path.join(base, ".agents", "skills", "adaptive-learning", "SKILL.md");
   const piExtension = path.join(base, ".pi", "extensions", "adaptive-learning.js");
   const piSettings = path.join(base, ".pi", "settings.json");
-  let piSettingsValid = false;
+  let parsedPiSettings = null;
   try {
-    piSettingsValid = JSON.parse(fs.readFileSync(piSettings, "utf8")).enableSkillCommands === true;
+    parsedPiSettings = JSON.parse(fs.readFileSync(piSettings, "utf8"));
   } catch {
-    piSettingsValid = false;
+    parsedPiSettings = null;
   }
+  const piConfiguration = {
+    enableSkillCommands: parsedPiSettings?.enableSkillCommands === true,
+    defaultProvider: parsedPiSettings?.defaultProvider ?? null,
+    defaultModel: parsedPiSettings?.defaultModel ?? null,
+    valid:
+      parsedPiSettings?.enableSkillCommands === true
+      && parsedPiSettings?.defaultProvider === "openai-codex"
+      && parsedPiSettings?.defaultModel === "gpt-5.5",
+  };
   const discovery = {
     codex: fs.existsSync(codexSkill) && fs.statSync(codexSkill).isFile(),
     pi:
       fs.existsSync(piExtension) &&
       fs.statSync(piExtension).isFile() &&
-      piSettingsValid,
+      piConfiguration.valid,
+  };
+  const hostAcceptance = {
+    codex: "not-checked",
+    pi: "not-checked",
   };
   const vaultPath = inspectedState.state
     ? path.resolve(base, inspectedState.state.settings.vaultDir)
@@ -130,9 +155,14 @@ export function doctor(root) {
     actions.push("Restrict canonical state permissions to the current user.");
   }
   if (!runtime.minimumSatisfied) actions.push("Install Node.js 20 or newer.");
+  if (!runtime.piMinimumSatisfied) {
+    actions.push("Pi 0.84 requires Node.js 22.19 or newer; the engine and Codex path can still run.");
+  }
   if (!platform.supported) actions.push("Use macOS for the supported first release.");
   if (!discovery.codex) actions.push("Restore the Codex adaptive-learning skill files.");
-  if (!discovery.pi) actions.push("Restore the Pi extension and enable project skill commands.");
+  if (!discovery.pi) {
+    actions.push("Restore the Pi extension and its OpenAI Codex project defaults.");
+  }
   if (!vault.exists) actions.push("Run setup or repair-render to create the Obsidian vault.");
   if (vault.exists && !vault.ownerOnly) actions.push("Restrict vault permissions to the current user.");
   if (fs.existsSync(paths.backups) && !permissions.backupsOwnerOnly) {
@@ -158,6 +188,8 @@ export function doctor(root) {
     runtime,
     platform,
     discovery,
+    piConfiguration,
+    hostAcceptance,
     vault,
     state: inspectedState.report,
     lock,

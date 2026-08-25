@@ -4,9 +4,9 @@ Date: 2026-08-25
 
 ## Current release-grade audit
 
-Status: **release candidate verified locally; stable release not accepted**
+Status: **release candidate under Pi integration hardening; stable release not accepted**
 
-The `0.2.0-rc.1` implementation now covers the source-backed reference-video
+The `0.2.0-rc.2` implementation now covers the source-backed reference-video
 workflow, including interactive multiple choice, **I don't know**, learner
 notes, adaptive prerequisite branches, a cross-session learner profile, and
 the shared Codex/Pi/Obsidian evidence path. The current evidence is reconciled in
@@ -16,8 +16,10 @@ live-host evidence is recorded in
 
 Current local evidence includes:
 
-- 196 automated tests and the repository release-check path;
-- complete release checks on official Node `v20.20.2` and `v22.23.2` macOS
+- 208 automated tests and the complete repository release-check path on the
+  current Node 26 development runtime, including a dedicated Pi 0.84 host-input
+  contract stage;
+- prior complete engine/Codex release checks on official Node `v20.20.2` and `v22.23.2` macOS
   arm64 runtimes, including 196 of 196 automated tests, 7 of 7 end-to-end
   fixtures, fresh-path setup, syntax and JSON checks, and a healthy fresh-path
   `doctor` result under each runtime;
@@ -37,25 +39,32 @@ Current local evidence includes:
   packages and two fresh byte-exact Codex/Pi candidates that validate
   structurally with no critical failures but still have pending human verdicts.
 
+The fresh Pi artifact did not exercise the native multiple-choice modal. It
+proves the Pi model/tool and durable lifecycle path, not live keyboard behavior.
+The modal is covered by real Pi TUI parser tests, but its live human acceptance
+in the learner's terminal remains pending.
+
 Those facts establish a locally verified release candidate, not a stable
 release. The Codex artifact and Pi-to-OpenAI-Codex artifact preserve their
 original final state bytes, pass every deterministic check, and contain no
 critical failures, but neither has an independent human `pass` verdict. The
 two older local Pi behavioral artifacts retain their critical failures as
-regression evidence. The supported Node 20/22 matrix is verified locally on
-macOS arm64. Private GitHub remote `0xkato/AI-tutor` exists and candidate commit
+regression evidence. The engine/Codex Node 20/22 matrix was verified locally on
+macOS arm64 for the prior candidate. Pi 0.84 requires Node 22.19 or newer, so
+Node 20 is not Pi runtime evidence. Private GitHub remote `0xkato/AI-tutor`
+exists and candidate commit
 `c827024a7b4c6b9e4fbdc5eb8258d8c6ce7020b4` is on `main`. Hosted workflow run
 [`32833414368`](https://github.com/0xkato/AI-tutor/actions/runs/32833414368)
 created both Node jobs with zero steps, then GitHub rejected each before it
 started because recent account payments failed or the spending limit must be
 increased. That is an external CI gate, not a code-test failure.
-Version `0.2.0-rc.1` and its changelog now exist. A stable release tag remains
+Version `0.2.0-rc.2` and its changelog now exist. A stable release tag remains
 blocked on the independent human verdicts and an actually executed hosted
 matrix.
 
-No stable-production or tagged-release claim is made. Codex and Pi support are
-implemented and mechanically verified within the host-quality boundaries
-above.
+No stable-production or tagged-release claim is made. Codex is implemented;
+the Pi adapter and published input contract are mechanically verified, but Pi
+support remains unaccepted until the native modal passes live human testing.
 
 ## Archived version-1 prototype verification
 

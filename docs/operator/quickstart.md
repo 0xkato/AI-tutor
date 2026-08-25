@@ -2,16 +2,17 @@
 
 ## Candidate first release
 
-The locally qualified engine environment is macOS with Node.js 20 or 22,
-current Codex project skills, and optional Obsidian. Setup rejects Node
-versions below 20. Newer versions can run, but they are not part of the
-qualified release matrix until CI covers them.
+The locally qualified engine and Codex environment is macOS with Node.js 20 or
+22 and optional Obsidian. Pi 0.84 separately requires Node.js 22.19 or newer.
+Setup rejects Node versions below 20 and reports Pi compatibility separately.
+Newer versions can run, but they are not part of the qualified engine matrix
+until CI covers them.
 
-Pi adapter discovery and command behavior are verified locally, but Pi is not
-yet release-qualified. A fresh live Pi-to-OpenAI-Codex behavioral artifact is
-mechanically complete with no critical failures, but an independent human pass
-and accepted artifact are still required before this document may describe Pi
-as supported.
+Pi adapter discovery, command behavior, and the Pi 0.84 input contract are
+verified locally, but Pi is not yet release-qualified. The prior live
+Pi-to-OpenAI-Codex artifact tested a durable review flow, not the native quiz
+modal. Native Pi quiz live human acceptance is still pending before this
+document may describe Pi as supported.
 
 Pi and Obsidian are optional for a Codex-only learning session. Their project
 files are still verified so switching hosts later uses the same durable state.
@@ -27,7 +28,7 @@ npm run setup
 The command:
 
 1. validates Node.js and macOS;
-2. checks the Codex skill and Pi extension discovery files;
+2. checks the Codex skill, Pi extension, and OpenAI Codex project defaults;
 3. creates `.adaptive-learning/state.json` with owner-only permissions;
 4. creates the repository-relative `vault/` directory;
 5. renders the initial `Home.md`, `Profile.md`, and `Reviews.md` files;
@@ -43,7 +44,9 @@ Verify the result independently:
 npm run doctor -- --json
 ```
 
-The command exits successfully only when its `ok` field is `true`.
+The command exits successfully only when its `ok` field is `true`. That field
+covers local state and project files. `hostAcceptance.pi` remains `not-checked`
+because diagnostics do not impersonate a learner in the live terminal UI.
 
 ## Start learning immediately
 
@@ -100,6 +103,10 @@ Until the live-host acceptance record reports an accepted Pi artifact, treat
 these commands as integration-testing instructions rather than a support
 claim.
 
+OpenAI Codex is the project default provider and `gpt-5.5` is the project
+default model. Pi CLI flags and `/model` can override both. If Pi is not already
+authenticated, complete Pi's login flow before `/teach`.
+
 Launch Pi from the repository root, then use:
 
 ```text
@@ -114,8 +121,9 @@ cannot silently replace an active session.
 
 The Pi extension provides the interactive version of the same question. Use
 the arrow keys to move between choices, press Tab to edit the optional note,
-then submit. **I don't know** records an admitted gap so the agent teaches the
-missing mechanism before asking a new transfer question.
+Enter to submit or return to the choices, Ctrl+J for a note newline, Backspace
+to edit, and Escape to cancel. **I don't know** records an admitted gap so the
+agent teaches the missing mechanism before asking a new transfer question.
 
 ## Open the Obsidian view
 

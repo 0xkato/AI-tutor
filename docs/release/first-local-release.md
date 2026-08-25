@@ -4,7 +4,7 @@ Date: 2026-08-25
 
 Status: **locally verified release candidate; not a stable release**
 
-Package version: `0.2.0-rc.1`
+Package version: `0.2.0-rc.2`
 
 Release tag: none
 
@@ -17,13 +17,13 @@ smoke test is not treated as release acceptance.
 
 | # | Release criterion | Authoritative evidence | Status |
 | --- | --- | --- | --- |
-| 1 | Multi-day Codex-to-Pi retention passes end to end | [`live-host-acceptance.md`](../verification/live-host-acceptance.md), `artifacts/evals/2026-08-24-codex-novice-branches-byte-exact/`, and `artifacts/evals/2026-08-25-pi-retry-repair-transfer-openai-byte-exact/` | **Partially verified / unproved.** Fresh Codex and Pi-to-OpenAI-Codex sessions used the same canonical root and completed the required learning, due-review, bounded repair, transfer, and closure lifecycle with byte-exact final snapshots and no critical failures. Both independent human verdicts remain pending. |
+| 1 | Multi-day Codex-to-Pi retention passes end to end | [`live-host-acceptance.md`](../verification/live-host-acceptance.md), `artifacts/evals/2026-08-24-codex-novice-branches-byte-exact/`, and `artifacts/evals/2026-08-25-pi-retry-repair-transfer-openai-byte-exact/` | **Partially verified / unproved.** Fresh Codex and Pi-to-OpenAI-Codex sessions used the same canonical root and completed the required learning, due-review, bounded repair, transfer, and closure lifecycle with byte-exact final snapshots and no critical failures. The Pi artifact did not exercise the native multiple-choice modal. Both independent human verdicts and native modal acceptance remain pending. |
 | 2 | Migration, backup, restore-check, stale-lock recovery, renderer repair, and corrupted-state diagnostics pass destructive checks | Focused recovery/migration/render/setup/CLI/review tests; manual malformed-state check; actual permission-failure audit | **Verified locally.** The actual permission audit committed canonical revision 1 despite `EACCES`; after permissions were restored, `repair-render` preserved the exact state bytes and `doctor` reported the projection current. Export and evaluation capture also refuse source files swapped to symlinks between validation and opening. |
 | 3 | Hostile identifiers, Markdown, sources, paths, timestamps, and visuals cannot corrupt state or notes | Schema, CLI-options, render-safety, source, visual, graph, and protocol-invariant tests in the full suite | **Verified locally** for the defined macOS implementation contract. Unsafe custom vault paths are rejected before canonical state is created and are rejected again during state validation. |
-| 4 | Fresh-clone setup and first session succeed outside the development path | `npm run release-check`, including disposable fresh-path setup and E2E fixtures | **Verified locally** with the complete release check on official Node `v20.20.2` and `v22.23.2` macOS arm64 runtimes. Setup exposes `Profile.md` and the Pi `/learn-profile` entry point before `/teach`. |
+| 4 | Fresh-clone setup and first session succeed outside the development path | `npm run release-check`, including disposable fresh-path setup and E2E fixtures | **Partially verified.** The prior release check passed on official Node `v20.20.2` and `v22.23.2` macOS arm64 runtimes, and setup exposes `Profile.md` and Pi project defaults. Setup does not verify Pi authentication or live terminal controls; native modal acceptance is pending. |
 | 5 | Behavioral scenario suite has no critical failure | Five preserved live-host packages plus the release validator | **Partially verified.** The two fresh release candidates have no contaminated questions or critical failures and pass every deterministic check. Their human verdicts remain pending. The earlier Pi failures remain preserved as historical regression evidence rather than being overwritten. |
-| 6 | Complete suite passes on macOS with Node 20 and 22 | Local runtime and GitHub Actions matrix | **Partially verified.** The complete release check passed locally on official Node `v20.20.2` and `v22.23.2` macOS arm64 runtimes. The uncached macOS workflow is committed and contract-tested. Private remote `0xkato/AI-tutor` contains candidate commit `c827024`; workflow run [`32833414368`](https://github.com/0xkato/AI-tutor/actions/runs/32833414368) created both jobs with zero steps, then GitHub rejected them before execution because of an account billing/spending-limit block. |
-| 7 | Documentation, privacy, recovery, changelog, and verification match the shipped version | Operator documentation and this audit | **Verified for the release candidate.** Privacy, recovery, scoped transmission approval, version `0.2.0-rc.1`, changelog, source-backed parity contract, operator setup, and current local verification are reconciled. Human acceptance and hosted CI remain separate release gates. |
+| 6 | Complete suite passes on macOS with Node 20 and 22 | Local runtime and GitHub Actions matrix | **Partially verified.** The complete release check passed locally on official Node `v20.20.2` and `v22.23.2` macOS arm64 runtimes for the earlier candidate. Node 20 is engine/Codex evidence only because Pi 0.84 requires Node 22.19 or newer. The uncached macOS workflow is committed and contract-tested. Private remote `0xkato/AI-tutor` contains candidate commit `c827024`; workflow run [`32833414368`](https://github.com/0xkato/AI-tutor/actions/runs/32833414368) created both jobs with zero steps, then GitHub rejected them before execution because of an account billing/spending-limit block. |
+| 7 | Documentation, privacy, recovery, changelog, and verification match the shipped version | Operator documentation and this audit | **Partially verified.** The documents now distinguish native Pi UI evidence from adapter/lifecycle evidence. Native modal acceptance and hosted CI remain separate release gates. |
 | 8 | Repository is clean, committed, and has a release tag | Git status, commit history, and tag list | **Partially verified.** The candidate is prepared on an isolated branch for a clean intended commit. No release tag exists, by design, while human acceptance and hosted CI remain incomplete. |
 
 ## Destructive evidence completed locally
@@ -47,7 +47,8 @@ smoke test is not treated as release acceptance.
 
 ## Supported-runtime evidence completed locally
 
-Official macOS arm64 archives for Node `v20.20.2` and `v22.23.2` were checked
+For the build before the Pi input-contract hardening, official macOS arm64
+archives for Node `v20.20.2` and `v22.23.2` were checked
 against their published `SHASUMS256.txt` entries before use. The complete
 `scripts/release-check.mjs` path then exited `0` under each runtime with:
 
@@ -58,8 +59,10 @@ against their published `SHASUMS256.txt` entries before use. The complete
 - fresh-path `doctor` reporting `ok`;
 - the final `Release check passed.` receipt.
 
-This proves the supported runtime matrix locally on this macOS arm64 machine.
-It does not prove hosted GitHub Actions execution or another operating system.
+That proves the supported runtime matrix for the earlier candidate on this
+macOS arm64 machine. The hardened Pi input build must rerun that matrix before
+the same claim applies to it. It does not prove hosted GitHub Actions execution
+or another operating system.
 
 ## Live-host decision
 
@@ -86,10 +89,12 @@ evidence without that flag.
 1. Obtain independent human `pass` verdicts for the fresh Codex and Pi packages
    and validate the accepted packages
    without `--allow-failed`.
-2. Resolve the GitHub billing/spending-limit block, then rerun the committed
+2. Complete the native Pi modal acceptance checklist in the learner's terminal.
+3. Rerun the full Node 20/22 local matrix for the input-hardened build.
+4. Resolve the GitHub billing/spending-limit block, then rerun the committed
    uncached macOS Node 20/22 CI matrix and retain executed hosted receipts.
-3. The hardened prerelease version, changelog, and local matrix now exist.
-   Create the annotated stable tag only after the two remaining gates pass.
+5. The hardened prerelease version and changelog exist.
+   Create the annotated stable tag only after all remaining gates pass.
 
 Until every item passes, do not create a release tag or describe this build as
 fully production-ready.

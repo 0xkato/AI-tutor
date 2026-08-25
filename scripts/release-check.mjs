@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const stageNames = [
   "automated test suite",
+  "Pi host input contract",
   "JavaScript syntax",
   "JSON documents",
   "fresh-path setup",
@@ -92,6 +93,9 @@ try {
   runNode(["--test", ...selectedTests()]);
 
   announce(stageNames[1]);
+  runNode(["--test", path.join(repoRoot, "test", "pi-host-contract.test.mjs")]);
+
+  announce(stageNames[2]);
   const javascript = [
     ...filesWithExtensions(path.join(repoRoot, "bin"), new Set([".mjs", ".js"])),
     ...filesWithExtensions(path.join(repoRoot, "src"), new Set([".mjs", ".js"])),
@@ -100,7 +104,7 @@ try {
   ];
   for (const file of javascript) runNode(["--check", file]);
 
-  announce(stageNames[2]);
+  announce(stageNames[3]);
   const jsonFiles = [
     path.join(repoRoot, "package-lock.json"),
     path.join(repoRoot, "package.json"),
@@ -109,7 +113,7 @@ try {
   ];
   for (const file of jsonFiles) JSON.parse(fs.readFileSync(file, "utf8"));
 
-  announce(stageNames[3]);
+  announce(stageNames[4]);
   copyReleaseFixture(freshRoot);
   const setup = runNode([path.join(freshRoot, "scripts", "setup.mjs")], {
     cwd: freshRoot,
@@ -117,14 +121,14 @@ try {
   });
   process.stdout.write(setup.stdout);
 
-  announce(stageNames[4]);
+  announce(stageNames[5]);
   runNode([
     "--test",
     path.join(repoRoot, "test", "e2e-learning-session.test.mjs"),
     path.join(repoRoot, "test", "review-lifecycle.test.mjs"),
   ]);
 
-  announce(stageNames[5]);
+  announce(stageNames[6]);
   const doctor = runNode(
     [path.join(freshRoot, "bin", "learn.mjs"), "doctor", "--root", freshRoot, "--json"],
     { cwd: freshRoot, capture: true },

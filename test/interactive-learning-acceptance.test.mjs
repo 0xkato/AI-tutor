@@ -43,7 +43,7 @@ function question(overrides = {}) {
   };
 }
 
-test("real Pi quiz path persists graded choice, learner notes, and adaptive gap to Obsidian", async () => {
+test("Pi tool persistence path records graded choice, learner notes, and adaptive gap to Obsidian", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learning-interactive-acceptance-"));
   await runAdaptiveLearningCli("init", [], root);
   await runAdaptiveLearningCli(

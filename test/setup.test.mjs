@@ -45,6 +45,8 @@ test("one-command setup works from a fresh path with spaces and prints portable 
     encoding: "utf8",
   });
   assert.equal(setup.status, 0, `${setup.stdout}\n${setup.stderr}`);
+  assert.match(setup.stdout, /local state is ready/i);
+  assert.doesNotMatch(setup.stdout, /Adaptive Learning Agent is ready\./i);
   assert.match(setup.stdout, /Node\.js \d+/);
   assert.match(setup.stdout, /macOS/);
   assert.match(setup.stdout, /Codex/);
@@ -52,6 +54,8 @@ test("one-command setup works from a fresh path with spaces and prints portable 
   assert.match(setup.stdout, /Profile\.md/);
   assert.match(setup.stdout, /Built-in teaching defaults: active/i);
   assert.match(setup.stdout, /Pi:[^\n]*\/teach <your learning target>/i);
+  assert.match(setup.stdout, /Pi project default:[^\n]*OpenAI Codex[^\n]*gpt-5\.5/i);
+  assert.match(setup.stdout, /Pi host authentication and live quiz controls:[^\n]*not checked/i);
   assert.doesNotMatch(setup.stdout, /describe how you learn best|run \/learn-profile/i);
   assert.match(setup.stdout, /npm run doctor/);
   assert.doesNotMatch(setup.stdout, new RegExp(sourceRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
@@ -74,9 +78,21 @@ test("one-command setup works from a fresh path with spaces and prints portable 
   const report = JSON.parse(doctor.stdout.slice(doctor.stdout.indexOf("{")));
   assert.equal(report.ok, true);
   assert.equal(report.runtime.minimumSatisfied, true);
+  assert.equal(report.runtime.piMinimumVersion, "22.19.0");
+  assert.equal(report.runtime.piMinimumSatisfied, true);
   assert.equal(report.platform.supported, true);
   assert.equal(report.discovery.codex, true);
   assert.equal(report.discovery.pi, true);
+  assert.deepEqual(report.piConfiguration, {
+    enableSkillCommands: true,
+    defaultProvider: "openai-codex",
+    defaultModel: "gpt-5.5",
+    valid: true,
+  });
+  assert.deepEqual(report.hostAcceptance, {
+    codex: "not-checked",
+    pi: "not-checked",
+  });
   assert.equal(report.vault.exists, true);
   assert.equal(report.render.current, true);
 

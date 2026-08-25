@@ -2,6 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  decodeKittyPrintable,
+  matchesKey,
+  stripTerminalSequences,
+} from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 
 const extensionDir = path.dirname(fileURLToPath(import.meta.url));
@@ -281,7 +286,8 @@ function runOptions(ctx, suppliedSignal) {
 function plainLines(text, width, indent = "") {
   const limit = Math.max(1, width - indent.length);
   const output = [];
-  for (const paragraph of String(text ?? "").split("\n")) {
+  const safeText = stripTerminalSequences(String(text ?? ""));
+  for (const paragraph of safeText.split("\n")) {
     if (paragraph.length === 0) {
       output.push(indent);
       continue;
@@ -327,6 +333,7 @@ export function createQuizController({ question, requestRender, done, submit, ke
   let phase = "select";
   let result = null;
   let failure = null;
+  let pasteBuffer = null;
   const selected = new Set();
   const multi = question.mode === "multi-select";
   const dontKnowIndex = question.choices.length;
@@ -364,58 +371,114 @@ export function createQuizController({ question, requestRender, done, submit, ke
     );
   }
 
+  function matchesAction(data, action, rawFallbacks = []) {
+    return keybindings?.matches?.(data, action) || rawFallbacks.includes(data);
+  }
+
+  function cleanNoteText(value) {
+    return stripTerminalSequences(String(value))
+      .replace(/\r\n?/g, "\n")
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
+  }
+
+  function appendNoteInput(data) {
+    const pasteStart = "\x1b[200~";
+    const pasteEnd = "\x1b[201~";
+
+    if (pasteBuffer !== null) {
+      pasteBuffer += data;
+      const endIndex = pasteBuffer.indexOf(pasteEnd);
+      if (endIndex === -1) return true;
+      note += cleanNoteText(pasteBuffer.slice(0, endIndex));
+      pasteBuffer = null;
+      return true;
+    }
+
+    const startIndex = data.indexOf(pasteStart);
+    if (startIndex !== -1) {
+      note += cleanNoteText(data.slice(0, startIndex));
+      const pasted = data.slice(startIndex + pasteStart.length);
+      const endIndex = pasted.indexOf(pasteEnd);
+      if (endIndex === -1) pasteBuffer = pasted;
+      else note += cleanNoteText(pasted.slice(0, endIndex));
+      return true;
+    }
+
+    const printable = decodeKittyPrintable(data);
+    if (printable !== undefined) {
+      note += cleanNoteText(printable);
+      return true;
+    }
+    if (!data.startsWith("\x1b")) {
+      note += cleanNoteText(data);
+      return true;
+    }
+    return false;
+  }
+
   function handleInput(data) {
     if (phase === "saving") return;
     if (phase === "feedback") {
-      if (data === "\r" || data === "\n" || data === "\x1b") done(result);
+      if (
+        matchesAction(data, "tui.select.confirm", ["\r", "\n"])
+        || matchesAction(data, "tui.select.cancel", ["\x1b"])
+      ) done(result);
       return;
     }
     if (phase === "error") {
-      if (data === "\r" || data === "\n" || data === "\x1b") done({ error: failure });
+      if (
+        matchesAction(data, "tui.select.confirm", ["\r", "\n"])
+        || matchesAction(data, "tui.select.cancel", ["\x1b"])
+      ) done({ error: failure });
       return;
     }
 
-    if (data === "\t") {
+    if (matchesAction(data, "tui.input.tab", ["\t"])) {
       focus = focus === "options" ? "note" : "options";
       refresh();
       return;
     }
     if (focus === "note") {
-      if (data === "\r" || data === "\x1b") {
+      if (matchesAction(data, "tui.select.cancel", ["\x1b"])) {
         focus = "options";
-      } else if (data === "\x7f" || data === "\b") {
+      } else if (
+        matchesAction(data, "tui.input.submit", ["\r"])
+        || matchesAction(data, "tui.select.confirm", ["\r"])
+      ) {
+        focus = "options";
+      } else if (matchesAction(data, "tui.editor.deleteCharBackward", ["\x7f", "\b"])) {
         note = lastCodePoint(note);
-      } else if (data === "\n") {
+      } else if (matchesAction(data, "tui.input.newLine", ["\n"])) {
         note += "\n";
-      } else if (!data.startsWith("\x1b")) {
-        note += data;
-      }
+      } else appendNoteInput(data);
       refresh();
       return;
     }
 
-    if (keybindings?.matches?.(data, "tui.select.up") || data === "\x1b[A") {
+    if (matchesAction(data, "tui.select.up", ["\x1b[A"])) {
       optionIndex = Math.max(0, optionIndex - 1);
       refresh();
       return;
     }
-    if (keybindings?.matches?.(data, "tui.select.down") || data === "\x1b[B") {
+    if (matchesAction(data, "tui.select.down", ["\x1b[B"])) {
       optionIndex = Math.min(finalIndex, optionIndex + 1);
       refresh();
       return;
     }
-    if (data === "\x1b") {
+    if (matchesAction(data, "tui.select.cancel", ["\x1b"])) {
       done(null);
       return;
     }
-    if (data !== "\r" && data !== "\n" && data !== " ") return;
+    const confirm = matchesAction(data, "tui.select.confirm", ["\r", "\n"]);
+    const toggle = confirm || matchesKey(data, "space") || data === " ";
+    if (!toggle) return;
 
     if (optionIndex === dontKnowIndex) {
-      beginSubmit(responseFor([], true));
+      if (confirm) beginSubmit(responseFor([], true));
       return;
     }
     if (multi && optionIndex === submitIndex) {
-      if (selected.size > 0) beginSubmit(responseFor([...selected], false));
+      if (confirm && selected.size > 0) beginSubmit(responseFor([...selected], false));
       return;
     }
     const value = question.choices[optionIndex].value;
