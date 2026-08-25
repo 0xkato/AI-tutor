@@ -22,10 +22,27 @@ steps. The release matrix is Node.js 20 and 22. Newer Node versions may satisfy
 the minimum runtime check but are outside that qualified matrix until CI covers
 them.
 
-## Set your learner profile
+## Start learning
 
-Before the first target, record the teaching philosophy and preferences you
-want reused across sessions. In Pi, start with:
+The complete adaptive teaching protocol is active immediately. In Pi, start
+with the learning target:
+
+```text
+/teach Understand why gradient descent subtracts the gradient
+```
+
+In Codex, ask naturally:
+
+> Teach me why gradient descent subtracts the gradient, starting from what I already know.
+
+You do not need to configure teaching behavior before starting.
+
+## Optional learner profile
+
+The built-in defaults enforce causal teaching, adaptive multiple-choice
+calibration, exact feedback, source verification, useful visuals, retry rules,
+and durable transfer checks. Profile customization is optional and only records
+learner-specific overrides that should be reused across sessions. In Pi:
 
 ```text
 /learn-profile teaching :: Build causal understanding before testing; use transfer rather than repetition.
@@ -33,10 +50,10 @@ want reused across sessions. In Pi, start with:
 /learn-profile feedback :: Assess only the explicit question and name the exact missing mechanism.
 ```
 
-`/learn-profile` with no argument shows the current profile. Codex can update
-the same canonical fields through `set-profile`; both hosts read them from
-durable context before calibration or teaching. The profile is also visible in
-Obsidian as `Profile.md`.
+`/learn-profile` with no argument shows custom overrides or reports that each
+built-in default is active. Codex can update the same canonical fields through
+`set-profile`; both hosts read them from durable context before calibration or
+teaching. The profile is also visible in Obsidian as `Profile.md`.
 
 ## What the learner does
 

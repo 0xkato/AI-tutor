@@ -251,6 +251,7 @@ function parseProfileUpdate(raw) {
 }
 
 function profileSummary(profile) {
+  const defaultStatus = "Built-in default active (optional customization)";
   const entries = [
     ["Teaching", profile.teachingPhilosophy],
     ["Explanations", profile.explanationPreferences],
@@ -259,7 +260,7 @@ function profileSummary(profile) {
     ["Sources", profile.sourcePreferences],
   ];
   return entries
-    .map(([label, value]) => `${label}: ${value || "Not configured"}`)
+    .map(([label, value]) => `${label}: ${value || defaultStatus}`)
     .join("\n");
 }
 

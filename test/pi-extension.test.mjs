@@ -134,6 +134,25 @@ test("/learn-profile shows and updates the shared learner-authored preferences",
   ]);
 });
 
+test("/learn-profile presents empty overrides as active built-in defaults", async () => {
+  const h = harness({
+    profile: {
+      teachingPhilosophy: "",
+      explanationPreferences: "",
+      feedbackPreferences: "",
+      visualPreferences: "",
+      sourcePreferences: "",
+      updatedAt: null,
+    },
+  });
+
+  await h.commands.get("learn-profile").handler("", h.ctx);
+
+  assert.match(h.notifications[0].message, /Teaching: Built-in default active/i);
+  assert.match(h.notifications[0].message, /Sources: Built-in default active/i);
+  assert.doesNotMatch(h.notifications[0].message, /Not configured/i);
+});
+
 test("/teach resumes an active session without creating or overwriting state", async () => {
   const h = harness({
     status: {

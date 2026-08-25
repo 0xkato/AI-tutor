@@ -45,10 +45,23 @@ npm run doctor -- --json
 
 The command exits successfully only when its `ok` field is `true`.
 
-## Configure the learner profile
+## Start learning immediately
 
-The learner profile makes your teaching philosophy and preferences reusable
-instead of forcing you to restate them for every target. In Pi:
+The built-in defaults are active after setup; no learner-profile configuration
+is required. In Pi, start with a learning target:
+
+```text
+/teach Understand why gradient descent subtracts the gradient
+```
+
+In Codex, state the same target naturally. Both hosts load the complete
+adaptive-learning protocol before calibration or teaching.
+
+## Optionally customize the learner profile
+
+The learner profile stores optional teaching-philosophy and presentation
+overrides instead of forcing you to restate personal preferences for every
+target. It does not enable the underlying teaching system. In Pi:
 
 ```text
 /learn-profile teaching :: Build causal understanding before testing; use transfer rather than repetition.
@@ -58,10 +71,11 @@ instead of forcing you to restate them for every target. In Pi:
 /learn-profile sources :: Prefer primary sources and preserve uncertainty.
 ```
 
-Run `/learn-profile` without an argument to inspect the current values. Codex
-uses the same `profile` and `set-profile` engine commands. The profile is saved
-in canonical state and rendered to Obsidian as `Profile.md`; leaving a field
-empty uses the protocol default.
+Run `/learn-profile` without an argument to inspect custom values or confirm
+that the built-in defaults are active. Codex uses the same `profile` and
+`set-profile` engine commands. The profile is saved in canonical state and
+rendered to Obsidian as `Profile.md`; leaving a field empty keeps the protocol
+default active.
 
 ## Start in Codex
 

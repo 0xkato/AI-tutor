@@ -344,3 +344,15 @@ test("renderVault writes home, session, topic, and review notes", () => {
     /Evidence history/,
   );
 });
+
+test("an empty learner profile renders built-in defaults as active", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-default-profile-"));
+  const initial = createInitialState({ now: "2026-08-25T08:00:00.000Z" });
+
+  renderVault(root, initial);
+
+  const profile = fs.readFileSync(path.join(root, "vault", "Profile.md"), "utf8");
+  assert.match(profile, /Built-in default active/i);
+  assert.match(profile, /no custom overrides/i);
+  assert.doesNotMatch(profile, /Not configured|Not recorded/i);
+});

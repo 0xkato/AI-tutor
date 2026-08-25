@@ -13,6 +13,9 @@ function read(relative) {
 test("README explains the interactive learning experience in both hosts", () => {
   const readme = read("README.md");
 
+  assert.match(readme, /built-in defaults/i);
+  assert.match(readme, /Profile customization is optional/i);
+  assert.ok(readme.indexOf("/teach") < readme.indexOf("/learn-profile"));
   assert.match(readme, /first broad probe[\s\S]*multiple[- ]choice/i);
   assert.match(readme, /I don['’]t know[\s\S]*optional note/i);
   assert.match(readme, /Pi[\s\S]*interactive[\s\S]*(quiz|modal)/i);
@@ -26,6 +29,9 @@ test("README explains the interactive learning experience in both hosts", () => 
 test("operator quickstart tells a learner what they will see and how to answer", () => {
   const quickstart = read("docs/operator/quickstart.md");
 
+  assert.match(quickstart, /built-in defaults/i);
+  assert.match(quickstart, /learner profile stores optional/i);
+  assert.ok(quickstart.indexOf("/teach") < quickstart.indexOf("/learn-profile"));
   assert.match(quickstart, /multiple[- ]choice/i);
   assert.match(quickstart, /I don['’]t know/i);
   assert.match(quickstart, /Note:/i);

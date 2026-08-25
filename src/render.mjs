@@ -314,30 +314,31 @@ function renderHome(state) {
 
 function renderProfile(state) {
   const profile = state.learnerProfile;
+  const defaultStatus = "Built-in default active.";
   return [
     "# Learner profile",
     "",
-    `- **Updated:** ${listValue(profile.updatedAt ?? "Not configured")}`,
+    `- **Custom overrides:** ${listValue(profile.updatedAt ?? "No custom overrides")}`,
     "",
     "## Teaching philosophy",
     "",
-    plainParagraph(profile.teachingPhilosophy, "Not recorded."),
+    plainParagraph(profile.teachingPhilosophy, defaultStatus),
     "",
     "## Explanation preferences",
     "",
-    plainParagraph(profile.explanationPreferences, "Not recorded."),
+    plainParagraph(profile.explanationPreferences, defaultStatus),
     "",
     "## Feedback preferences",
     "",
-    plainParagraph(profile.feedbackPreferences, "Not recorded."),
+    plainParagraph(profile.feedbackPreferences, defaultStatus),
     "",
     "## Visual preferences",
     "",
-    plainParagraph(profile.visualPreferences, "Not recorded."),
+    plainParagraph(profile.visualPreferences, defaultStatus),
     "",
     "## Source preferences",
     "",
-    plainParagraph(profile.sourcePreferences, "Not recorded."),
+    plainParagraph(profile.sourcePreferences, defaultStatus),
     "",
   ].join("\n");
 }

@@ -32,14 +32,17 @@ test("the source-backed video parity contract names every demonstrated workflow 
   assert.match(parity, /host-quality boundary/i);
 });
 
-test("first-run documentation exposes profile setup before the first target", () => {
+test("first-run documentation makes built-in defaults active before optional profile customization", () => {
   const readme = read("README.md");
   const quickstart = read("docs/operator/quickstart.md");
 
   for (const document of [readme, quickstart]) {
     assert.match(document, /learner profile/i);
     assert.match(document, /teaching philosophy/i);
+    assert.match(document, /built-in defaults/i);
+    assert.match(document, /optional/i);
     assert.match(document, /\/learn-profile/);
+    assert.ok(document.indexOf("/teach") < document.indexOf("/learn-profile"));
     assert.match(document, /Profile\.md/);
   }
 });
