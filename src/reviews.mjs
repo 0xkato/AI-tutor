@@ -97,6 +97,7 @@ export function startReviewSession(state, { id, reviewIds, now } = {}) {
     completedAt: null,
     probeSummary: "",
     admittedGaps: [],
+    checkpointGaps: [],
     assessments: [],
     questions: [],
     notes: [],

@@ -107,6 +107,49 @@ function seedDueReview(root, { reviewCount = 0 } = {}) {
   return due.reviews.find((review) => review.nodeId === "covectors");
 }
 
+test("a retention checkpoint persists I don't know as an ungraded repair signal", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-review-gap-"));
+  const due = seedDueReview(root);
+  invoke(root, "start-review", [
+    "--id", "review-gap-s1",
+    "--review", due.reviewId,
+    "--now", DAY_TWO,
+  ]);
+  invoke(root, "start-review-checkpoint", [
+    "--question-id", "retention-gap-q1",
+    "--node", "covectors",
+    "--kind", "retention",
+    "--question", "What does a covector consume and produce, and what law must it preserve?",
+    "--now", "2026-08-25T08:00:01.000Z",
+  ]);
+  invoke(root, "record-admitted-gap", [
+    "--id", "retention-gap-1",
+    "--question-id", "retention-gap-q1",
+    "--node", "covectors",
+    "--statement", "I don't remember the input-output types or the preserved law.",
+    "--evidence", "The learner explicitly admitted the missing covector mechanism on the persisted retention checkpoint.",
+    "--now", "2026-08-25T08:00:02.000Z",
+  ]);
+
+  const state = JSON.parse(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+  );
+  const session = state.sessions["review-gap-s1"];
+  const concept = state.concepts[due.conceptId];
+
+  assert.equal(session.assessments.length, 0);
+  assert.equal(session.reviewItems[0].status, "repair-required");
+  assert.equal(session.checkpoint.status, "new-transfer-required");
+  assert.equal(session.checkpoint.mistakeType, "admitted-gap");
+  assert.equal(session.checkpointGaps.length, 1);
+  assert.equal(session.checkpointGaps[0].stage, "retention");
+  assert.equal(session.checkpointGaps[0].questionId, "retention-gap-q1");
+  assert.equal(concept.status, "gap");
+  assert.equal(concept.retry.status, "new-transfer-required");
+  assert.equal(concept.retry.answerMayBeTaught, true);
+  assert.equal(concept.latestGrade, "correct");
+});
+
 test("a due review is claimed, executed across processes, and persisted once", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-review-"));
   const due = seedDueReview(root);
@@ -636,10 +679,42 @@ test("a required review synthesis is assessed before the review can close", () =
     "--question", "Connect the retained vector operations to the covector's input and output.",
     "--now", "2026-08-25T08:07:00.000Z",
   ]);
+  invoke(root, "record-admitted-gap", [
+    "--id", "review-whole-system-gap-1",
+    "--question-id", "review-whole-system-q1",
+    "--node", "covectors",
+    "--statement", "I don't know how both vector operations constrain the covector output.",
+    "--evidence", "The learner localized the whole-system gap to the covector linearity mechanism.",
+    "--now", "2026-08-25T08:07:10.000Z",
+  ]);
+  invoke(root, "start-review-checkpoint", [
+    "--question-id", "review-synthesis-repair-q1",
+    "--node", "covectors",
+    "--kind", "transfer",
+    "--question", "How must a linear price sensitivity respond when two displacement vectors are added?",
+    "--now", "2026-08-25T08:07:20.000Z",
+  ]);
+  invoke(root, "record-assessment", [
+    "--id", "review-synthesis-repair-a1",
+    "--question-id", "review-synthesis-repair-q1",
+    "--node", "covectors",
+    "--stage", "retention",
+    "--kind", "transfer",
+    "--question", "How must a linear price sensitivity respond when two displacement vectors are added?",
+    "--answer", "Its scalar response to the sum must equal the sum of its scalar responses.",
+    "--grade", "correct",
+    "--evidence", "Transferred additivity to a new scalar-valued price-sensitivity example.",
+    "--now", "2026-08-25T08:07:30.000Z",
+  ]);
+  invoke(root, "start-synthesis", [
+    "--question-id", "review-whole-system-transfer-q1",
+    "--question", "Connect vector addition and scaling to a linear risk sensitivity's scalar output.",
+    "--now", "2026-08-25T08:07:40.000Z",
+  ]);
   invoke(root, "record-synthesis", [
     "--id", "review-whole-system-a1",
-    "--question-id", "review-whole-system-q1",
-    "--question", "Connect the retained vector operations to the covector's input and output.",
+    "--question-id", "review-whole-system-transfer-q1",
+    "--question", "Connect vector addition and scaling to a linear risk sensitivity's scalar output.",
     "--answer", "A covector accepts vectors, returns scalars, and preserves vector addition and scalar multiplication.",
     "--grade", "correct",
     "--evidence", "Connected the retained input-output model to both operations that linearity preserves.",
@@ -652,6 +727,8 @@ test("a required review synthesis is assessed before the review can close", () =
   );
   const session = state.sessions["review-synthesis"];
   assert.equal(session.synthesisCheckpoint.resolvedEvidenceId, "review-whole-system-a1");
+  assert.equal(session.checkpointGaps[0].stage, "synthesis");
+  assert.equal(session.checkpointGaps[0].questionId, "review-whole-system-q1");
   assert.equal(
     session.synthesis,
     "A covector accepts vectors, returns scalars, and preserves vector addition and scalar multiplication.",

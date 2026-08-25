@@ -189,6 +189,17 @@ node bin/learn.mjs record-admitted-gap --root <root> \
   --statement "<learner's stated gap>" \
   --evidence "<why this is the exact admitted missing mechanism>"
 
+# If the learner says I don't know to an active open-ended teaching or
+# retention checkpoint, preserve the checkpoint identity. For synthesis, first
+# localize the gap to one plan or selected-review node. These create no
+# assessment or grade and require teaching followed by a new transfer.
+node bin/learn.mjs record-admitted-gap --root <root> \
+  --id <stable-checkpoint-gap-id> \
+  --question-id <active-checkpoint-question-id> \
+  --node <active-checkpoint-node> \
+  --statement "<learner's exact I don't know statement>" \
+  --evidence "<why this is the exact missing mechanism at this checkpoint>"
+
 node bin/learn.mjs finish-probe --root <root> \
   --summary "<demonstrated foundations and bounded gaps>"
 ```
@@ -233,8 +244,12 @@ Valid assessment kinds are `multiple-choice`, `explanation`, `prediction`,
 `transfer`, `reconstruction`, `debugging`, `synthesis`, and `retention`.
 Grades are lowercase CLI values: `correct`, `partial`, or `incorrect`. Add
 `--contaminated` when answer exposure invalidates the question.
-`record-admitted-gap` creates no assessment, grade, retry, or review progress;
-the admitted node must still appear in the dependency plan before teaching.
+During probe, `record-admitted-gap` creates no assessment, grade, retry, or
+review progress; the admitted node must still appear in the dependency plan
+before teaching. During an active teaching, retention, or localized synthesis
+checkpoint, it still creates no assessment or grade, but moves that exact
+checkpoint to `new-transfer-required` so the mechanism is taught before a new
+transfer question.
 
 ## Research and plan
 

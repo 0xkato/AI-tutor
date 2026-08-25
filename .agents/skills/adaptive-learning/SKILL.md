@@ -43,7 +43,7 @@ The learner supplies the learning target; do not silently replace or broaden it.
   it succeeds before showing the question, then accept one numbered choice or
   `I don't know` plus an optional `Note: ...`, and run `submit-question` before
   feedback. That command atomically persists the response, note, and
-  deterministic assessment or probe-stage admitted gap.
+  deterministic assessment or phase-correct admitted gap.
 - After the first question, every adaptive child must include
   `--parent-question-id` and `--adaptation-reason` so the branch is auditable.
 - When the learner explicitly identifies a missing mechanism, persist it with
@@ -73,7 +73,16 @@ The learner supplies the learning target; do not silently replace or broaden it.
   learner selects **I don't know** in an interactive question, let
   `submit-question` or `adaptive_learning_quiz` persist it, teach the missing
   mechanism, then test it with a new transfer question or example. Use
-  `record-admitted-gap` for a gap stated outside that interaction.
+  `record-admitted-gap` for a gap stated outside that interaction. During an
+  active open-ended teaching or retention checkpoint, include the exact
+  checkpoint question ID and node; the command must succeed before teaching or
+  advancing. It records no assessment or grade and requires a new transfer
+  checkpoint after teaching.
+- If **I don't know** answers a whole-system synthesis, ask one bounded,
+  open diagnostic clarification to locate the first missing concept without
+  suggesting candidates. Then run `record-admitted-gap` with the synthesis
+  question ID and that exact plan or review node. Repair the concept and use a
+  new synthesis transfer; do not fabricate an incorrect synthesis assessment.
 - A clarification explains only the missing term or premise and returns to the
   same question.
 - On a first genuine miss, identify the error type, do not reveal the answer,
@@ -119,6 +128,10 @@ The learner supplies the learning target; do not silently replace or broaden it.
   question text, and kind before the learner answer. Only then record the
   assessment. Repair misses within that active checkpoint and require a new
   durable transfer checkpoint before treating an item as resolved.
+- If the learner says **I don't know** to that persisted review checkpoint,
+  run `record-admitted-gap` with its exact question ID and node. Teach the
+  missing mechanism and open a new durable transfer checkpoint; do not invent
+  a retention assessment.
 - If a selected item cannot be validly assessed, use `defer-review` with a
   concrete reason and future time. Do not silently skip it.
 - Run `close-review` only after every selected item is resolved or explicitly

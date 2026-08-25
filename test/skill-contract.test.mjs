@@ -52,6 +52,10 @@ test("skill corpus preserves the complete adaptive-learning behavior", () => {
       "persist admitted gaps without false grading",
       /record-admitted-gap[\s\S]*without.*(assessment|grad)/i,
     ],
+    [
+      "open-ended checkpoint gaps preserve identity before teaching",
+      /open-ended teaching or retention checkpoint[\s\S]*exact[\s\S]*question ID[\s\S]*node[\s\S]*before teaching/i,
+    ],
     ["agent-led research", /agent (owns|handles).*research.*verification.*fact-check/is],
     ["visible source choice", /discuss.*source (selection|choices).*learner/is],
     ["no per-source approval", /do not require.*per-source approval/i],

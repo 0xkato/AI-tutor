@@ -51,9 +51,17 @@ Then binary-search each prerequisite strand:
 An admitted knowledge gap is not a quiz target. Selecting **I don't know** is
 an admission, not an incorrect attempt. The interactive submission persists it
 without an assessment or grade. Use `record-admitted-gap` only when the learner
-states the gap outside that interaction. Teach the missing mechanism, then
-assess it with a new transfer question or example. Never duplicate the
-admission as incorrect attempts to satisfy a retry gate.
+states the gap outside that interaction. If it answers an active open-ended
+teaching or retention checkpoint, bind the admission to that persisted question
+ID and node. Teach the missing mechanism, then assess it with a new transfer
+question or example. Never duplicate the admission as incorrect attempts to
+satisfy a retry gate.
+
+If the admission occurs at whole-system synthesis, it is not yet localized
+enough to reteach. Ask one bounded open diagnostic question without candidate
+answers, bind the resulting gap to the synthesis question and exact concept
+node with `record-admitted-gap`, repair that concept, and then use a new
+whole-system transfer.
 
 ## 3. Produce the dependency route
 

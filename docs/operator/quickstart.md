@@ -97,6 +97,11 @@ These interactive cards are used during probing and teaching. Retention is not
 graded from recognition-only multiple choice; due reviews use the persisted
 review-checkpoint flow and stronger recall or transfer evidence.
 
+For an open-ended teaching or review checkpoint, **I don't know** is also an
+ungraded admission. The agent persists it against that exact question, teaches
+the missing mechanism, and continues with a new transfer rather than treating
+it as an incorrect answer.
+
 ## Exercise the Pi integration candidate
 
 Until the live-host acceptance record reports an accepted Pi artifact, treat

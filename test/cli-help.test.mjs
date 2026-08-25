@@ -99,6 +99,8 @@ test("admitted-gap help describes ungraded learner evidence without undefined te
   );
 
   assert.equal(commandHelp.status, 0, commandHelp.stderr);
+  assert.match(commandHelp.stdout, /ungraded probe or active-checkpoint gap/i);
+  assert.match(commandHelp.stdout, /--question-id <value>\s+Exact active checkpoint question identifier.*synthesis/);
   assert.match(commandHelp.stdout, /--statement <value>\s+Learner's exact admitted-gap statement/);
   assert.match(commandHelp.stdout, /--evidence <value>\s+Evidence locating the admitted knowledge gap/);
   assert.doesNotMatch(commandHelp.stdout, /undefined/);

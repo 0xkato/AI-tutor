@@ -81,6 +81,11 @@ evidence. Spaced reviews continue through the stricter persisted review
 checkpoint lifecycle with transfer, reconstruction, debugging, or retention
 questions.
 
+If the learner answers an open-ended teaching or retention checkpoint with
+**I don't know**, that admission is persisted against the exact checkpoint
+without a grade. The agent teaches the missing mechanism and then opens a new
+transfer question; the lesson does not strand or fabricate an incorrect answer.
+
 ## Use with Codex
 
 Open this repository in Codex and ask naturally, for example:

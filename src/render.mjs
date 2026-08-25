@@ -150,6 +150,22 @@ export function renderSessionNote(state, session) {
     );
   }
 
+  if (session.checkpointGaps?.length) {
+    lines.push("## Admitted checkpoint gaps", "");
+    session.checkpointGaps.forEach((gap, index) => {
+      lines.push(
+        `### ${index + 1}\. ${headingText(gap.nodeId)}`,
+        "",
+        `- **Stage:** ${listValue(titleCase(gap.stage))}`,
+        `- **Question ID:** ${inlineCode(gap.questionId)}`,
+        `- **Question:** ${listValue(gap.question)}`,
+        `- **Learner statement:** ${listValue(gap.statement)}`,
+        `- **Evidence:** ${listValue(gap.evidence)}`,
+        "",
+      );
+    });
+  }
+
   lines.push("## Questions and learner notes", "");
   if (session.questions?.length) {
     for (const [index, question] of session.questions.entries()) {

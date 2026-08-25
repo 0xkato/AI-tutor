@@ -57,6 +57,7 @@ test("validateState additively upgrades sessions created before later session fi
   assert.equal(validated.sessions["legacy-v2-session"].synthesisRequired, false);
   assert.equal(validated.sessions["legacy-v2-session"].synthesisCheckpoint, null);
   assert.deepEqual(validated.sessions["legacy-v2-session"].admittedGaps, []);
+  assert.deepEqual(validated.sessions["legacy-v2-session"].checkpointGaps, []);
   assert.deepEqual(validated.sessions["legacy-v2-session"].questions, []);
   assert.deepEqual(validated.sessions["legacy-v2-session"].notes, []);
 });

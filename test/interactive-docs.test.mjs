@@ -26,6 +26,7 @@ test("README explains the interactive learning experience in both hosts", () => 
   assert.match(readme, /adaptive[\s\S]*parent[\s\S]*reason/i);
   assert.match(readme, /Obsidian[\s\S]*question[\s\S]*note/i);
   assert.match(readme, /recognition alone[\s\S]*not durable retention/i);
+  assert.match(readme, /open-ended teaching or retention checkpoint[\s\S]*I don['’]t know[\s\S]*without a grade/i);
   assert.doesNotMatch(readme, /implementation is dependency-free/i);
 });
 
@@ -46,6 +47,7 @@ test("operator quickstart tells a learner what they will see and how to answer",
   assert.match(quickstart, /Codex[\s\S]*numbered/i);
   assert.match(quickstart, /vault[\s\S]*question[\s\S]*note/i);
   assert.match(quickstart, /retention[\s\S]*not[\s\S]*recognition-only multiple choice/i);
+  assert.match(quickstart, /open-ended teaching or review checkpoint[\s\S]*I don['’]t know[\s\S]*ungraded admission/i);
 });
 
 test("state format documents schema v4 profile, interactive records, and migration", () => {
@@ -56,4 +58,5 @@ test("state format documents schema v4 profile, interactive records, and migrati
   assert.match(format, /learnerProfile[\s\S]*teaching[\s\S]*preferences/i);
   assert.match(format, /question[\s\S]*response[\s\S]*learner note/i);
   assert.match(format, /answer key[\s\S]*redact/i);
+  assert.match(format, /checkpointGaps[\s\S]*teaching, retention, or[\s\S]*synthesis/i);
 });

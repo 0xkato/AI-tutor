@@ -55,7 +55,7 @@ const commands = [
   ["set-profile", "Update one or more learner teaching preferences"],
   ["start", "Start a learning session from a learner-supplied target"],
   ["record-probe", "Record one diagnostic question and assessment"],
-  ["record-admitted-gap", "Record a learner-stated gap without grading it"],
+  ["record-admitted-gap", "Record an ungraded probe or active-checkpoint gap"],
   ["start-question", "Persist a multiple-choice item before showing it"],
   ["pending-question", "Show the unresolved question without its answer key"],
   ["answer-question", "Persist a selected answer and optional learner note"],
@@ -110,7 +110,7 @@ const COMMAND_OPTIONS = {
     "mistake-type",
     "contaminated",
   ],
-  "record-admitted-gap": ["id", "node", "statement", "evidence"],
+  "record-admitted-gap": ["id", "question-id", "node", "statement", "evidence"],
   "start-question": [
     "id",
     "stage",
@@ -271,6 +271,7 @@ const OPTION_DESCRIPTIONS = {
 };
 const COMMAND_OPTION_DESCRIPTIONS = {
   "record-admitted-gap": {
+    "question-id": "Exact active checkpoint question identifier (teach, retention, or synthesis)",
     statement: "Learner's exact admitted-gap statement",
     evidence: "Evidence locating the admitted knowledge gap",
   },
@@ -580,6 +581,7 @@ function commandResult(command, options, root) {
     if (command === "record-admitted-gap") {
       return recordAdmittedGap(current, {
         id: last(options, "id"),
+        questionId: last(options, "question-id"),
         nodeId: last(options, "node"),
         statement: last(options, "statement"),
         evidence: last(options, "evidence"),

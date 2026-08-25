@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   bindConceptToSession,
   bindPlanConcepts,
+  conceptForNode,
   createConceptForSession,
   knowledgeForSession,
   registerTopic,
@@ -140,6 +141,7 @@ export function startSession(state, input) {
     completedAt: null,
     probeSummary: "",
     admittedGaps: [],
+    checkpointGaps: [],
     assessments: [],
     questions: [],
     notes: [],
@@ -165,6 +167,9 @@ export function startSession(state, input) {
 
 export function recordAdmittedGap(state, input = {}) {
   const id = safeIdentifier(input.id ?? randomUUID(), "admitted gap id");
+  const questionId = input.questionId === undefined
+    ? undefined
+    : safeIdentifier(input.questionId, "checkpoint question ID");
   const nodeId = safeSingleLine(input.nodeId, "nodeId", { maxLength: 512 });
   const statement = safeText(input.statement, "admitted gap statement");
   const evidence = safeText(input.evidence, "admitted gap evidence");
@@ -179,18 +184,172 @@ export function recordAdmittedGap(state, input = {}) {
   return updateActiveSession(
     state,
     (session, next) => {
-      if (session.phase !== "probe") {
-        throw new LearningError(
-          `Cannot record an admitted gap during ${session.phase}`,
-          "INVALID_PHASE",
-        );
-      }
       const duplicateId = Object.values(next.sessions).some((candidate) =>
-        candidate.admittedGaps?.some((gap) => gap.id === id),
+        candidate.admittedGaps?.some((gap) => gap.id === id) ||
+        candidate.checkpointGaps?.some((gap) => gap.id === id),
       );
       if (duplicateId) {
         throw new LearningError(`Admitted gap already exists: ${id}`, "DUPLICATE_ADMITTED_GAP");
       }
+
+      const synthesisCheckpoint = session.synthesisCheckpoint;
+      const synthesisIsActive =
+        ["teach", "review"].includes(session.phase) &&
+        synthesisCheckpoint &&
+        ["awaiting-answer", "retry-required"].includes(synthesisCheckpoint.status);
+      if (synthesisIsActive) {
+        if (questionId !== undefined && questionId !== synthesisCheckpoint.questionId) {
+          throw new LearningError(
+            `Admitted gap must preserve synthesis question ${synthesisCheckpoint.questionId} exactly`,
+            "CHECKPOINT_IDENTITY_MISMATCH",
+          );
+        }
+        const concept = conceptForNode(next, session, nodeId);
+        const reviewItem = session.kind === "review"
+          ? session.reviewItems.find((candidate) => candidate.conceptId === concept.id)
+          : null;
+        if (session.kind === "review" && !reviewItem) {
+          throw new LearningError(
+            "Synthesis admitted gap must identify a concept selected for this review",
+            "CHECKPOINT_IDENTITY_MISMATCH",
+          );
+        }
+
+        const attempts = Math.max(synthesisCheckpoint.attempts, concept.retry?.attempts ?? 0);
+        concept.status = "gap";
+        concept.retry = {
+          status: "new-transfer-required",
+          questionId: synthesisCheckpoint.questionId,
+          attempts,
+          required: false,
+          answerMayBeTaught: true,
+          requiresNewTransfer: true,
+          priorQuestionId: synthesisCheckpoint.questionId,
+          mistakeType: "admitted-gap",
+        };
+        concept.updatedAt = createdAt;
+        session.checkpointGaps.push({
+          id,
+          stage: "synthesis",
+          nodeId,
+          conceptId: concept.id,
+          questionId: synthesisCheckpoint.questionId,
+          question: synthesisCheckpoint.question,
+          kind: "synthesis",
+          statement,
+          evidence,
+          createdAt,
+        });
+        Object.assign(synthesisCheckpoint, {
+          status: "new-transfer-required",
+          priorQuestionId: synthesisCheckpoint.questionId,
+          attempts,
+          resolvedEvidenceId: null,
+          mistakeType: "admitted-gap",
+        });
+        if (session.kind === "review") {
+          reviewItem.status = "repair-required";
+          session.checkpoint = {
+            status: "new-transfer-required",
+            nodeId,
+            questionId: synthesisCheckpoint.questionId,
+            question: synthesisCheckpoint.question,
+            kind: "synthesis",
+            priorQuestionId: synthesisCheckpoint.questionId,
+            attempts,
+            resolvedEvidenceId: null,
+            mistakeType: "admitted-gap",
+          };
+        } else {
+          session.frontier = nextFrontier(session.plan, knowledgeForSession(next, session));
+        }
+        return;
+      }
+
+      if (session.phase !== "probe") {
+        const stage = session.kind === "review" && session.phase === "review"
+          ? "retention"
+          : session.kind === "learn" && session.phase === "teach"
+            ? "teach"
+            : null;
+        const checkpoint = session.checkpoint;
+        if (!stage || !checkpoint || !["awaiting-answer", "retry-required"].includes(checkpoint.status)) {
+          throw new LearningError(
+            `Cannot record an admitted gap during ${session.phase}`,
+            "INVALID_PHASE",
+          );
+        }
+        if (
+          checkpoint.nodeId !== nodeId ||
+          (questionId !== undefined && questionId !== checkpoint.questionId)
+        ) {
+          throw new LearningError(
+            `Admitted gap must preserve checkpoint question ${checkpoint.questionId} exactly`,
+            "CHECKPOINT_IDENTITY_MISMATCH",
+          );
+        }
+
+        const concept = conceptForNode(next, session, nodeId);
+        if (stage === "teach") {
+          const step = session.steps.find((candidate) => candidate.id === session.activeStepId);
+          if (
+            !step ||
+            step.nodeId !== checkpoint.nodeId ||
+            step.checkpointQuestionId !== checkpoint.questionId ||
+            step.checkpointQuestion !== checkpoint.question ||
+            step.checkpointKind !== checkpoint.kind
+          ) {
+            throw new LearningError(
+              "Teach-stage admitted gap does not match the active teaching checkpoint",
+              "CHECKPOINT_IDENTITY_MISMATCH",
+            );
+          }
+        } else {
+          const item = session.reviewItems.find((candidate) => candidate.conceptId === concept.id);
+          if (!item || ["resolved", "deferred"].includes(item.status)) {
+            throw new LearningError(
+              "Retention admitted gap does not match an open selected review item",
+              "CHECKPOINT_IDENTITY_MISMATCH",
+            );
+          }
+          item.status = "repair-required";
+        }
+
+        const attempts = Math.max(checkpoint.attempts, concept.retry?.attempts ?? 0);
+        concept.status = "gap";
+        concept.retry = {
+          status: "new-transfer-required",
+          questionId: checkpoint.questionId,
+          attempts,
+          required: false,
+          answerMayBeTaught: true,
+          requiresNewTransfer: true,
+          priorQuestionId: checkpoint.questionId,
+          mistakeType: "admitted-gap",
+        };
+        concept.updatedAt = createdAt;
+        session.checkpointGaps.push({
+          id,
+          stage,
+          nodeId,
+          conceptId: concept.id,
+          questionId: checkpoint.questionId,
+          question: checkpoint.question,
+          kind: checkpoint.kind,
+          statement,
+          evidence,
+          createdAt,
+        });
+        Object.assign(checkpoint, {
+          status: "new-transfer-required",
+          priorQuestionId: checkpoint.questionId,
+          attempts,
+          resolvedEvidenceId: null,
+          mistakeType: "admitted-gap",
+        });
+        return;
+      }
+
       if (session.admittedGaps.some((gap) => gap.nodeId === nodeId)) {
         throw new LearningError(
           `An admitted gap is already recorded for: ${nodeId}`,

@@ -374,6 +374,29 @@ function validateSession(
     stateInstant(gap.createdAt, `${gapLabel}.createdAt`);
   }
 
+  for (const [index, gap] of array(session.checkpointGaps, `${label}.checkpointGaps`).entries()) {
+    const gapLabel = `${label}.checkpointGaps[${index}]`;
+    object(gap, gapLabel);
+    text(gap.id, `${gapLabel}.id`);
+    if (globalAdmittedGapIds.has(gap.id)) invalid(`duplicate admitted gap ID: ${gap.id}`);
+    globalAdmittedGapIds.add(gap.id);
+    oneOf(gap.stage, new Set(["teach", "retention", "synthesis"]), `${gapLabel}.stage`);
+    text(gap.nodeId, `${gapLabel}.nodeId`);
+    text(gap.conceptId, `${gapLabel}.conceptId`);
+    text(gap.questionId, `${gapLabel}.questionId`);
+    text(gap.question, `${gapLabel}.question`);
+    text(gap.kind, `${gapLabel}.kind`);
+    text(gap.statement, `${gapLabel}.statement`);
+    text(gap.evidence, `${gapLabel}.evidence`);
+    stateInstant(gap.createdAt, `${gapLabel}.createdAt`);
+    if (
+      (session.kind === "learn" && !["teach", "synthesis"].includes(gap.stage)) ||
+      (session.kind === "review" && !["retention", "synthesis"].includes(gap.stage))
+    ) {
+      invalid(`${gapLabel}.stage does not match the session kind`);
+    }
+  }
+
   for (const [index, assessment] of array(session.assessments, `${label}.assessments`).entries()) {
     validateAssessment(assessment, `${label}.assessments[${index}]`, globalAssessmentIds);
   }
@@ -732,6 +755,7 @@ export function validateState(value) {
     if (!session || typeof session !== "object" || Array.isArray(session)) continue;
     if (!("reviewItems" in session)) session.reviewItems = [];
     if (!("admittedGaps" in session)) session.admittedGaps = [];
+    if (!("checkpointGaps" in session)) session.checkpointGaps = [];
     if (!("questions" in session)) session.questions = [];
     if (!("notes" in session)) session.notes = [];
     if (!("synthesisRequired" in session)) session.synthesisRequired = false;
@@ -820,6 +844,17 @@ export function validateState(value) {
         concept.topicId !== session.topicId
       ) {
         invalid(`sessions.${id} admitted gap ${gap.id} has an invalid concept binding`);
+      }
+    }
+    for (const gap of session.checkpointGaps) {
+      const concept = state.concepts[gap.conceptId];
+      if (
+        !concept ||
+        !session.conceptIds.includes(gap.conceptId) ||
+        concept.key !== gap.nodeId ||
+        concept.topicId !== session.topicId
+      ) {
+        invalid(`sessions.${id} checkpoint gap ${gap.id} has an invalid concept binding`);
       }
     }
     if (session.plan) {

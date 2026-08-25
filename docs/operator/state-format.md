@@ -34,6 +34,13 @@ Unspecified fields survive later partial updates. Both hosts receive the
 profile through `context --json`, and the derived vault renders it to
 `Profile.md`.
 
+The additive version-4 session record also contains `checkpointGaps`. Each
+entry binds an ungraded learner admission to the exact teaching, retention, or
+synthesis checkpoint question, node, concept, statement, evidence, and event
+time. This is distinct from `admittedGaps`, which describes the probe-time
+diagnostic frontier. Existing version-4 sessions without the collection read
+as an empty list.
+
 Do not edit canonical JSON by hand. Use the CLI or the shared host skill.
 
 ## Render manifest
