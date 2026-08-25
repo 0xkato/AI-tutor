@@ -47,7 +47,7 @@ try {
       "Diagnostics: npm run doctor",
       "Codex: open this repository and ask it to teach a specific target.",
       report.runtime.piMinimumSatisfied
-        ? "Pi: launch Pi here, then run /teach <your learning target> (Pi 0.84 requires Node.js 22.19 or newer)."
+        ? "Pi: run npm run pi here, then enter /teach <your learning target> (Pi 0.84 requires Node.js 22.19 or newer)."
         : "Pi: upgrade to Node.js 22.19 or newer before launching Pi 0.84.",
       "Pi project default: OpenAI Codex / gpt-5.5 (override with /model or Pi CLI flags).",
       "Pi host authentication and live quiz controls: not checked by setup.",

@@ -22,6 +22,7 @@ files are still verified so switching hosts later uses the same durable state.
 Run from the repository root:
 
 ```bash
+npm ci
 npm run setup
 ```
 
@@ -51,7 +52,13 @@ because diagnostics do not impersonate a learner in the live terminal UI.
 ## Start learning immediately
 
 The built-in defaults are active after setup; no learner-profile configuration
-is required. In Pi, start with a learning target:
+is required. Launch the pinned repository-owned Pi version:
+
+```bash
+npm run pi
+```
+
+Then start with a learning target inside Pi:
 
 ```text
 /teach Understand why gradient descent subtracts the gradient

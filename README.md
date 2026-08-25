@@ -14,6 +14,7 @@ or hosted database is required.
 From a fresh clone on macOS:
 
 ```bash
+npm ci
 npm run setup
 npm run doctor -- --json
 ```
@@ -27,8 +28,14 @@ them.
 
 ## Start learning
 
-The complete adaptive teaching protocol is active immediately. In Pi, start
-with the learning target:
+The complete adaptive teaching protocol is active immediately. Launch the
+repository-owned Pi version from the repository root:
+
+```bash
+npm run pi
+```
+
+Then start with the learning target inside Pi:
 
 ```text
 /teach Understand why gradient descent subtracts the gradient

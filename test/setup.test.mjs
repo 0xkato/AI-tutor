@@ -35,6 +35,12 @@ function ownerOnly(file) {
   return (fs.statSync(file).mode & 0o077) === 0;
 }
 
+test("the repository owns a pinned Pi CLI launcher", () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(sourceRoot, "package.json"), "utf8"));
+  assert.equal(manifest.scripts.pi, "pi");
+  assert.equal(manifest.devDependencies["@earendil-works/pi-coding-agent"], "0.84.2");
+});
+
 test("one-command setup works from a fresh path with spaces and prints portable host steps", () => {
   const parent = tempRoot();
   const releaseRoot = path.join(parent, "fresh adaptive learner");
@@ -53,6 +59,7 @@ test("one-command setup works from a fresh path with spaces and prints portable 
   assert.match(setup.stdout, /Pi/);
   assert.match(setup.stdout, /Profile\.md/);
   assert.match(setup.stdout, /Built-in teaching defaults: active/i);
+  assert.match(setup.stdout, /npm run pi/);
   assert.match(setup.stdout, /Pi:[^\n]*\/teach <your learning target>/i);
   assert.match(setup.stdout, /Pi project default:[^\n]*OpenAI Codex[^\n]*gpt-5\.5/i);
   assert.match(setup.stdout, /Pi host authentication and live quiz controls:[^\n]*not checked/i);
