@@ -10,6 +10,7 @@ import { doctor } from "../src/doctor.mjs";
 import { LearningError } from "../src/errors.mjs";
 import { exportLearnerRecord } from "../src/export.mjs";
 import { inspectVisual, safeVaultDir } from "../src/inputs.mjs";
+import { submitQuestion } from "../src/interactive.mjs";
 import {
   addSource,
   addVisual,
@@ -23,6 +24,14 @@ import {
   startSession,
 } from "../src/model.mjs";
 import { commitAndRender, repairRender } from "../src/render.mjs";
+import {
+  addLearnerNote,
+  answerQuestion,
+  cancelQuestion,
+  learnerQuestion,
+  questionDefinitionDigest,
+  startQuestion,
+} from "../src/questions.mjs";
 import { dueReviews, shouldSynthesize } from "../src/retention.mjs";
 import {
   closeReviewSession,
@@ -44,6 +53,12 @@ const commands = [
   ["start", "Start a learning session from a learner-supplied target"],
   ["record-probe", "Record one diagnostic question and assessment"],
   ["record-admitted-gap", "Record a learner-stated gap without grading it"],
+  ["start-question", "Persist a multiple-choice item before showing it"],
+  ["pending-question", "Show the unresolved question without its answer key"],
+  ["answer-question", "Persist a selected answer and optional learner note"],
+  ["submit-question", "Atomically persist an answer, note, and deterministic outcome"],
+  ["cancel-question", "Cancel the unresolved question"],
+  ["add-note", "Attach a learner note to a session learning object"],
   ["finish-probe", "Finish diagnosis and record the learner map"],
   ["add-source", "Attach a verified source and supported claim"],
   ["set-plan", "Validate and store a dependency plan"],
@@ -85,6 +100,39 @@ const COMMAND_OPTIONS = {
     "contaminated",
   ],
   "record-admitted-gap": ["id", "node", "statement", "evidence"],
+  "start-question": [
+    "id",
+    "stage",
+    "node",
+    "kind",
+    "question",
+    "mode",
+    "choice",
+    "correct",
+    "explanation",
+    "parent-question-id",
+    "adaptation-reason",
+  ],
+  "pending-question": [],
+  "answer-question": [
+    "question-id",
+    "response-id",
+    "selected",
+    "dont-know",
+    "note-id",
+    "note",
+  ],
+  "submit-question": [
+    "question-id",
+    "response-id",
+    "selected",
+    "dont-know",
+    "note-id",
+    "note",
+    "outcome-id",
+  ],
+  "cancel-question": ["question-id"],
+  "add-note": ["id", "target-type", "target-id", "body"],
   "finish-probe": ["summary"],
   "add-source": ["id", "title", "url", "source-class", "supports", "verification"],
   "set-plan": ["file"],
@@ -138,10 +186,13 @@ const COMMAND_OPTIONS = {
   "close-review": ["synthesis"],
   close: ["gap"],
 };
-const BOOLEAN_OPTIONS = new Set(["json", "contaminated", "help", "check"]);
+const BOOLEAN_OPTIONS = new Set(["json", "contaminated", "dont-know", "help", "check"]);
 const REPEATABLE_OPTIONS = {
   start: new Set(["reuse-concept"]),
   "start-review": new Set(["review"]),
+  "start-question": new Set(["choice", "correct"]),
+  "answer-question": new Set(["selected"]),
+  "submit-question": new Set(["selected"]),
   close: new Set(["gap"]),
 };
 const OPTION_DESCRIPTIONS = {
@@ -166,6 +217,21 @@ const OPTION_DESCRIPTIONS = {
   evidence: "Exact assessment evidence",
   "mistake-type": "Specific mistake category",
   contaminated: "Exclude exposed-answer evidence",
+  mode: "single-select or multi-select",
+  choice: "Choice JSON with stable value, label, and optional description (repeatable)",
+  correct: "Correct stable choice value (repeatable)",
+  explanation: "Post-answer explanation retained by the engine",
+  "parent-question-id": "Prior question that caused this adaptive item",
+  "adaptation-reason": "Why the prior response led to this item",
+  "response-id": "Stable response identifier",
+  selected: "Selected stable choice value (repeatable)",
+  "dont-know": "Record I don't know instead of a guess",
+  "note-id": "Stable optional note identifier",
+  note: "Optional note attached to the answered item",
+  "outcome-id": "Stable assessment or admitted-gap identifier",
+  "target-type": "session, question, concept, or step",
+  "target-id": "Learning object receiving the note",
+  body: "Learner note text",
   summary: "Probe conclusion",
   title: "Source title",
   url: "http(s) URL or local:<reference>",
@@ -300,6 +366,23 @@ function assessmentInput(options, stage) {
   };
 }
 
+function parseChoice(value, index) {
+  try {
+    const choice = JSON.parse(value);
+    if (!choice || typeof choice !== "object" || Array.isArray(choice)) throw new Error("expected an object");
+    return choice;
+  } catch (error) {
+    throw new LearningError(`Invalid --choice ${index + 1}: ${error.message}`, "INVALID_CHOICE");
+  }
+}
+
+function publicSession(session) {
+  return {
+    ...structuredClone(session),
+    questions: (session.questions ?? []).map(learnerQuestion),
+  };
+}
+
 function retryList(state, session) {
   if (!session) return [];
   return Object.values(knowledgeForSession(state, session))
@@ -331,6 +414,10 @@ function statusFor(state) {
             status: item.status,
           })),
           checkpoint: session.checkpoint ?? null,
+          question: session.questions?.length
+            ? learnerQuestion(session.questions.at(-1))
+            : null,
+          noteCount: session.notes?.length ?? 0,
         }
       : null,
   };
@@ -406,6 +493,16 @@ function commandResult(command, options, root) {
   const state = readState(root);
   if (command === "repair-render") return repairRender(root);
   if (command === "status") return statusFor(state);
+  if (command === "pending-question") {
+    const session = getActiveSession(state);
+    const question = [...(session.questions ?? [])]
+      .reverse()
+      .find((candidate) => ["awaiting-answer", "awaiting-assessment", "retry-required"].includes(candidate.status));
+    return {
+      question: question ? learnerQuestion(question) : null,
+      definitionDigest: question ? questionDefinitionDigest(question) : null,
+    };
+  }
   if (command === "due") {
     const reviews = dueReviews(state, { now: last(options, "now") });
     return { reviews, synthesisDue: shouldSynthesize(state, reviews) };
@@ -414,7 +511,7 @@ function commandResult(command, options, root) {
     const session = getActiveSession(state);
     const reviews = dueReviews(state, { now: last(options, "now") });
     return {
-      session,
+      session: publicSession(session),
       retry: retryList(state, session),
       dueReviews: reviews,
       synthesisDue: shouldSynthesize(state, reviews),
@@ -458,6 +555,60 @@ function commandResult(command, options, root) {
         nodeId: last(options, "node"),
         statement: last(options, "statement"),
         evidence: last(options, "evidence"),
+        now: last(options, "now"),
+      });
+    }
+    if (command === "start-question") {
+      return startQuestion(current, {
+        id: last(options, "id"),
+        stage: last(options, "stage"),
+        nodeId: last(options, "node"),
+        kind: last(options, "kind"),
+        question: last(options, "question"),
+        mode: last(options, "mode"),
+        choices: all(options, "choice").map(parseChoice),
+        correctChoiceValues: all(options, "correct"),
+        explanation: last(options, "explanation"),
+        parentQuestionId: last(options, "parent-question-id"),
+        adaptationReason: last(options, "adaptation-reason"),
+        now: last(options, "now"),
+      });
+    }
+    if (command === "answer-question") {
+      return answerQuestion(current, {
+        questionId: last(options, "question-id"),
+        responseId: last(options, "response-id"),
+        selectedChoiceValues: all(options, "selected"),
+        dontKnow: options["dont-know"] === true,
+        noteId: last(options, "note-id"),
+        note: last(options, "note"),
+        now: last(options, "now"),
+      });
+    }
+    if (command === "submit-question") {
+      return submitQuestion(current, {
+        questionId: last(options, "question-id"),
+        responseId: last(options, "response-id"),
+        selectedChoiceValues: all(options, "selected"),
+        dontKnow: options["dont-know"] === true,
+        noteId: last(options, "note-id"),
+        note: last(options, "note"),
+        outcomeId: last(options, "outcome-id"),
+        now: last(options, "now"),
+      });
+    }
+    if (command === "cancel-question") {
+      return cancelQuestion(current, {
+        questionId: last(options, "question-id"),
+        now: last(options, "now"),
+      });
+    }
+    if (command === "add-note") {
+      return addLearnerNote(current, {
+        id: last(options, "id"),
+        targetType: last(options, "target-type"),
+        targetId: last(options, "target-id"),
+        body: last(options, "body"),
         now: last(options, "now"),
       });
     }

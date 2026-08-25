@@ -148,7 +148,7 @@ test("doctor reports state, ownership, backups, render revision, and permissions
   assert.deepEqual(report.state, {
     exists: true,
     valid: true,
-    schemaVersion: 2,
+    schemaVersion: 3,
     revision: 0,
     error: null,
   });

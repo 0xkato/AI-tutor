@@ -65,6 +65,7 @@ function copyReleaseFixture(destination) {
     "src",
     "AGENTS.md",
     "README.md",
+    "package-lock.json",
     "package.json",
   ]) {
     const source = path.join(repoRoot, entry);
@@ -100,6 +101,7 @@ try {
 
   announce(stageNames[2]);
   const jsonFiles = [
+    path.join(repoRoot, "package-lock.json"),
     path.join(repoRoot, "package.json"),
     ...filesWithExtensions(path.join(repoRoot, ".pi"), new Set([".json"])),
     ...filesWithExtensions(path.join(repoRoot, "examples"), new Set([".json"])),

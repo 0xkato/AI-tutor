@@ -11,9 +11,23 @@ Do not ask the learner to redesign behavior already fixed by this protocol.
 
 ## 2. Locate the knowledge frontier
 
-Start with a broad probe that samples the major prerequisite branches. A useful
-probe asks the learner to explain a mechanism, predict an outcome, reconstruct
-a relationship, apply it to a new case, or debug a broken model.
+For a new target, the first broad probe is a persisted multiple-choice question
+that samples a major prerequisite branch. Every multiple-choice interaction
+offers **I don't know** and an optional note on the same interaction as the
+question and answer. Recognition is calibration evidence, not mastery.
+
+In Pi, call `adaptive_learning_quiz`; it persists the question, response, note,
+and assessment before returning feedback. Do not duplicate those mutations.
+In Codex, render a compact numbered card only after `start-question` succeeds,
+accept a numbered answer or `I don't know` plus optional `Note: ...`, then run
+`submit-question` before feedback. It atomically persists the response, note,
+and deterministic assessment or probe-stage admitted gap. Never expose the
+stored answer key in the card or context.
+
+After the first question, every question records the exact prior question as
+`--parent-question-id` and the observed reason for the branch as
+`--adaptation-reason`. This applies whether the next question becomes harder,
+backs up to a prerequisite, or transfers after teaching.
 
 Then binary-search each prerequisite strand:
 
@@ -24,10 +38,12 @@ Then binary-search each prerequisite strand:
 4. Stop probing once every important branch has a bounded frontier. Do not
    turn diagnosis into an exhaustive trivia interview.
 
-An admitted knowledge gap is not a quiz target. Persist it with
-`record-admitted-gap` without an assessment or grade, teach the missing
-mechanism before testing it, then assess with a new example. Never duplicate
-the admission as incorrect attempts to satisfy a retry gate.
+An admitted knowledge gap is not a quiz target. Selecting **I don't know** is
+an admission, not an incorrect attempt. The interactive submission persists it
+without an assessment or grade. Use `record-admitted-gap` only when the learner
+states the gap outside that interaction. Teach the missing mechanism, then
+assess it with a new transfer question or example. Never duplicate the
+admission as incorrect attempts to satisfy a retry gate.
 
 ## 3. Produce the dependency route
 
@@ -106,7 +122,18 @@ Prefer an appropriate mix of:
 - debugging a broken mechanism;
 - whole-system synthesis.
 
-Multiple choice may cheaply locate a frontier, but recognition alone supports
-only fragile evidence. Due review results drive spaced retention. Three related
-due nodes or every seventh completed review should trigger a whole-system
-synthesis rather than isolated repetition.
+Multiple choice locates the initial frontier and may cheaply refine it, but
+recognition alone supports only fragile evidence. Later checks should move to
+own-words, prediction, transfer, reconstruction, or debugging evidence. Due
+review results drive spaced retention. Three related due nodes or every seventh
+completed review should trigger a whole-system synthesis rather than isolated
+repetition.
+
+When a correct teaching-stage multiple-choice answer produces
+`new-transfer-required` with `answerMayBeTaught: false`, do not reteach that
+answer. Persist a new checkpoint with a new question ID that asks for durable
+transfer, prediction, reconstruction, or debugging evidence.
+
+The interactive multiple-choice surface is therefore limited to `probe` and
+`teach`. Never label one of its selections as a `retention` assessment. Use the
+persisted review-checkpoint lifecycle for retention evidence.

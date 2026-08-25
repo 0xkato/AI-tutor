@@ -9,6 +9,7 @@ import {
 import { LearningError, requireText } from "./errors.mjs";
 import { nextFrontier } from "./graph.mjs";
 import { updateActiveSession } from "./model.mjs";
+import { bindQuestionAssessment } from "./questions.mjs";
 import { recordReviewAssessment } from "./reviews.mjs";
 
 const GRADES = new Set(["correct", "partial", "incorrect"]);
@@ -362,6 +363,7 @@ export function recordAssessment(state, input) {
       }
 
       session.assessments.push(assessment);
+      bindQuestionAssessment(session, assessment, concept?.retry ?? null);
     },
     { now: assessment.createdAt },
   );

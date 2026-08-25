@@ -116,11 +116,49 @@ node bin/learn.mjs start --root <root> \
   --target "Build a causal introduction" \
   --context "Knows basic calculus"
 
-node bin/learn.mjs record-probe --root <root> \
-  --question-id probe-q1 --node vectors --kind explanation \
-  --question "Which operations define this structure?" \
-  --answer "<learner answer>" --grade correct \
-  --evidence "<specific demonstrated or missing mechanism>"
+# Persist the first multiple-choice probe before displaying it. Each --choice
+# value is JSON with a stable value and learner-facing label.
+node bin/learn.mjs start-question --root <root> \
+  --id probe-q1 --stage probe --node vectors --kind multiple-choice \
+  --question "Which description best matches a vector here?" \
+  --mode single-select \
+  --choice '{"value":"coordinates","label":"An ordered list relative to a basis"}' \
+  --choice '{"value":"derivative","label":"A rule that differentiates functions"}' \
+  --correct coordinates \
+  --explanation "A vector can be represented by coordinates after choosing a basis."
+
+# Read only the redacted learner-facing question.
+node bin/learn.mjs pending-question --root <root> --json
+
+# Atomically persist the learner's selection, optional same-question note, and
+# deterministic assessment before conversational feedback.
+node bin/learn.mjs submit-question --root <root> \
+  --question-id probe-q1 --response-id probe-q1-a1 \
+  --selected coordinates \
+  --note-id probe-q1-note \
+  --note "I remember that the coordinates depend on the chosen basis." \
+  --outcome-id probe-q1-assessment
+
+# Every later question records the response that caused the adaptive branch.
+node bin/learn.mjs start-question --root <root> \
+  --id probe-q2 --stage probe --node basis-dependence --kind multiple-choice \
+  --question "What changes when only the basis changes?" \
+  --mode single-select \
+  --choice '{"value":"vector","label":"The geometric vector itself"}' \
+  --choice '{"value":"coordinates","label":"Its coordinate list"}' \
+  --correct coordinates \
+  --explanation "Coordinates change with the basis while the vector does not." \
+  --parent-question-id probe-q1 \
+  --adaptation-reason "The first answer was correct; test basis dependence."
+
+# I don't know and the probe-stage admitted gap commit atomically without a
+# guess or assessment. Follow with teaching and a new transfer question.
+node bin/learn.mjs submit-question --root <root> \
+  --question-id probe-q2 --response-id probe-q2-gap \
+  --dont-know \
+  --note-id probe-q2-note \
+  --note "I do not yet understand what belongs to the vector versus the basis." \
+  --outcome-id probe-q2-admitted-gap
 
 # When the learner states the gap directly, persist it without grading:
 node bin/learn.mjs record-admitted-gap --root <root> \
@@ -130,6 +168,26 @@ node bin/learn.mjs record-admitted-gap --root <root> \
 
 node bin/learn.mjs finish-probe --root <root> \
   --summary "<demonstrated foundations and bounded gaps>"
+```
+
+Pi uses the `adaptive_learning_quiz` tool for this lifecycle. The tool runs
+`start-question`, collects the selection or **I don't know** and the optional
+note in one modal, then persists the answer plus probe or assessment. Do not
+run the example mutations again for a Pi response.
+
+Codex uses the same engine through the numbered-card fallback. Run
+`start-question` before showing the card and `submit-question` before feedback.
+Show choices as `1`, `2`, and so on, always include `I don't know`, and accept
+an optional line beginning with `Note:` in the same response.
+
+Notes can also be added independently to a session, question, concept, or step:
+
+```bash
+node bin/learn.mjs add-note --root <root> \
+  --id learner-note-1 \
+  --target-type question \
+  --target-id probe-q1 \
+  --body "Connect this back to basis changes during the next explanation."
 ```
 
 Omit identity flags for a genuinely new topic. To continue an existing topic,

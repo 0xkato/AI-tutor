@@ -14,12 +14,16 @@ const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 
 function harness(responses = {}) {
   const commands = new Map();
+  const tools = new Map();
   const messages = [];
   const notifications = [];
   const calls = [];
   const pi = {
     registerCommand(name, command) {
       commands.set(name, command);
+    },
+    registerTool(tool) {
+      tools.set(tool.name, tool);
     },
     sendUserMessage(message, options) {
       messages.push({ message, options });
@@ -40,16 +44,17 @@ function harness(responses = {}) {
     return typeof value === "function" ? value({ command, args, root, calls }) : value;
   };
   createAdaptiveLearningExtension({ runCli })(pi);
-  return { commands, messages, notifications, calls, ctx };
+  return { commands, tools, messages, notifications, calls, ctx };
 }
 
 test("Pi extension registers the chat-first learning commands", () => {
-  const { commands } = harness();
+  const { commands, tools } = harness();
   assert.deepEqual([...commands.keys()], ["teach", "learn-status", "learn-review"]);
   for (const command of commands.values()) {
     assert.equal(typeof command.description, "string");
     assert.equal(typeof command.handler, "function");
   }
+  assert.equal(tools.has("adaptive_learning_quiz"), true);
 });
 
 test("/teach creates a new learner-owned target and expands the shared skill", async () => {

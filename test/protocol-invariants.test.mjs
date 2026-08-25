@@ -216,6 +216,60 @@ test("a second probe miss can enter the permitted teaching repair", () => {
   assert.equal(conceptForNode(state, session, "vectors").retry.status, "new-transfer-required");
 });
 
+test("a correct teaching multiple-choice answer can advance to a new durable transfer checkpoint", () => {
+  let state = setPlan(afterValidProbe(), {
+    plan: {
+      targetNodeId: "linear-functional",
+      nodes: [{ id: "linear-functional", title: "Linear functional" }],
+      edges: [],
+    },
+    now: "2026-08-24T08:02:00.000Z",
+  });
+  state = beginTeach(state, { now: "2026-08-24T08:03:00.000Z" });
+  state = recordStep(state, {
+    id: "recognition-step",
+    nodeId: "linear-functional",
+    foundation: "A linear map preserves vector addition and scalar multiplication.",
+    motivation: "We need a scalar measurement that respects vector structure.",
+    explanation: "A linear functional maps a vector to a scalar linearly.",
+    checkpointQuestionId: "recognition-q1",
+    checkpointKind: "multiple-choice",
+    checkpointQuestion: "Which output type does a linear functional produce?",
+    now: "2026-08-24T08:04:00.000Z",
+  });
+  state = recordAssessment(state, {
+    id: "recognition-a1",
+    questionId: "recognition-q1",
+    nodeId: "linear-functional",
+    stage: "teach",
+    kind: "multiple-choice",
+    question: "Which output type does a linear functional produce?",
+    answer: "A scalar",
+    grade: "correct",
+    evidence: "Selected the scalar output rather than another vector output.",
+    mistakeType: "",
+    now: "2026-08-24T08:05:00.000Z",
+  });
+
+  const concept = conceptForNode(state, getActiveSession(state), "linear-functional");
+  assert.equal(concept.retry.status, "new-transfer-required");
+  assert.equal(concept.retry.answerMayBeTaught, false);
+  state = recordStep(state, {
+    id: "durable-transfer-step",
+    nodeId: "linear-functional",
+    foundation: "The learner already recognized that the output is scalar.",
+    motivation: "Recognition alone does not establish transfer to a new setting.",
+    explanation: "Use the same input-output relationship in an unfamiliar measurement scenario.",
+    checkpointQuestionId: "durable-transfer-q1",
+    checkpointKind: "transfer",
+    checkpointQuestion: "What must a linear temperature sensitivity consume and produce?",
+    now: "2026-08-24T08:06:00.000Z",
+  });
+
+  assert.equal(getActiveSession(state).checkpoint.status, "awaiting-answer");
+  assert.equal(getActiveSession(state).checkpoint.questionId, "durable-transfer-q1");
+});
+
 test("a dependency plan cannot omit a diagnosed retry concept", () => {
   let state = recordAssessment(fresh(), answer({
     grade: "incorrect",

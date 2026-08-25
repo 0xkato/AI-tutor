@@ -27,8 +27,21 @@ The learner supplies the learning target; do not silently replace or broaden it.
 ### New target
 
 - Persist the learner-owned target and relevant prior context.
-- Start with a broad probe, then binary-search each prerequisite strand until
-  the learner's actual edge of understanding is located.
+- Start with a broad probe. For a new target, the first broad probe must be
+  multiple-choice. Every
+  multiple-choice interaction includes an explicit **I don't know** option and
+  an optional note alongside the answer. Then binary-search each prerequisite
+  strand until the learner's actual edge of understanding is located.
+- In Pi, use `adaptive_learning_quiz`. It persists the question, answer, note,
+  and assessment itself; do not duplicate those mutations with separate CLI
+  calls.
+- In Codex, use the numbered-card fallback: run `start-question` and wait until
+  it succeeds before showing the question, then accept one numbered choice or
+  `I don't know` plus an optional `Note: ...`, and run `submit-question` before
+  feedback. That command atomically persists the response, note, and
+  deterministic assessment or probe-stage admitted gap.
+- After the first question, every adaptive child must include
+  `--parent-question-id` and `--adaptation-reason` so the branch is auditable.
 - When the learner explicitly identifies a missing mechanism, persist it with
   `record-admitted-gap` without creating an assessment or grade. Do not use a
   fabricated incorrect answer or duplicate admission to unlock teaching.
@@ -52,8 +65,11 @@ The learner supplies the learning target; do not silently replace or broaden it.
 
 - Assess substantive answers as exactly **Correct**, **Partial**, or
   **Incorrect**, followed by the specific evidence.
-- An admitted gap is diagnostic context, not a substantive answer. Use
-  `record-admitted-gap`, then teach it before testing with a new example.
+- An admitted gap is diagnostic context, not a substantive answer. When the
+  learner selects **I don't know** in an interactive question, let
+  `submit-question` or `adaptive_learning_quiz` persist it, teach the missing
+  mechanism, then test it with a new transfer question or example. Use
+  `record-admitted-gap` for a gap stated outside that interaction.
 - A clarification explains only the missing term or premise and returns to the
   same question.
 - On a first genuine miss, identify the error type, do not reveal the answer,
@@ -61,13 +77,21 @@ The learner supplies the learning target; do not silently replace or broaden it.
 - First-miss feedback may identify where the learner's reasoning broke and its
   error type. It must not state the correct outcome, expected mechanism,
   correct value, corrective steps, or replacement answer wording.
-- After receiving a substantive answer, run `record-assessment` with the exact
-  persisted question and learner answer. Continue only after that command
-  succeeds, and only then send the assessment feedback. If persistence fails,
-  report that failure without presenting a grade or advancing the lesson.
+- After receiving an open-ended substantive answer outside an interactive
+  multiple-choice flow, run `record-assessment` with the exact persisted
+  question and learner answer.
+  Continue only after that command succeeds, and only then send the assessment
+  feedback. If persistence fails, report that failure without presenting a
+  grade or advancing the lesson. `adaptive_learning_quiz` already performs
+  this persistence; do not record its assessment twice.
 - When canonical state requires a retry, reuse the exact persisted question,
   question ID, node, and kind. Never place a different question under the old
   identity to satisfy the retry gate.
+- A correct teaching-stage multiple-choice answer is recognition evidence, not
+  durable transfer. When state returns `new-transfer-required` with
+  `answerMayBeTaught: false`, do not reteach or reveal anything new about that
+  answer. Persist a new `record-step` checkpoint with a new question ID and a
+  durable transfer, prediction, reconstruction, or debugging task.
 - After a second miss permits teaching, teach the missing mechanism and persist
   the replacement transfer as a repair `record-step` with a new question ID,
   exact question text, and kind before asking for or accepting its answer.
@@ -75,6 +99,9 @@ The learner supplies the learning target; do not silently replace or broaden it.
   and use a new transfer question or task.
 - Prefer own-words explanation, prediction, transfer, reconstruction, and
   debugging over recognition-only checks.
+- Use interactive multiple-choice only during `probe` or `teach`. It locates a
+  frontier but does not impersonate durable retention evidence; retention uses
+  the persisted review-checkpoint lifecycle below.
 
 ### Retention and closure
 

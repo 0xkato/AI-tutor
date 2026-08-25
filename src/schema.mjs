@@ -2,12 +2,13 @@ import { LearningError } from "./errors.mjs";
 import { validatePlan } from "./graph.mjs";
 import { safeRelativeVaultPath, safeVaultDir, validateSourceReference } from "./inputs.mjs";
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const SESSION_PHASES = new Set(["probe", "plan", "teach", "review", "complete"]);
 const SESSION_KINDS = new Set(["learn", "review"]);
 const GRADES = new Set(["correct", "partial", "incorrect"]);
 const ASSESSMENT_STAGES = new Set(["probe", "teach", "retention", "synthesis"]);
+const QUESTION_STAGES = new Set(["probe", "teach"]);
 const CONCEPT_STATUSES = new Set(["unknown", "fragile", "gap", "developing", "strong"]);
 const REVIEW_STATUSES = new Set(["inactive", "scheduled", "claimed", "deferred", "complete"]);
 const REVIEW_ITEM_STATUSES = new Set(["pending", "repair-required", "resolved", "deferred"]);
@@ -20,6 +21,17 @@ const CHECKPOINT_STATUSES = new Set([
 ]);
 const RENDER_STATUSES = new Set(["current", "stale", "failed"]);
 const VISUAL_IDENTITY_STATUSES = new Set(["verified", "legacy-unverified"]);
+const QUESTION_STATUSES = new Set([
+  "awaiting-answer",
+  "awaiting-assessment",
+  "retry-required",
+  "resolved",
+  "gap",
+  "cancelled",
+  "contaminated",
+]);
+const QUESTION_MODES = new Set(["single-select", "multi-select"]);
+const NOTE_TARGET_TYPES = new Set(["session", "question", "concept", "step"]);
 
 function invalid(message, code = "INVALID_STATE") {
   throw new LearningError(message, code);
@@ -197,6 +209,116 @@ function validateAssessment(item, label, globalAssessmentIds) {
   stateInstant(item.createdAt, `${label}.createdAt`);
 }
 
+function equalTextSets(left, right) {
+  if (left.length !== right.length) return false;
+  const expected = new Set(right);
+  return left.every((value) => expected.has(value));
+}
+
+function validateQuestion(item, label, questionIds, responseIds) {
+  object(item, label);
+  text(item.id, `${label}.id`);
+  if (questionIds.has(item.id)) invalid(`duplicate question ID: ${item.id}`);
+  questionIds.add(item.id);
+  oneOf(item.stage, QUESTION_STAGES, `${label}.stage`);
+  text(item.nodeId, `${label}.nodeId`);
+  if (item.kind !== "multiple-choice") invalid(`${label}.kind must be multiple-choice`);
+  text(item.question, `${label}.question`);
+  oneOf(item.mode, QUESTION_MODES, `${label}.mode`);
+
+  const choiceValues = new Set();
+  const choices = array(item.choices, `${label}.choices`);
+  if (choices.length < 2 || choices.length > 12) invalid(`${label}.choices must contain 2 to 12 items`);
+  for (const [index, choice] of choices.entries()) {
+    const choiceLabel = `${label}.choices[${index}]`;
+    object(choice, choiceLabel);
+    text(choice.value, `${choiceLabel}.value`);
+    text(choice.label, `${choiceLabel}.label`);
+    nullableText(choice.description, `${choiceLabel}.description`);
+    if (choiceValues.has(choice.value)) invalid(`${label}.choices contains duplicate values`);
+    choiceValues.add(choice.value);
+  }
+  const correctValues = uniqueTextArray(item.correctChoiceValues, `${label}.correctChoiceValues`);
+  if (
+    correctValues.length === 0 ||
+    correctValues.some((value) => !choiceValues.has(value)) ||
+    (item.mode === "single-select" && correctValues.length !== 1)
+  ) {
+    invalid(`${label}.correctChoiceValues do not match the choices and mode`);
+  }
+  text(item.explanation, `${label}.explanation`);
+  oneOf(item.status, QUESTION_STATUSES, `${label}.status`);
+  nullableText(item.parentQuestionId, `${label}.parentQuestionId`);
+  nullableText(item.adaptationReason, `${label}.adaptationReason`);
+  stateInstant(item.createdAt, `${label}.createdAt`);
+  nullableInstant(item.cancelledAt, `${label}.cancelledAt`);
+
+  const responses = array(item.responses, `${label}.responses`);
+  for (const [index, response] of responses.entries()) {
+    const responseLabel = `${label}.responses[${index}]`;
+    object(response, responseLabel);
+    text(response.id, `${responseLabel}.id`);
+    if (responseIds.has(response.id)) invalid(`duplicate response ID: ${response.id}`);
+    responseIds.add(response.id);
+    const selected = uniqueTextArray(
+      response.selectedChoiceValues,
+      `${responseLabel}.selectedChoiceValues`,
+    );
+    if (selected.some((value) => !choiceValues.has(value))) {
+      invalid(`${responseLabel} references an unknown choice`);
+    }
+    if (typeof response.dontKnow !== "boolean") invalid(`${responseLabel}.dontKnow must be boolean`);
+    if (typeof response.correct !== "boolean") invalid(`${responseLabel}.correct must be boolean`);
+    nullableText(response.noteId, `${responseLabel}.noteId`);
+    nullableText(response.assessmentId, `${responseLabel}.assessmentId`);
+    stateInstant(response.createdAt, `${responseLabel}.createdAt`);
+    if (response.dontKnow && selected.length !== 0) {
+      invalid(`${responseLabel} cannot select choices with I don't know`);
+    }
+    if (
+      !response.dontKnow &&
+      ((item.mode === "single-select" && selected.length !== 1) ||
+        (item.mode === "multi-select" && selected.length === 0))
+    ) {
+      invalid(`${responseLabel} selections do not match the question mode`);
+    }
+    const computedCorrect = !response.dontKnow && equalTextSets(selected, correctValues);
+    if (response.correct !== computedCorrect) invalid(`${responseLabel}.correct is inconsistent`);
+  }
+
+  const latest = responses.at(-1) ?? null;
+  if (item.status === "awaiting-answer" && responses.length !== 0) {
+    invalid(`${label} cannot have responses while awaiting its first answer`);
+  }
+  if (
+    item.status === "awaiting-assessment" &&
+    (!latest || latest.dontKnow || latest.assessmentId !== null)
+  ) {
+    invalid(`${label} requires an unassessed response while awaiting assessment`);
+  }
+  if (
+    item.status === "retry-required" &&
+    (!latest || latest.dontKnow || latest.correct || latest.assessmentId === null)
+  ) {
+    invalid(`${label} requires an assessed incorrect response for retry`);
+  }
+  if (
+    ["resolved", "contaminated"].includes(item.status) &&
+    (!latest || latest.dontKnow || latest.assessmentId === null)
+  ) {
+    invalid(`${label} requires an assessed response when ${item.status}`);
+  }
+  if (item.status === "gap" && (!latest || !latest.dontKnow || latest.assessmentId !== null)) {
+    invalid(`${label} requires an ungraded I don't know response for a gap`);
+  }
+  if (item.status === "cancelled" && item.cancelledAt === null) {
+    invalid(`${label}.cancelledAt is required when cancelled`);
+  }
+  if (item.status !== "cancelled" && item.cancelledAt !== null) {
+    invalid(`${label}.cancelledAt requires cancelled status`);
+  }
+}
+
 function validateSession(
   session,
   key,
@@ -246,6 +368,19 @@ function validateSession(
     validateAssessment(assessment, `${label}.assessments[${index}]`, globalAssessmentIds);
   }
 
+  const questionIds = new Set();
+  const responseIds = new Set();
+  for (const [index, question] of array(session.questions, `${label}.questions`).entries()) {
+    validateQuestion(question, `${label}.questions[${index}]`, questionIds, responseIds);
+  }
+  if (
+    session.questions.filter((question) =>
+      ["awaiting-answer", "awaiting-assessment", "retry-required"].includes(question.status),
+    ).length > 1
+  ) {
+    invalid(`${label}.questions contains multiple unresolved questions`);
+  }
+
   for (const [index, source] of array(session.sources, `${label}.sources`).entries()) {
     const sourceLabel = `${label}.sources[${index}]`;
     object(source, sourceLabel);
@@ -282,6 +417,85 @@ function validateSession(
   }
   if (session.activeStepId !== null && !stepIds.has(session.activeStepId)) {
     invalid(`${label}.activeStepId references an unknown step`);
+  }
+
+  const noteIds = new Set();
+  for (const [index, note] of array(session.notes, `${label}.notes`).entries()) {
+    const noteLabel = `${label}.notes[${index}]`;
+    object(note, noteLabel);
+    text(note.id, `${noteLabel}.id`);
+    if (noteIds.has(note.id)) invalid(`${label}.notes contains duplicate ID: ${note.id}`);
+    noteIds.add(note.id);
+    oneOf(note.targetType, NOTE_TARGET_TYPES, `${noteLabel}.targetType`);
+    text(note.targetId, `${noteLabel}.targetId`);
+    text(note.body, `${noteLabel}.body`);
+    stateInstant(note.createdAt, `${noteLabel}.createdAt`);
+    stateInstant(note.updatedAt, `${noteLabel}.updatedAt`);
+    const targetExists =
+      (note.targetType === "session" && note.targetId === session.id) ||
+      (note.targetType === "question" && questionIds.has(note.targetId)) ||
+      (note.targetType === "step" && stepIds.has(note.targetId)) ||
+      (note.targetType === "concept" && session.conceptIds.includes(note.targetId));
+    if (!targetExists) invalid(`${noteLabel} references an unknown session target`);
+  }
+
+  for (const [index, question] of session.questions.entries()) {
+    const questionLabel = `${label}.questions[${index}]`;
+    const eligibleParents = session.questions
+      .slice(0, index)
+      .filter((candidate) => ["resolved", "gap"].includes(candidate.status));
+    if (eligibleParents.length === 0) {
+      if (question.parentQuestionId !== null || question.adaptationReason !== null) {
+        invalid(`${questionLabel} has no eligible adaptive parent`);
+      }
+    } else {
+      const parentIndex = session.questions.findIndex(
+        (candidate) => candidate.id === question.parentQuestionId,
+      );
+      const parent = parentIndex < 0 ? null : session.questions[parentIndex];
+      if (
+        parentIndex < 0 ||
+        parentIndex >= index ||
+        !["resolved", "gap"].includes(parent?.status) ||
+        question.adaptationReason === null
+      ) {
+        invalid(`${questionLabel} requires an earlier adaptive parent and reason`);
+      }
+    }
+    for (const response of question.responses) {
+      if (response.noteId !== null && !noteIds.has(response.noteId)) {
+        invalid(`${questionLabel} response references an unknown note`);
+      }
+      if (response.noteId !== null) {
+        const note = session.notes.find((candidate) => candidate.id === response.noteId);
+        if (note?.targetType !== "question" || note.targetId !== question.id) {
+          invalid(`${questionLabel} response note is bound to a different target`);
+        }
+      }
+      if (response.assessmentId !== null) {
+        const assessment = globalAssessmentIds.get(response.assessmentId);
+        if (
+          !assessment ||
+          assessment.questionId !== question.id ||
+          assessment.question !== question.question ||
+          assessment.kind !== question.kind ||
+          assessment.stage !== question.stage
+        ) {
+          invalid(`${questionLabel} response references an incompatible assessment`);
+        }
+        const expectedGrade = response.correct ? "correct" : "incorrect";
+        if (assessment.grade !== expectedGrade) {
+          invalid(`${questionLabel} response has an inconsistent assessment grade`);
+        }
+        if (
+          response === question.responses.at(-1) &&
+          ["retry-required", "resolved", "contaminated"].includes(question.status) &&
+          assessment.contaminated !== (question.status === "contaminated")
+        ) {
+          invalid(`${questionLabel} status does not match assessment contamination`);
+        }
+      }
+    }
   }
   validateCheckpoint(session.checkpoint, `${label}.checkpoint`);
   validateSynthesisCheckpoint(session.synthesisCheckpoint, `${label}.synthesisCheckpoint`);
@@ -507,6 +721,8 @@ export function validateState(value) {
     if (!session || typeof session !== "object" || Array.isArray(session)) continue;
     if (!("reviewItems" in session)) session.reviewItems = [];
     if (!("admittedGaps" in session)) session.admittedGaps = [];
+    if (!("questions" in session)) session.questions = [];
+    if (!("notes" in session)) session.notes = [];
     if (!("synthesisRequired" in session)) session.synthesisRequired = false;
     if (!("checkpoint" in session)) session.checkpoint = null;
     if (!("synthesisCheckpoint" in session)) session.synthesisCheckpoint = null;

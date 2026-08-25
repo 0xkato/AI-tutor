@@ -4,7 +4,8 @@ A local, chat-first learning system for Codex and Pi. It diagnoses current
 understanding, builds a verified dependency plan, teaches one motivated step at
 a time, schedules retention, and renders every session into an Obsidian vault.
 
-The implementation is dependency-free and requires Node.js 20 or newer.
+The engine requires Node.js 20 or newer. The Pi quiz schema uses the pinned
+`typebox` package; no model SDK or hosted database is required.
 
 ## Install and verify
 
@@ -25,7 +26,7 @@ them.
 
 State the understanding you want. The agent owns the rest of the workflow:
 
-1. probe broadly, then narrow each prerequisite strand to the actual knowledge edge;
+1. start the first broad probe as multiple-choice, then narrow each prerequisite strand to the actual knowledge edge;
 2. research and fact-check the missing route while discussing source choices;
 3. build and validate a Mermaid prerequisite graph;
 4. teach from foundations through one motivated reasoning step at a time;
@@ -34,6 +35,15 @@ State the understanding you want. The agent owns the rest of the workflow:
 
 The learner does not approve sources one by one. Source class, supported claim,
 verification, and limitations remain visible in the conversation and vault.
+Every multiple-choice interaction offers **I don't know** and an optional note
+on the same question. Later questions store their adaptive parent and the reason
+the previous response caused that branch.
+
+The interactive multiple-choice surface is for probing and teaching. It finds
+the learner's frontier, but recognition alone is not durable retention
+evidence. Spaced reviews continue through the stricter persisted review
+checkpoint lifecycle with transfer, reconstruction, debugging, or retention
+questions.
 
 ## Use with Codex
 
@@ -42,7 +52,10 @@ Open this repository in Codex and ask naturally, for example:
 > Teach me why gradient descent subtracts the gradient, starting from what I already know.
 
 `AGENTS.md` routes learning requests to the shared adaptive-learning skill. The
-skill initializes or resumes durable state before probing or teaching.
+skill initializes or resumes durable state before probing or teaching. Codex
+shows a compact numbered-card fallback with the same choices, **I don't know**,
+and an optional `Note:` line. The card and answer use the same canonical state
+as Pi.
 
 ## Use with Pi
 
@@ -63,6 +76,9 @@ Launch Pi from this repository, then use:
 
 The `topic :: target` form is optional. `/teach` with no argument resumes the
 active target. A different target cannot silently overwrite an active session.
+When the model calls `adaptive_learning_quiz`, Pi opens an interactive quiz
+modal. Use the arrow keys to choose, Tab to move to the optional note editor,
+and Enter to submit. The modal saves the question and response before feedback.
 
 Pi is not bundled with this repository. The adapter follows Pi's project-local
 `.agents/skills`, `.pi/extensions`, and `enableSkillCommands` conventions; see
@@ -81,7 +97,8 @@ The vault contains:
 
 - `Home.md` for session navigation;
 - `Sessions/` for the complete target, probe conclusion, graph, sources,
-  teaching steps, assessments, visuals, synthesis, and gaps;
+  teaching steps, question choices and answers, learner notes, assessments,
+  visuals, synthesis, and gaps;
 - `Topics/` for topic history and current evidence;
 - `Reviews.md` for the scheduled retention queue.
 
@@ -98,7 +115,9 @@ node bin/learn.mjs --help
 npm test
 ```
 
-The full lifecycle is `init`, `start`, `record-probe` or
+The full lifecycle is `init`, `start`, `start-question`, `pending-question`,
+`submit-question` (`answer-question` is the lower-level split operation),
+`cancel-question`, `add-note`, `record-probe` or
 `record-admitted-gap`, `finish-probe`,
 `add-source`, `set-plan`, `begin-teach`, `record-step`, `record-assessment`,
 `start-synthesis`, `record-synthesis`, `add-visual`, `status`, `context`, `due`,

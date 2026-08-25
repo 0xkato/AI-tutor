@@ -104,6 +104,8 @@ export function startSession(state, input) {
     probeSummary: "",
     admittedGaps: [],
     assessments: [],
+    questions: [],
+    notes: [],
     conceptIds: [],
     sources: [],
     plan: null,
@@ -329,7 +331,6 @@ export function recordStep(state, input) {
         session.activeStepId !== null &&
         session.checkpoint?.status === "new-transfer-required" &&
         unresolvedRetry?.retry?.status === "new-transfer-required" &&
-        unresolvedRetry.retry.answerMayBeTaught === true &&
         unresolvedRetry.key === step.nodeId;
       const permittedRepair = startingProbeRepair || replacingTeachingCheckpoint;
       if (unresolvedRetry && !permittedRepair) {

@@ -21,16 +21,16 @@ test("parseInstant accepts only canonical ISO instants", () => {
   }
 });
 
-test("validateState accepts and clones a complete version-2 initial state", () => {
+test("validateState accepts and clones a complete version-3 initial state", () => {
   const state = createInitialState({ now: NOW });
   const validated = validateState(state);
 
   assert.deepEqual(validated, state);
   assert.notEqual(validated, state);
-  assert.equal(validated.schemaVersion, 2);
+  assert.equal(validated.schemaVersion, 3);
 });
 
-test("validateState additively upgrades version-2 sessions created before later session fields", () => {
+test("validateState additively upgrades version-3 sessions created before later session fields", () => {
   let state = createInitialState({ now: NOW });
   state = startSession(state, {
     id: "legacy-v2-session",
@@ -42,16 +42,20 @@ test("validateState additively upgrades version-2 sessions created before later 
   delete state.sessions["legacy-v2-session"].synthesisRequired;
   delete state.sessions["legacy-v2-session"].synthesisCheckpoint;
   delete state.sessions["legacy-v2-session"].admittedGaps;
+  delete state.sessions["legacy-v2-session"].questions;
+  delete state.sessions["legacy-v2-session"].notes;
 
   const validated = validateState(state);
   assert.equal(validated.sessions["legacy-v2-session"].synthesisRequired, false);
   assert.equal(validated.sessions["legacy-v2-session"].synthesisCheckpoint, null);
   assert.deepEqual(validated.sessions["legacy-v2-session"].admittedGaps, []);
+  assert.deepEqual(validated.sessions["legacy-v2-session"].questions, []);
+  assert.deepEqual(validated.sessions["legacy-v2-session"].notes, []);
 });
 
-test("validateState rejects structurally incomplete version-2 state", () => {
+test("validateState rejects structurally incomplete version-3 state", () => {
   assert.throws(
-    () => validateState({ schemaVersion: 2, sessions: {} }),
+    () => validateState({ schemaVersion: 3, sessions: {} }),
     (error) => error.code === "INVALID_STATE" && /createdAt/.test(error.message),
   );
 });

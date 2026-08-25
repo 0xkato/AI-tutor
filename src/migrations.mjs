@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { LearningError } from "./errors.mjs";
-import { SCHEMA_VERSION, validateState } from "./schema.mjs";
+import { validateState } from "./schema.mjs";
 
 function stableId(prefix, ...parts) {
   const digest = createHash("sha256").update(parts.join("\u0000")).digest("hex").slice(0, 20);
@@ -154,8 +154,8 @@ export function migrateV1ToV2(value) {
     }
   }
 
-  return validateState({
-    schemaVersion: SCHEMA_VERSION,
+  return {
+    schemaVersion: 2,
     revision: 1,
     createdAt: original.createdAt,
     updatedAt: original.updatedAt,
@@ -167,5 +167,24 @@ export function migrateV1ToV2(value) {
     reviews,
     reviewCount: original.reviewCount ?? 0,
     render: { revision: 0, status: "stale", error: null },
-  });
+  };
+}
+
+export function migrateV2ToV3(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new LearningError("Version-2 state must be an object", "INVALID_STATE");
+  }
+  if (value.schemaVersion !== 2) {
+    throw new LearningError(`Cannot migrate schema version: ${value.schemaVersion}`, "UNSUPPORTED_SCHEMA");
+  }
+
+  const next = structuredClone(value);
+  next.schemaVersion = 3;
+  next.revision = (next.revision ?? 0) + 1;
+  next.render = { revision: next.render?.revision ?? 0, status: "stale", error: null };
+  for (const session of Object.values(next.sessions ?? {})) {
+    session.questions = [];
+    session.notes = [];
+  }
+  return validateState(next);
 }

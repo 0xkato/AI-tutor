@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { LearningError } from "./errors.mjs";
-import { migrateV1ToV2 } from "./migrations.mjs";
+import { migrateV1ToV2, migrateV2ToV3 } from "./migrations.mjs";
 import { createInitialState } from "./model.mjs";
 import { parseInstant, validateState } from "./schema.mjs";
 
@@ -230,10 +230,10 @@ function parseState(paths) {
   }
 }
 
-function backupVersionOne(paths, state) {
+function backupLegacyVersion(paths, state) {
   ensureDirectory(paths.backups);
   const stamp = String(state.updatedAt ?? state.createdAt ?? "unknown").replace(/[^0-9A-Za-z]+/g, "-");
-  const destination = path.join(paths.backups, `state-v1-${stamp}.json`);
+  const destination = path.join(paths.backups, `state-v${state.schemaVersion}-${stamp}.json`);
   if (!fs.existsSync(destination)) {
     const fd = fs.openSync(destination, "wx", 0o600);
     try {
@@ -247,13 +247,14 @@ function backupVersionOne(paths, state) {
 }
 
 function readStateUnlocked(paths, ownership) {
-  const state = parseState(paths);
-  if (state.schemaVersion === 1) {
-    backupVersionOne(paths, state);
-    const migrated = migrateV1ToV2(state);
+  const original = parseState(paths);
+  if (original.schemaVersion === 1 || original.schemaVersion === 2) {
+    backupLegacyVersion(paths, original);
+    const versionTwo = original.schemaVersion === 1 ? migrateV1ToV2(original) : original;
+    const migrated = migrateV2ToV3(versionTwo);
     return writeStateUnlocked(paths, migrated, ownership);
   }
-  return validateState(state);
+  return validateState(original);
 }
 
 function withLock(root, options, operation) {
@@ -309,7 +310,7 @@ export function readState(root, options = {}) {
     throw new LearningError("Learning state is not initialized", "STATE_NOT_INITIALIZED");
   }
   const state = parseState(paths);
-  if (state.schemaVersion !== 1) return validateState(state);
+  if (state.schemaVersion !== 1 && state.schemaVersion !== 2) return validateState(state);
   return withLock(root, options, (lockedPaths, ownership) =>
     readStateUnlocked(lockedPaths, ownership));
 }

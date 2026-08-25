@@ -128,3 +128,66 @@ test("review CLI example preserves checkpoint identity through retry and repair"
     "The review example must persist one checkpoint and record both attempts under its exact identity",
   );
 });
+
+test("new targets begin with a persisted interactive multiple-choice card", () => {
+  const skill = read("SKILL.md");
+  const protocol = read("references/teaching-protocol.md");
+  const cliReference = read("references/cli-reference.md");
+  const corpus = [skill, protocol, cliReference].join("\n");
+
+  requires(
+    corpus,
+    "multiple-choice first",
+    /new target[\s\S]*first broad probe[\s\S]*multiple[- ]choice/i,
+  );
+  requires(
+    corpus,
+    "persist before display",
+    /start-question[\s\S]*succeeds[\s\S]*before[\s\S]*(show|display|present).*question/i,
+  );
+  requires(
+    corpus,
+    "I don't know is always available",
+    /every multiple[- ]choice[\s\S]*I don['’]t know/i,
+  );
+  requires(
+    corpus,
+    "optional note is on the same interaction",
+    /optional note[\s\S]*(same|alongside)[\s\S]*(question|interaction|answer)/i,
+  );
+  requires(
+    corpus,
+    "Pi owns question persistence",
+    /adaptive_learning_quiz[\s\S]*persists[\s\S]*(question|answer|note|assessment)[\s\S]*do not.*duplicate/is,
+  );
+  requires(
+    corpus,
+    "Codex fallback is persisted",
+    /Codex[\s\S]*numbered[\s\S]*start-question[\s\S]*submit-question/is,
+  );
+  requires(
+    corpus,
+    "follow-ups carry adaptive provenance",
+    /after the first question[\s\S]*parent-question-id[\s\S]*adaptation-reason/i,
+  );
+  requires(
+    corpus,
+    "I don't know teaches before testing",
+    /I don['’]t know[\s\S]*record-admitted-gap[\s\S]*teach[\s\S]*new (transfer )?(question|example)/i,
+  );
+});
+
+test("CLI reference demonstrates question, response, and note persistence", () => {
+  const cliReference = read("references/cli-reference.md");
+
+  assert.match(
+    cliReference,
+    /start-question[\s\S]*--choice[\s\S]*--correct[\s\S]*pending-question[\s\S]*submit-question[\s\S]*--selected[\s\S]*--note/is,
+  );
+  assert.match(cliReference, /submit-question[\s\S]*--dont-know[\s\S]*--note/is);
+  assert.match(
+    cliReference,
+    /start-question[\s\S]*--parent-question-id[\s\S]*--adaptation-reason/is,
+  );
+  assert.match(cliReference, /add-note[\s\S]*--target-type[\s\S]*--target-id/is);
+});

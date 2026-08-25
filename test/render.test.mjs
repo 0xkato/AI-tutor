@@ -222,6 +222,98 @@ test("renderSessionNote exposes the active review question before any answer", (
   }
 });
 
+test("renderSessionNote preserves interactive choices, adaptive links, responses, and learner notes", () => {
+  const interactive = structuredClone(state.sessions.s1);
+  interactive.questions = [
+    {
+      id: "probe-attention-q1",
+      stage: "probe",
+      nodeId: "attention",
+      kind: "multiple-choice",
+      question: "What does self-attention change for one token?",
+      mode: "single-select",
+      choices: [
+        { value: "position", label: "Only its position number", description: null },
+        { value: "context", label: "Its representation using other tokens", description: null },
+      ],
+      correctChoiceValues: ["context"],
+      explanation: "Self-attention mixes information from other token representations.",
+      status: "resolved",
+      parentQuestionId: null,
+      adaptationReason: null,
+      responses: [
+        {
+          id: "response-1",
+          selectedChoiceValues: ["context"],
+          dontKnow: false,
+          correct: true,
+          noteId: "note-1",
+          assessmentId: "assessment-1",
+          createdAt: "2026-08-24T08:25:00.000Z",
+        },
+      ],
+      createdAt: "2026-08-24T08:20:00.000Z",
+      cancelledAt: null,
+    },
+    {
+      id: "probe-attention-q2",
+      stage: "probe",
+      nodeId: "attention-weights",
+      kind: "multiple-choice",
+      question: "What determines how strongly one token uses another?",
+      mode: "single-select",
+      choices: [
+        { value: "similarity", label: "Query-key compatibility", description: null },
+        { value: "alphabet", label: "Alphabetical order", description: null },
+      ],
+      correctChoiceValues: ["similarity"],
+      explanation: "Compatibility scores become attention weights after normalization.",
+      status: "awaiting-answer",
+      parentQuestionId: "probe-attention-q1",
+      adaptationReason: "Correct; test the next harder boundary inside attention.",
+      responses: [],
+      createdAt: "2026-08-24T08:30:00.000Z",
+      cancelledAt: null,
+    },
+  ];
+  interactive.notes = [
+    {
+      id: "note-1",
+      targetType: "question",
+      targetId: "probe-attention-q1",
+      body: "This is where a token becomes contextual.",
+      createdAt: "2026-08-24T08:25:00.000Z",
+      updatedAt: "2026-08-24T08:25:00.000Z",
+    },
+    {
+      id: "session-note",
+      targetType: "session",
+      targetId: "s1",
+      body: "Return to query, key, and value roles later.",
+      createdAt: "2026-08-24T08:31:00.000Z",
+      updatedAt: "2026-08-24T08:31:00.000Z",
+    },
+  ];
+
+  const note = renderSessionNote(state, interactive);
+  for (const expected of [
+    "## Questions and learner notes",
+    "What does self-attention change for one token?",
+    "Its representation using other tokens",
+    "Outcome:** Correct",
+    "This is where a token becomes contextual.",
+    "What determines how strongly one token uses another?",
+    "Correct; test the next harder boundary inside attention.",
+    "Outcome:** Awaiting answer",
+    "## Other learner notes",
+    "Return to query, key, and value roles later.",
+  ]) {
+    assert.match(note, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+  assert.doesNotMatch(note, /correctChoiceValues|\*\*Correct answer:\*\*/);
+  assert.doesNotMatch(note, /Compatibility scores become attention weights/);
+});
+
 test("renderVault writes home, session, topic, and review notes", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-vault-"));
   renderVault(root, state);

@@ -150,6 +150,68 @@ export function renderSessionNote(state, session) {
     );
   }
 
+  lines.push("## Questions and learner notes", "");
+  if (session.questions?.length) {
+    for (const [index, question] of session.questions.entries()) {
+      const latest = question.responses.at(-1) ?? null;
+      const labelsByValue = new Map(question.choices.map((choice) => [choice.value, choice.label]));
+      let outcome = titleCase(question.status.replaceAll("-", " "));
+      if (question.status === "resolved" && latest) outcome = latest.correct ? "Correct" : "Incorrect";
+      if (question.status === "retry-required") outcome = "Incorrect — retry required";
+      if (question.status === "gap") outcome = "I don't know";
+      const selected = latest?.dontKnow
+        ? "I don't know"
+        : latest?.selectedChoiceValues?.map((value) => labelsByValue.get(value) ?? value).join(", ") ?? "Not answered";
+      const responseNote = latest?.noteId
+        ? session.notes?.find((note) => note.id === latest.noteId)
+        : null;
+
+      lines.push(
+        `### ${index + 1}\. ${headingText(question.question)}`,
+        "",
+        `- **Question ID:** ${inlineCode(question.id)}`,
+        `- **Stage:** ${listValue(titleCase(question.stage))}`,
+        `- **Node:** ${inlineCode(question.nodeId)}`,
+        `- **Mode:** ${listValue(titleCase(question.mode.replaceAll("-", " ")))}`,
+        `- **Outcome:** ${listValue(outcome)}`,
+        `- **Selected:** ${listValue(selected)}`,
+      );
+      if (question.parentQuestionId) {
+        lines.push(
+          `- **Parent question:** ${inlineCode(question.parentQuestionId)}`,
+          `- **Adaptive reason:** ${listValue(question.adaptationReason)}`,
+        );
+      }
+      lines.push("", "Choices:", "");
+      for (const [choiceIndex, choice] of question.choices.entries()) {
+        const description = choice.description ? ` — ${choice.description}` : "";
+        lines.push(`${choiceIndex + 1}. ${listValue(`${choice.label}${description}`)}`);
+      }
+      if (responseNote) {
+        lines.push("", `- **Learner note:** ${listValue(responseNote.body)}`);
+      }
+      if (question.status === "resolved") {
+        lines.push("", `- **Explanation:** ${listValue(question.explanation)}`);
+      }
+      lines.push("");
+    }
+  } else {
+    lines.push("No interactive questions recorded.", "");
+  }
+
+  lines.push("## Other learner notes", "");
+  const otherNotes = (session.notes ?? []).filter((note) => note.targetType !== "question");
+  if (otherNotes.length) {
+    for (const note of otherNotes) {
+      lines.push(
+        `- **${listValue(titleCase(note.targetType))} ${inlineCode(note.targetId)}:** ${listValue(note.body)}`,
+      );
+    }
+    lines.push("");
+  } else {
+    lines.push("None recorded.", "");
+  }
+
   lines.push("## Assessments", "");
   if (session.assessments?.length) {
     for (const assessment of session.assessments) {

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import test from "node:test";
@@ -34,4 +35,9 @@ test("release check selects test modules without executing process fixtures as t
   assert.equal(selected.length > 0, true);
   assert.equal(selected.every((file) => file.endsWith(".test.mjs")), true);
   assert.equal(selected.some((file) => file.includes("/fixtures/")), false);
+});
+
+test("fresh release fixture includes the locked runtime dependency graph", () => {
+  const source = fs.readFileSync(script, "utf8");
+  assert.match(source, /"package-lock\.json"/);
 });

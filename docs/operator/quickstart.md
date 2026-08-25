@@ -53,7 +53,14 @@ example:
 > Teach me why gradient descent subtracts the gradient, starting from what I already know.
 
 `AGENTS.md` routes the request into the shared adaptive-learning skill. The
-skill reads or initializes durable state before probing.
+skill reads or initializes durable state before probing. The first broad probe
+is multiple-choice. Codex displays a numbered card with the available answers,
+**I don't know**, and an optional `Note:` line. Reply with the number or
+`I don't know`; put `Note: <your note>` on the same response when useful.
+
+These interactive cards are used during probing and teaching. Retention is not
+graded from recognition-only multiple choice; due reviews use the persisted
+review-checkpoint flow and stronger recall or transfer evidence.
 
 ## Exercise the Pi integration candidate
 
@@ -72,10 +79,17 @@ Launch Pi from the repository root, then use:
 `/teach` without an argument resumes the active target. A different target
 cannot silently replace an active session.
 
+The Pi extension provides the interactive version of the same question. Use
+the arrow keys to move between choices, press Tab to edit the optional note,
+then submit. **I don't know** records an admitted gap so the agent teaches the
+missing mechanism before asking a new transfer question.
+
 ## Open the Obsidian view
 
 Open `vault/` as the Obsidian vault. Obsidian is a viewer, not a state
-dependency. Generated Markdown must not be treated as canonical input.
+dependency. Generated Markdown must not be treated as canonical input. Session
+notes show each persisted question, its response, adaptive parent and reason,
+and any learner note attached to that question.
 
 ## Exact local data locations
 
