@@ -43,10 +43,12 @@ original final state bytes, pass every deterministic check, and contain no
 critical failures, but neither has an independent human `pass` verdict. The
 two older local Pi behavioral artifacts retain their critical failures as
 regression evidence. The supported Node 20/22 matrix is verified locally on
-macOS arm64. Private GitHub remote `0xkato/AI-tutor` exists; its hosted matrix
-was attempted on the previous candidate commit but GitHub rejected both jobs
-before any step because recent account payments failed or the spending limit
-must be increased. That is an external CI gate, not a code-test failure.
+macOS arm64. Private GitHub remote `0xkato/AI-tutor` exists and candidate commit
+`c827024a7b4c6b9e4fbdc5eb8258d8c6ce7020b4` is on `main`. Hosted workflow run
+[`32833414368`](https://github.com/0xkato/AI-tutor/actions/runs/32833414368)
+created both Node jobs with zero steps, then GitHub rejected each before it
+started because recent account payments failed or the spending limit must be
+increased. That is an external CI gate, not a code-test failure.
 Version `0.2.0-rc.1` and its changelog now exist. A stable release tag remains
 blocked on the independent human verdicts and an actually executed hosted
 matrix.

@@ -92,7 +92,9 @@ second approval was required.
    replace each `pending` verdict with a justified `pass` or `fail`.
 2. Validate both accepted packages without `--allow-failed`.
 3. Resolve the GitHub account billing/spending-limit block and rerun the
-   committed macOS Node 20/22 matrix. The existing hosted jobs were rejected
-   before any workflow step, so they are not code evidence.
+   committed macOS Node 20/22 matrix. Workflow run
+   [`32833414368`](https://github.com/0xkato/AI-tutor/actions/runs/32833414368)
+   created zero-step jobs for release-candidate commit `c827024`; both were
+   rejected before any workflow step, so they are not code evidence.
 4. Version `0.2.0-rc.1` and its changelog are present. Create an annotated
    stable tag only after the human verdicts and hosted matrix pass.
