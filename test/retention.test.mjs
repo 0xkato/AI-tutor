@@ -7,6 +7,7 @@ import {
   shouldSynthesize,
   synthesisRequiredForSelection,
 } from "../src/retention.mjs";
+import { buildInterleavedPracticeQueue } from "../src/learning-strategy.mjs";
 import { createInitialState } from "../src/model.mjs";
 
 const now = "2026-08-24T08:00:00.000Z";
@@ -25,6 +26,78 @@ test("correct transfer evidence advances expanding review intervals", () => {
   assert.equal(review.level, 2);
   assert.equal(review.dueAt, "2026-08-28T08:00:00.000Z");
   assert.equal(review.completed, 2);
+  assert.equal(review.stabilityDays, 3);
+  assert.equal(review.history.length, 2);
+});
+
+test("missing performance metrics preserve the exact neutral interval prior", () => {
+  const review = advanceReview(
+    { level: 2, dueAt: now, completed: 2, stabilityDays: 3, difficulty: 50, lapses: 0, history: [] },
+    { id: "neutral-a1", grade: "correct", kind: "retention", now },
+  );
+  assert.equal(review.dueAt, "2026-08-31T08:00:00.000Z");
+  assert.equal(review.stabilityDays, 7);
+  assert.equal(review.difficulty, 50);
+});
+
+test("a high-confidence lapse increases difficulty and resets stability", () => {
+  const review = advanceReview(
+    { level: 4, dueAt: now, completed: 4, stabilityDays: 14, difficulty: 45, lapses: 0, history: [] },
+    {
+      id: "lapse-a1",
+      grade: "incorrect",
+      kind: "retention",
+      confidence: 95,
+      responseTimeMs: 8_000,
+      attemptCount: 1,
+      supportLevel: 0,
+      now,
+    },
+  );
+  assert.equal(review.level, 0);
+  assert.equal(review.dueAt, "2026-08-25T08:00:00.000Z");
+  assert.equal(review.stabilityDays, 0);
+  assert.equal(review.difficulty, 65);
+  assert.equal(review.lapses, 1);
+  assert.equal(review.history[0].confidence, 95);
+});
+
+test("fast confident independent retrieval lengthens the next interval", () => {
+  const review = advanceReview(
+    { level: 2, dueAt: now, completed: 2, stabilityDays: 3, difficulty: 50, lapses: 0, history: [] },
+    {
+      id: "fast-a1",
+      grade: "correct",
+      kind: "retention",
+      confidence: 90,
+      responseTimeMs: 10_000,
+      attemptCount: 1,
+      supportLevel: 0,
+      now,
+    },
+  );
+  assert.equal(review.dueAt, "2026-09-02T08:00:00.000Z");
+  assert.equal(review.stabilityDays, 9);
+  assert.equal(review.difficulty, 45);
+});
+
+test("slow or supported retrieval shortens the next interval", () => {
+  const review = advanceReview(
+    { level: 2, dueAt: now, completed: 2, stabilityDays: 3, difficulty: 50, lapses: 0, history: [] },
+    {
+      id: "supported-a1",
+      grade: "correct",
+      kind: "retention",
+      confidence: 60,
+      responseTimeMs: 120_000,
+      attemptCount: 2,
+      supportLevel: 2,
+      now,
+    },
+  );
+  assert.equal(review.dueAt, "2026-08-29T08:00:00.000Z");
+  assert.equal(review.stabilityDays, 5);
+  assert.equal(review.difficulty, 58);
 });
 
 test("partial evidence regresses one level and is due next day", () => {
@@ -87,6 +160,28 @@ test("dueReviews returns due nodes in chronological order", () => {
     dueReviews(state, { now }).map((item) => item.nodeId),
     ["first", "later"],
   );
+});
+
+test("practice queue interleaves topics and prioritizes active misconceptions", () => {
+  const due = [
+    { reviewId: "r-a1", conceptId: "c-a1", topicId: "a", dueAt: "2026-08-20T08:00:00.000Z" },
+    { reviewId: "r-a2", conceptId: "c-a2", topicId: "a", dueAt: "2026-08-21T08:00:00.000Z" },
+    { reviewId: "r-b1", conceptId: "c-b1", topicId: "b", dueAt: "2026-08-22T08:00:00.000Z" },
+  ];
+  const state = {
+    concepts: {
+      "c-a1": { id: "c-a1", misconceptionIds: [] },
+      "c-a2": { id: "c-a2", misconceptionIds: ["m-a2"] },
+      "c-b1": { id: "c-b1", misconceptionIds: [] },
+    },
+    misconceptions: { "m-a2": { id: "m-a2", status: "active" } },
+  };
+
+  const queue = buildInterleavedPracticeQueue(state, due);
+  assert.deepEqual(queue.map((item) => item.reviewId), ["r-a2", "r-b1", "r-a1"]);
+  assert.equal(queue[0].activityType, "contrastive-review");
+  assert.equal(queue[1].activityType, "retrieval-review");
+  assert.deepEqual(queue.map((item) => item.position), [1, 2, 3]);
 });
 
 test("a review selection predicts the seventh-review and related-concept synthesis gates", () => {

@@ -348,3 +348,37 @@ export function recommendNextActivity(state, session, nodeId) {
     { supportLevel: 0, transferLevel },
   );
 }
+
+export function buildInterleavedPracticeQueue(state, due = []) {
+  const activeMisconception = (item) => {
+    const concept = state.concepts?.[item.conceptId];
+    return concept?.misconceptionIds?.some(
+      (id) => state.misconceptions?.[id]?.status === "active",
+    ) ?? false;
+  };
+  const pending = due
+    .map((item) => ({ ...item, hasActiveMisconception: activeMisconception(item) }))
+    .sort(
+      (left, right) =>
+        Number(right.hasActiveMisconception) - Number(left.hasActiveMisconception) ||
+        new Date(left.dueAt).getTime() - new Date(right.dueAt).getTime() ||
+        left.reviewId.localeCompare(right.reviewId),
+    );
+  const ordered = [];
+  let previousTopic = null;
+  while (pending.length > 0) {
+    let index = pending.findIndex((item) => item.topicId !== previousTopic);
+    if (index < 0) index = 0;
+    const [item] = pending.splice(index, 1);
+    ordered.push(item);
+    previousTopic = item.topicId;
+  }
+  return ordered.map(({ hasActiveMisconception, ...item }, index) => ({
+    ...item,
+    position: index + 1,
+    activityType: hasActiveMisconception ? "contrastive-review" : "retrieval-review",
+    reason: hasActiveMisconception
+      ? "An active misconception makes contrastive retrieval the highest-value review."
+      : "The queue alternates topics where possible to strengthen discrimination and cumulative recall.",
+  }));
+}

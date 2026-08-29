@@ -210,8 +210,13 @@ export function recordConceptAssessment(
   if (scheduleReview && DURABLE_KINDS.has(assessment.kind)) {
     const review = state.reviews[concept.reviewId];
     const advanced = advanceReview(review, {
+      evidenceId: assessment.id,
       grade: assessment.grade,
       kind: assessment.kind,
+      confidence: assessment.confidence,
+      responseTimeMs: assessment.responseTimeMs,
+      attemptCount: retry?.attempts ?? 1,
+      supportLevel: assessment.supportLevel,
       now: assessment.createdAt,
     });
     Object.assign(review, advanced, {

@@ -375,9 +375,17 @@ export function closeReviewSession(state, { synthesis, now } = {}) {
           );
         }
         if (item.status === "resolved") {
+          const outcomeAssessment = item.evidenceIds
+            .map((evidenceId) => session.assessments.find((assessment) => assessment.id === evidenceId))
+            .find((assessment) => assessment?.grade === item.outcomeGrade);
           const advanced = advanceReview(review, {
+            evidenceId: outcomeAssessment?.id ?? item.evidenceIds[0],
             grade: item.outcomeGrade,
             kind: "retention",
+            confidence: outcomeAssessment?.confidence ?? null,
+            responseTimeMs: outcomeAssessment?.responseTimeMs ?? null,
+            attemptCount: item.evidenceIds.length,
+            supportLevel: outcomeAssessment?.supportLevel ?? null,
             now: closedAt,
           });
           Object.assign(review, advanced, {

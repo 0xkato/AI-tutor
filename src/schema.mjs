@@ -922,7 +922,15 @@ function validateReviews(state) {
       object(entry, entryLabel);
       text(entry.evidenceId, `${entryLabel}.evidenceId`);
       oneOf(entry.grade, GRADES, `${entryLabel}.grade`);
+      text(entry.kind, `${entryLabel}.kind`);
+      if (entry.confidence !== null) boundedInteger(entry.confidence, `${entryLabel}.confidence`, 100);
+      if (entry.responseTimeMs !== null) integer(entry.responseTimeMs, `${entryLabel}.responseTimeMs`);
+      if (entry.attemptCount !== null) integer(entry.attemptCount, `${entryLabel}.attemptCount`);
+      if (entry.supportLevel !== null) boundedInteger(entry.supportLevel, `${entryLabel}.supportLevel`, 4);
       integer(entry.intervalDays, `${entryLabel}.intervalDays`);
+      integer(entry.stabilityDays, `${entryLabel}.stabilityDays`);
+      boundedInteger(entry.difficulty, `${entryLabel}.difficulty`, 100);
+      integer(entry.lapses, `${entryLabel}.lapses`);
       nullableInstant(entry.dueAt, `${entryLabel}.dueAt`);
       stateInstant(entry.createdAt, `${entryLabel}.createdAt`);
     });
@@ -1052,6 +1060,19 @@ export function validateState(value) {
     if (!("difficulty" in review)) review.difficulty = 50;
     if (!("lapses" in review)) review.lapses = 0;
     if (!("history" in review)) review.history = [];
+    if (Array.isArray(review.history)) {
+      for (const entry of review.history) {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+        if (!("kind" in entry)) entry.kind = "retention";
+        if (!("confidence" in entry)) entry.confidence = null;
+        if (!("responseTimeMs" in entry)) entry.responseTimeMs = null;
+        if (!("attemptCount" in entry)) entry.attemptCount = null;
+        if (!("supportLevel" in entry)) entry.supportLevel = null;
+        if (!("stabilityDays" in entry)) entry.stabilityDays = entry.intervalDays ?? 0;
+        if (!("difficulty" in entry)) entry.difficulty = review.difficulty;
+        if (!("lapses" in entry)) entry.lapses = review.lapses;
+      }
+    }
   }
 
   const assessmentIds = new Map();

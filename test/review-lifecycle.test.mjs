@@ -388,6 +388,9 @@ test("a due review is claimed, executed across processes, and persisted once", (
   assert.equal(review.completed, 2, "the review item is completed once, not once per attempt");
   assert.equal(review.level, 0, "the initial failed recall prevents an interval promotion");
   assert.equal(review.dueAt, "2026-08-26T08:15:00.000Z");
+  assert.equal(review.lapses, 1);
+  assert.equal(review.history.length, 2);
+  assert.equal(review.history.at(-1).evidenceId, "retention-a1");
   assert.equal(review.status, "scheduled");
   assert.equal(review.claimedBySessionId, null);
   assert.equal(state.reviewCount, 1);
