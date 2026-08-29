@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { createInitialState } from "../src/model.mjs";
+import { createMasteryProfile } from "../src/learning-strategy.mjs";
 import { renderSessionNote, renderVault, slugify } from "../src/render.mjs";
 
 const state = createInitialState({ now: "2026-08-24T08:00:00.000Z" });
@@ -367,6 +368,164 @@ test("renderSessionNote preserves interactive choices, adaptive links, responses
   }
   assert.doesNotMatch(note, /correctChoiceValues|\*\*Correct answer:\*\*/);
   assert.doesNotMatch(note, /Compatibility scores become attention weights/);
+});
+
+test("human-readable records expose adaptive strategy, mastery, misconceptions, calibration, and scheduling", () => {
+  const adaptive = structuredClone(state);
+  const session = adaptive.sessions.s1;
+  const concept = adaptive.concepts["concept-1"];
+  const review = adaptive.reviews["review-1"];
+  concept.mastery = createMasteryProfile();
+  concept.mastery.explanation = {
+    level: 2,
+    evidenceIds: ["free-a1"],
+    attempts: 2,
+    correct: 1,
+    lastAssessedAt: "2026-08-24T09:05:00.000Z",
+  };
+  concept.highestTransferLevel = 2;
+  concept.supportLevel = 1;
+  concept.misconceptionIds = ["misconception-identity"];
+  adaptive.misconceptions = {
+    "misconception-identity": {
+      id: "misconception-identity",
+      conceptId: concept.id,
+      statement: "A contextual operation changes the input identity.",
+      status: "active",
+      confidence: 88,
+      occurrences: 2,
+      relapses: 1,
+      counterexample: "One input identity can produce different hidden states.",
+      repair: "Separate identity from context-dependent representation.",
+      evidenceIds: ["free-a1"],
+      createdAt: "2026-08-24T09:05:00.000Z",
+      updatedAt: "2026-08-24T09:05:00.000Z",
+      resolvedAt: null,
+    },
+  };
+  Object.assign(review, {
+    stabilityDays: 7,
+    difficulty: 64,
+    lapses: 2,
+    history: [{
+      evidenceId: "free-a1",
+      grade: "incorrect",
+      kind: "explanation",
+      confidence: 88,
+      responseTimeMs: 42000,
+      attemptCount: 1,
+      supportLevel: 1,
+      intervalDays: 1,
+      stabilityDays: 0,
+      difficulty: 64,
+      lapses: 2,
+      dueAt: "2026-08-25T08:00:00.000Z",
+      createdAt: "2026-08-24T09:05:00.000Z",
+    }],
+  });
+  Object.assign(session.steps[0], {
+    activityType: "faded-example",
+    strategyReason: "Prior causal explanation permits one less scaffold.",
+    supportLevel: 1,
+    transferLevel: 2,
+  });
+  session.activityHistory = [{
+    id: "step-1",
+    type: "faded-example",
+    nodeId: "forms",
+    questionId: "free-q1",
+    reason: "Prior causal explanation permits one less scaffold.",
+    transferLevel: 2,
+    supportLevel: 1,
+    createdAt: "2026-08-24T08:45:00.000Z",
+  }];
+  session.productiveAttempts = [{
+    id: "productive-1",
+    nodeId: "forms",
+    questionId: "productive-q1",
+    prompt: "Predict how a covector should act before seeing the construction.",
+    answer: "It should consume a displacement and return a scalar.",
+    rationale: "A measurement needs one direction-dependent numeric output.",
+    confidence: 60,
+    responseTimeMs: 30000,
+    createdAt: "2026-08-24T08:44:00.000Z",
+  }];
+  session.questions = [{
+    id: "free-q1",
+    stage: "teach",
+    nodeId: "forms",
+    kind: "explanation",
+    question: "Why does a covector return a scalar?",
+    mode: "free-response",
+    choices: [],
+    correctChoiceValues: [],
+    explanation: null,
+    activityType: "contrastive-case",
+    strategyReason: "An active identity misconception needs contrastive repair.",
+    supportLevel: 1,
+    transferLevel: 2,
+    status: "retry-required",
+    parentQuestionId: null,
+    adaptationReason: null,
+    responses: [{
+      id: "free-r1",
+      selectedChoiceValues: [],
+      textAnswer: "It changes the vector identity.",
+      dontKnow: false,
+      correct: null,
+      confidence: 88,
+      responseTimeMs: 42000,
+      noteId: null,
+      assessmentId: "free-a1",
+      createdAt: "2026-08-24T09:05:00.000Z",
+    }],
+    createdAt: "2026-08-24T09:04:00.000Z",
+    cancelledAt: null,
+  }];
+  session.assessments = [{
+    id: "free-a1",
+    questionId: "free-q1",
+    nodeId: "vectors",
+    conceptId: concept.id,
+    stage: "teach",
+    kind: "explanation",
+    question: "Why does a covector return a scalar?",
+    answer: "It changes the vector identity.",
+    grade: "incorrect",
+    evidence: "The answer changes identity instead of explaining the scalar-valued linear measurement.",
+    mistakeType: "identity-versus-representation",
+    contaminated: false,
+    confidence: 88,
+    responseTimeMs: 42000,
+    transferLevel: 2,
+    supportLevel: 1,
+    activityType: "contrastive-case",
+    misconceptionIds: ["misconception-identity"],
+    createdAt: "2026-08-24T09:05:00.000Z",
+  }];
+
+  const note = renderSessionNote(adaptive, session);
+  const searchable = note.replaceAll("**", "");
+  for (const expected of [
+    "Activity: Faded example",
+    "Strategy reason: Prior causal explanation permits one less scaffold.",
+    "Support level: 1",
+    "Transfer level: 2",
+    "Learner answer: It changes the vector identity.",
+    "Confidence: 88%",
+    "Response time: 42000 ms",
+    "Activity history",
+    "Productive-failure attempts",
+    "not graded as mastery evidence",
+    "Mastery by ability",
+    "Explanation: level 2",
+    "Active misconceptions",
+    "A contextual operation changes the input identity.",
+    "Difficulty 64",
+    "Lapses 2",
+  ]) {
+    assert.match(searchable, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"));
+  }
 });
 
 test("renderVault writes home, session, topic, and review notes", () => {

@@ -86,6 +86,9 @@ substitute model recall for an unavailable source.
 
 ### Teaching
 
+- Run `recommend-next --node ... --json` before choosing each activity. Preserve
+  its activity type, reason, support level, and transfer level in the question
+  or teaching-step record.
 - Begin from unconditional foundations, definitions and invariants already
   justified by evidence.
 - Motivate every step as a discovery forced by a concrete problem.
@@ -93,6 +96,12 @@ substitute model recall for an unavailable source.
   the foundation, motivation, explanation, question ID, question text, and
   kind with `record-step`.
 - Resolve that checkpoint before advancing to another step.
+- Use `adaptive_learning_response` for own-words Pi checkpoints and
+  `adaptive_learning_assess_response` only after the response is persisted.
+  In Codex, use `start-question --mode free-response`, then `answer-question`,
+  then `record-assessment` in that order.
+- Treat productive-failure attempts as ungraded diagnostics and use them only
+  when `recommend-next` confirms all prerequisites are durable.
 
 ### Assessment and repair
 
@@ -147,6 +156,8 @@ substitute model recall for an unavailable source.
 
 ### Retention and closure
 
+- Run `practice-plan --json` and use its interleaved order when multiple
+  concepts are due; do not convert the plan itself into review progress.
 - Run `due --json` to find available spaced-retention work, then claim explicit
   items with `start-review`. Listing an item as due does **not** complete it.
 - During a review session, assess only the selected concepts. Before running

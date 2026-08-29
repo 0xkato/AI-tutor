@@ -121,6 +121,37 @@ ungraded admission. The agent persists it against that exact question, teaches
 the missing mechanism, and continues with a new transfer rather than treating
 it as an incorrect answer.
 
+## What the adaptive lesson does
+
+After the initial multiple-choice calibration, important checkpoints move to
+free-response. You write the reasoning in your own words and record confidence
+before feedback. The response is persisted first; the agent then gives an
+explicit Correct, Partial, or Incorrect assessment of that exact answer.
+
+The next activity is chosen from the durable record rather than a fixed quiz
+loop. The lesson can:
+
+- start with a worked example and fade one support level at a time;
+- use a contrastive case when two similar mechanisms are being confused;
+- raise a transfer ladder from a near variation at level 0 to a whole-system
+  synthesis at level 4;
+- interleave due concepts from different topics instead of drilling one block;
+- preserve and later retest a named misconception;
+- use one bounded productive-failure attempt only when its prerequisites are
+  already demonstrated, with that attempt kept ungraded;
+- adapt future review timing from confidence, response time, retries, support,
+  difficulty, stability, and prior lapses.
+
+To inspect the engine's next recommendation or the current interleaved queue:
+
+```bash
+node bin/learn.mjs recommend-next --root . --node <plan-node> --json
+node bin/learn.mjs practice-plan --root . --json
+```
+
+`practice-plan` returns the learner's current interleaved review order; it does
+not mark any review complete.
+
 ## Exercise the Pi integration candidate
 
 Until the live-host acceptance record reports an accepted Pi artifact, treat
@@ -154,13 +185,19 @@ the arrow keys to move between choices, press Tab to edit the optional note,
 Enter to submit or return to the choices, Ctrl+J for a note newline, Backspace
 to edit, and Escape to cancel. **I don't know** records an admitted gap so the
 agent teaches the missing mechanism before asking a new transfer question.
+For an own-words checkpoint, Pi opens the free-response editor: enter the
+answer, confidence, and optional note, or select **I don't know**. The agent
+must run the separate assessment tool against that persisted response before
+showing a grade.
 
 ## Open the Obsidian view
 
 Open `vault/` as the Obsidian vault. Obsidian is a viewer, not a state
 dependency. Generated Markdown must not be treated as canonical input. Session
 notes show each persisted question, its response, adaptive parent and reason,
-and any learner note attached to that question. `Profile.md` shows the durable
+and any learner note attached to that question. They also show activity choice,
+support and transfer levels, mastery by ability, misconceptions, confidence,
+response time, productive attempts, and personalized scheduling. `Profile.md` shows the durable
 teaching philosophy and preferences applied by both hosts.
 
 ## Exact local data locations

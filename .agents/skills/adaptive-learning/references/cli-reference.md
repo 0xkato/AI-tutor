@@ -45,6 +45,23 @@ Unspecified fields are preserved. Pi exposes the same state through
 `feedback`, `visuals`, or `sources`, while text without a field updates the
 teaching philosophy.
 
+## Adaptive activity and practice selection
+
+Ask the engine what the evidence supports before creating the next teaching
+step. The recommendation includes its reason, support level, transfer level,
+and whether a bounded productive-failure attempt is allowed:
+
+```bash
+node bin/learn.mjs recommend-next --root <root> \
+  --node <active-plan-node> --json
+
+node bin/learn.mjs practice-plan --root <root> --json
+```
+
+`practice-plan` returns due work in an interleaved order, alternating topics
+where possible and prioritizing active misconceptions. It plans practice; it
+does not claim or complete a review.
+
 ## Review lifecycle
 
 `due` only lists currently available review IDs. It does not claim, assess, or
@@ -205,6 +222,46 @@ node bin/learn.mjs submit-question --root <root> \
   --note-id probe-q1-note \
   --note "I remember that the coordinates depend on the chosen basis." \
   --outcome-id probe-q1-assessment
+
+# A free-response question stores no answer key. Persist the activity strategy
+# with the question before the learner sees it.
+node bin/learn.mjs start-question --root <root> \
+  --id explain-q1 --stage teach --node vectors --kind explanation \
+  --question "Why can one token identity have different contextual representations?" \
+  --mode free-response \
+  --activity-type contrastive-case \
+  --strategy-reason "An active identity-versus-representation misconception needs contrastive repair." \
+  --support-level 1 --transfer-level 2
+
+# Persist the learner's own words and confidence before any assessment.
+node bin/learn.mjs answer-question --root <root> \
+  --question-id explain-q1 --response-id explain-q1-a1 \
+  --text-answer "The identity stays fixed while context changes its hidden representation." \
+  --confidence 82 --response-time-ms 41000 \
+  --rationale "Neighboring tokens change the contextual mixing."
+
+# Assess exactly that persisted response. A miss can create a durable
+# misconception; a later clean transfer can resolve it by ID.
+node bin/learn.mjs record-assessment --root <root> \
+  --id explain-q1-assessment --question-id explain-q1 \
+  --node vectors --stage teach --kind explanation \
+  --question "Why can one token identity have different contextual representations?" \
+  --answer "The identity stays fixed while context changes its hidden representation." \
+  --grade incorrect --evidence "The answer still merged identity and representation." \
+  --confidence 82 --response-time-ms 41000 \
+  --support-level 1 --transfer-level 2 --activity-type contrastive-case \
+  --misconception-id identity-versus-representation \
+  --misconception-statement "Context changes the token identity." \
+  --counterexample "The same token ID can occur in two different contexts." \
+  --repair "Separate fixed token identity from context-dependent representation."
+
+node bin/learn.mjs record-assessment --root <root> \
+  --id identity-transfer-a1 --question-id identity-transfer-q1 \
+  --node vectors --stage teach --kind transfer \
+  --question "Apply the distinction to a new repeated-token example." \
+  --answer "<learner answer>" --grade correct \
+  --evidence "The new case correctly preserves identity while changing context." \
+  --resolve-misconception identity-versus-representation
 
 # Every later question records the response that caused the adaptive branch.
 node bin/learn.mjs start-question --root <root> \

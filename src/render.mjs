@@ -51,6 +51,32 @@ function conceptsForSession(state, session) {
   return (session.conceptIds ?? []).map((id) => state.concepts?.[id]).filter(Boolean);
 }
 
+function formatResponseTime(value) {
+  return Number.isFinite(value) ? `${value} ms` : "Not recorded";
+}
+
+function activityLabel(value) {
+  return titleCase(String(value ?? "not recorded").replaceAll("-", " "));
+}
+
+function masteryLines(concept) {
+  const entries = Object.entries(concept.mastery ?? {});
+  if (!entries.length) return ["No multidimensional mastery evidence recorded."];
+  return entries.map(([dimension, record]) =>
+    `- **${listValue(titleCase(dimension))}:** ${listValue(`level ${record.level}; ${record.correct}/${record.attempts} correct; last assessed ${record.lastAssessedAt ?? "never"}`)}`,
+  );
+}
+
+function misconceptionLines(state, concept) {
+  const misconceptions = (concept.misconceptionIds ?? [])
+    .map((id) => state.misconceptions?.[id])
+    .filter(Boolean);
+  if (!misconceptions.length) return ["None recorded."];
+  return misconceptions.map((misconception) =>
+    `- **${listValue(titleCase(misconception.status))}:** ${listValue(misconception.statement)} — confidence ${listValue(`${misconception.confidence}%`)}; occurrences ${listValue(misconception.occurrences)}; relapses ${listValue(misconception.relapses)}; counterexample: ${listValue(misconception.counterexample ?? "not recorded")}; repair: ${listValue(misconception.repair ?? "not recorded")}`,
+  );
+}
+
 export function renderSessionNote(state, session) {
   const lines = [
     `# ${headingText(session.topic)}`,
@@ -191,6 +217,10 @@ export function renderSessionNote(state, session) {
       lines.push(
         `### ${index + 1}\. ${headingText(step.nodeId)}`,
         "",
+        `- **Activity:** ${listValue(activityLabel(step.activityType))}`,
+        `- **Strategy reason:** ${listValue(step.strategyReason ?? "Not recorded")}`,
+        `- **Support level:** ${listValue(step.supportLevel ?? "Not recorded")}`,
+        `- **Transfer level:** ${listValue(step.transferLevel ?? "Not recorded")}`,
         `- **Foundation:** ${listValue(step.foundation)}`,
         `- **Motivation:** ${listValue(step.motivation)}`,
         `- **Explanation:** ${listValue(step.explanation)}`,
@@ -241,9 +271,21 @@ export function renderSessionNote(state, session) {
   if (session.questions?.length) {
     for (const [index, question] of session.questions.entries()) {
       const latest = question.responses.at(-1) ?? null;
-      const labelsByValue = new Map(question.choices.map((choice) => [choice.value, choice.label]));
+      const choices = question.choices ?? [];
+      const labelsByValue = new Map(choices.map((choice) => [choice.value, choice.label]));
+      const linkedAssessment = latest?.assessmentId
+        ? session.assessments?.find((assessment) => assessment.id === latest.assessmentId)
+        : null;
       let outcome = titleCase(question.status.replaceAll("-", " "));
-      if (question.status === "resolved" && latest) outcome = latest.correct ? "Correct" : "Incorrect";
+      if (question.status === "resolved" && latest) {
+        outcome = linkedAssessment
+          ? titleCase(linkedAssessment.grade)
+          : latest.correct === null
+            ? "Ungraded productive attempt"
+            : latest.correct
+              ? "Correct"
+              : "Incorrect";
+      }
       if (question.status === "retry-required") outcome = "Incorrect — retry required";
       if (question.status === "gap") outcome = "I don't know";
       const selected = latest?.dontKnow
@@ -260,8 +302,20 @@ export function renderSessionNote(state, session) {
         `- **Stage:** ${listValue(titleCase(question.stage))}`,
         `- **Node:** ${inlineCode(question.nodeId)}`,
         `- **Mode:** ${listValue(titleCase(question.mode.replaceAll("-", " ")))}`,
+        `- **Activity:** ${listValue(activityLabel(question.activityType))}`,
+        `- **Strategy reason:** ${listValue(question.strategyReason ?? "Not recorded")}`,
+        `- **Support level:** ${listValue(question.supportLevel ?? "Not recorded")}`,
+        `- **Transfer level:** ${listValue(question.transferLevel ?? "Not recorded")}`,
         `- **Outcome:** ${listValue(outcome)}`,
-        `- **Selected:** ${listValue(selected)}`,
+      );
+      if (question.mode === "free-response") {
+        lines.push(`- **Learner answer:** ${listValue(latest?.textAnswer ?? "Not answered")}`);
+      } else {
+        lines.push(`- **Selected:** ${listValue(selected)}`);
+      }
+      lines.push(
+        `- **Confidence:** ${listValue(latest?.confidence === null || latest?.confidence === undefined ? "Not recorded" : `${latest.confidence}%`)}`,
+        `- **Response time:** ${listValue(formatResponseTime(latest?.responseTimeMs))}`,
       );
       const questionSourceBasis = (session.sourceCoverage ?? [])
         .filter((coverage) => coverage.nodeId === question.nodeId)
@@ -277,10 +331,12 @@ export function renderSessionNote(state, session) {
           `- **Adaptive reason:** ${listValue(question.adaptationReason)}`,
         );
       }
-      lines.push("", "Choices:", "");
-      for (const [choiceIndex, choice] of question.choices.entries()) {
-        const description = choice.description ? ` — ${choice.description}` : "";
-        lines.push(`${choiceIndex + 1}. ${listValue(`${choice.label}${description}`)}`);
+      if (choices.length) {
+        lines.push("", "Choices:", "");
+        for (const [choiceIndex, choice] of choices.entries()) {
+          const description = choice.description ? ` — ${choice.description}` : "";
+          lines.push(`${choiceIndex + 1}. ${listValue(`${choice.label}${description}`)}`);
+        }
       }
       if (responseNote) {
         lines.push("", `- **Learner note:** ${listValue(responseNote.body)}`);
@@ -292,6 +348,31 @@ export function renderSessionNote(state, session) {
     }
   } else {
     lines.push("No interactive questions recorded.", "");
+  }
+
+  lines.push("## Activity history", "");
+  if (session.activityHistory?.length) {
+    for (const activity of session.activityHistory) {
+      lines.push(
+        `- **${listValue(activityLabel(activity.type))}:** ${listValue(activity.reason)} — node ${inlineCode(activity.nodeId)}; support level ${listValue(activity.supportLevel ?? "not recorded")}; transfer level ${listValue(activity.transferLevel ?? "not recorded")}`,
+      );
+    }
+    lines.push("");
+  } else {
+    lines.push("No adaptive activity history recorded.", "");
+  }
+
+  lines.push("## Productive-failure attempts", "");
+  if (session.productiveAttempts?.length) {
+    lines.push("These attempts are diagnostic and are not graded as mastery evidence.", "");
+    for (const attempt of session.productiveAttempts) {
+      lines.push(
+        `- **${listValue(attempt.prompt)}:** ${listValue(attempt.answer)} — rationale: ${listValue(attempt.rationale ?? "not recorded")}; confidence ${listValue(attempt.confidence === null || attempt.confidence === undefined ? "not recorded" : `${attempt.confidence}%`)}; response time ${listValue(formatResponseTime(attempt.responseTimeMs))}`,
+      );
+    }
+    lines.push("");
+  } else {
+    lines.push("None recorded.", "");
   }
 
   lines.push("## Other learner notes", "");
@@ -314,6 +395,13 @@ export function renderSessionNote(state, session) {
         `### ${headingText(titleCase(assessment.grade))} — ${headingText(assessment.nodeId)}`,
         "",
         `- **Kind:** ${listValue(assessment.kind)}`,
+        `- **Learner answer:** ${listValue(assessment.answer)}`,
+        `- **Activity:** ${listValue(activityLabel(assessment.activityType))}`,
+        `- **Confidence:** ${listValue(assessment.confidence === null || assessment.confidence === undefined ? "Not recorded" : `${assessment.confidence}%`)}`,
+        `- **Response time:** ${listValue(formatResponseTime(assessment.responseTimeMs))}`,
+        `- **Support level:** ${listValue(assessment.supportLevel ?? "Not recorded")}`,
+        `- **Transfer level:** ${listValue(assessment.transferLevel ?? "Not recorded")}`,
+        `- **Misconceptions:** ${listValue(assessment.misconceptionIds?.join(", ") || "None")}`,
         `- **Evidence:** ${listValue(assessment.evidence)}`,
         `- **Contaminated:** ${assessment.contaminated ? "Yes — excluded from knowledge evidence" : "No"}`,
         "",
@@ -329,7 +417,20 @@ export function renderSessionNote(state, session) {
     for (const concept of concepts) {
       const review = state.reviews?.[concept.reviewId];
       lines.push(
-        `- **${listValue(concept.title)}:** ${listValue(`${concept.status}; level ${review?.level ?? 0}; due ${review?.dueAt ?? "not scheduled"}`)}`,
+        `### ${headingText(concept.title)}`,
+        "",
+        `- **Status:** ${listValue(concept.status)}`,
+        `- **Transfer:** ${listValue(`highest level ${concept.highestTransferLevel ?? 0}; current support level ${concept.supportLevel ?? "not recorded"}`)}`,
+        `- **Scheduling:** ${listValue(`level ${review?.level ?? 0}; due ${review?.dueAt ?? "not scheduled"}; stability ${review?.stabilityDays ?? 0} days; difficulty ${review?.difficulty ?? 50}; lapses ${review?.lapses ?? 0}`)}`,
+        "",
+        "#### Mastery by ability",
+        "",
+        ...masteryLines(concept),
+        "",
+        "#### Active misconceptions",
+        "",
+        ...misconceptionLines(state, concept).filter((line) => !line.startsWith("- **Resolved")),
+        "",
       );
     }
   } else {
@@ -473,7 +574,16 @@ function renderTopic(state, topic) {
       `- **Key:** ${inlineCode(concept.key)}`,
       `- **Status:** ${listValue(titleCase(concept.status))}`,
       `- **Latest grade:** ${listValue(concept.latestGrade ? titleCase(concept.latestGrade) : "None")}`,
-      `- **Review:** ${listValue(`level ${review?.level ?? 0}; due ${review?.dueAt ?? "not scheduled"}`)}`,
+      `- **Transfer and support:** ${listValue(`highest transfer level ${concept.highestTransferLevel ?? 0}; support level ${concept.supportLevel ?? "not recorded"}`)}`,
+      `- **Review:** ${listValue(`level ${review?.level ?? 0}; due ${review?.dueAt ?? "not scheduled"}; stability ${review?.stabilityDays ?? 0} days; difficulty ${review?.difficulty ?? 50}; lapses ${review?.lapses ?? 0}`)}`,
+      "",
+      "#### Mastery by ability",
+      "",
+      ...masteryLines(concept),
+      "",
+      "#### Misconceptions",
+      "",
+      ...misconceptionLines(state, concept),
       "",
       "#### Evidence history",
       "",
@@ -513,7 +623,9 @@ function renderReviews(state) {
             const link = session
               ? obsidianLink(`Sessions/${sessionName(session)}`, topic?.name ?? session.topic)
               : listValue(topic?.name ?? "Unknown topic");
-            return `- ${listValue(review.dueAt)} — ${link} / ${listValue(concept.title)}`;
+            const activeMisconceptions = (concept.misconceptionIds ?? [])
+              .filter((id) => state.misconceptions?.[id]?.status === "active").length;
+            return `- ${listValue(review.dueAt)} — ${link} / ${listValue(concept.title)} — stability ${listValue(review.stabilityDays ?? 0)} days; difficulty ${listValue(review.difficulty ?? 50)}; lapses ${listValue(review.lapses ?? 0)}; active misconceptions ${listValue(activeMisconceptions)}`;
           })
           .join("\n")
       : "No reviews scheduled.",

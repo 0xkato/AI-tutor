@@ -49,13 +49,16 @@ test("operator quickstart tells a learner what they will see and how to answer",
   assert.match(quickstart, /vault[\s\S]*question[\s\S]*note/i);
   assert.match(quickstart, /retention[\s\S]*not[\s\S]*recognition-only multiple choice/i);
   assert.match(quickstart, /open-ended teaching or review checkpoint[\s\S]*I don['’]t know[\s\S]*ungraded admission/i);
+  assert.match(quickstart, /free[- ]response[\s\S]*own words[\s\S]*confidence[\s\S]*explicit.*assessment/i);
+  assert.match(quickstart, /worked example[\s\S]*fade[\s\S]*contrastive[\s\S]*transfer[\s\S]*whole-system/i);
+  assert.match(quickstart, /practice-plan[\s\S]*interleav/i);
 });
 
-test("state format documents schema v5 source-guided provenance and migration", () => {
+test("state format documents schema v6 adaptive evidence and migration", () => {
   const format = read("docs/operator/state-format.md");
 
-  assert.match(format, /current schema version is `5`/i);
-  assert.match(format, /Version-1[\s\S]*versions 2, 3, 4, and 5/i);
+  assert.match(format, /current schema version is `6`/i);
+  assert.match(format, /Version-1[\s\S]*versions 2, 3, 4, 5, and 6/i);
   assert.match(format, /learnerProfile[\s\S]*teaching[\s\S]*preferences/i);
   assert.match(format, /question[\s\S]*response[\s\S]*learner note/i);
   assert.match(format, /answer key[\s\S]*redact/i);
@@ -64,4 +67,9 @@ test("state format documents schema v5 source-guided provenance and migration", 
   assert.match(format, /anchor material[\s\S]*supplemental research/i);
   assert.match(format, /sourceCoverage[\s\S]*not learner evidence/i);
   assert.match(format, /sourceGuidance[\s\S]*pending materials block[\s\S]*continue-supplemental-only/i);
+  assert.match(format, /mastery[\s\S]*recall[\s\S]*explanation[\s\S]*prediction[\s\S]*application[\s\S]*discrimination[\s\S]*debugging[\s\S]*integration[\s\S]*retention/i);
+  assert.match(format, /misconceptions[\s\S]*active[\s\S]*resolved[\s\S]*relapse/i);
+  assert.match(format, /productiveAttempts[\s\S]*ungraded/i);
+  assert.match(format, /confidence[\s\S]*responseTimeMs[\s\S]*supportLevel[\s\S]*transferLevel/i);
+  assert.match(format, /stabilityDays[\s\S]*difficulty[\s\S]*lapses[\s\S]*history/i);
 });

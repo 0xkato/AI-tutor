@@ -28,6 +28,10 @@ question and answer. Recognition is calibration evidence, not mastery.
 
 In Pi, call `adaptive_learning_quiz`; it persists the question, response, note,
 and assessment before returning feedback. Do not duplicate those mutations.
+For a free-response checkpoint, call `adaptive_learning_response` to collect the
+learner's own words, confidence, and note and persist the response before any
+assessment. Then call `adaptive_learning_assess_response` against that exact
+persisted response. Never grade an answer that the engine did not first store.
 In Codex, render a compact numbered card only after `start-question` succeeds,
 accept a numbered answer or `I don't know` plus optional `Note: ...`, then run
 `submit-question` before feedback. It atomically persists the response, note,
@@ -86,6 +90,38 @@ For one frontier node only:
 Motivate every move; never dump the completed route and call it teaching. Use
 one reasoning step at a time and wait for the checkpoint before advancing.
 
+### 4.1 Select the activity from evidence
+
+Run `recommend-next` for the current node rather than defaulting to another
+quiz. Persist the returned activity type, reason, support level, and transfer
+level with the question or teaching step.
+
+- **Worked-example fading:** begin with a complete worked example when a
+  foundation is missing. After clean evidence, fade exactly one support level
+  at a time; do not remove all scaffolding because one answer was correct.
+- **Contrastive case:** when a persistent misconception confuses similar
+  mechanisms or crosses a decision boundary, show the smallest contrastive
+  pair that isolates the difference. Preserve the misconception until durable
+  transfer can resolve it; if it returns later, record a relapse.
+- **Transfer ladder:** level 0 is a near variation, levels 1-3 progressively
+  change representation, context, and task structure, and level 4 is a
+  whole-system synthesis. Advance only from demonstrated evidence, not elapsed
+  time or lesson completion.
+- **Conditional productive failure:** use one bounded independent attempt only
+  when every prerequisite already has durable evidence. Store it in
+  `productiveAttempts` as ungraded diagnostic evidence, then teach from the
+  learner's model. Never use productive failure to quiz an admitted gap.
+
+Concept mastery is multidimensional: track `recall`, `explanation`,
+`prediction`, `application`, `discrimination`, `debugging`, `integration`, and
+`retention` independently. Do not turn recognition in one dimension into a
+global mastery label.
+
+Misconceptions persist across sessions. An active misconception selects a
+contrastive repair before ordinary practice; a clean durable transfer may
+resolve it, and recurrence reactivates it as a relapse rather than creating an
+unrelated mistake label.
+
 ## 5. Clarify without leakage
 
 A clarification explains only the missing term, variable role, or premise and
@@ -105,6 +141,11 @@ Use exactly:
 Assess the learner's latest clarified answer, not stale wording. State the
 exact demonstrated part, missing link, or error type. Never invent a criticism
 to make feedback appear rigorous.
+
+Capture confidence before feedback so it reflects the learner's belief rather
+than agreement with the grade. Store response time, attempt count, support
+level, and transfer level with the assessment. Use high-confidence lapses as a
+calibration signal and misconception priority, not as proof of carelessness.
 
 On the first genuine miss, describe where the reasoning broke and its error
 type, do not reveal the answer, and offer a bounded retry. After a second miss
@@ -155,3 +196,14 @@ transfer, prediction, reconstruction, or debugging evidence.
 The interactive multiple-choice surface is therefore limited to `probe` and
 `teach`. Never label one of its selections as a `retention` assessment. Use the
 persisted review-checkpoint lifecycle for retention evidence.
+
+When multiple concepts are due, run `practice-plan` and follow its interleaved
+order. Alternate topics where possible while prioritizing active
+misconceptions; do not block all practice by chapter or repeat one mechanism
+after it has already been demonstrated.
+
+Review timing is learner-specific. Update stability, difficulty, and lapse
+history from the grade, confidence, response time, retries, and support used.
+A fast independent correct response may lengthen the interval; a slow,
+supported, retried, or high-confidence miss shortens it. The schedule predicts
+when to check again—it never declares mastery by itself.

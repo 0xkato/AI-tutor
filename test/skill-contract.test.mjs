@@ -112,6 +112,16 @@ test("skill corpus preserves the complete adaptive-learning behavior", () => {
     ["motivated discovery", /motivat(e|ion).*every (move|step)/i],
     ["one reasoning step", /one reasoning step at a time/i],
     ["checkpoint gate", /checkpoint.*before advancing/i],
+    ["free-response reasoning", /adaptive_learning_response[\s\S]*learner['’]s own words[\s\S]*persist.*before.*assess/is],
+    ["multidimensional mastery", /mastery[\s\S]*recall[\s\S]*explanation[\s\S]*prediction[\s\S]*application[\s\S]*discrimination[\s\S]*debugging[\s\S]*integration[\s\S]*retention/i],
+    ["persistent misconceptions", /misconception[\s\S]*persist[\s\S]*contrastive[\s\S]*(resolve|relapse)/i],
+    ["worked-example fading", /worked[- ]example[\s\S]*fade[\s\S]*support level/i],
+    ["contrastive cases", /contrastive (case|repair)[\s\S]*(similar|confus|boundary)/i],
+    ["interleaved practice", /practice-plan[\s\S]*interleav/i],
+    ["transfer ladder", /transfer (ladder|level)[\s\S]*(0|near)[\s\S]*(4|whole-system)/i],
+    ["confidence calibration", /confidence[\s\S]*before feedback[\s\S]*(calibrat|high-confidence lapse)/i],
+    ["learner-specific forgetting", /(stability|forgetting)[\s\S]*difficulty[\s\S]*lapse[\s\S]*response time/i],
+    ["conditional productive failure", /productive failure[\s\S]*only[\s\S]*prerequisite[\s\S]*(ungraded|teach)/i],
     ["checkpoint identity before answer", /persist.*question ID.*question text.*kind.*before.*answer/is],
     ["exact grades", /exactly.*Correct.*Partial.*Incorrect/is],
     ["bounded retry", /first genuine miss.*do not reveal.*answer.*retry/is],
@@ -238,4 +248,7 @@ test("CLI reference demonstrates question, response, and note persistence", () =
     /start-question[\s\S]*--parent-question-id[\s\S]*--adaptation-reason/is,
   );
   assert.match(cliReference, /add-note[\s\S]*--target-type[\s\S]*--target-id/is);
+  assert.match(cliReference, /recommend-next[\s\S]*practice-plan/is);
+  assert.match(cliReference, /--mode free-response[\s\S]*answer-question[\s\S]*--text-answer[\s\S]*--confidence[\s\S]*record-assessment/is);
+  assert.match(cliReference, /--misconception-statement[\s\S]*--counterexample[\s\S]*--repair/is);
 });

@@ -3,7 +3,7 @@
 ## Canonical state
 
 `.adaptive-learning/state.json` is the only canonical learner record. The
-current schema version is `5`. Every read and every write validates the full
+current schema version is `6`. Every read and every write validates the full
 structure. Unsupported future versions are rejected.
 
 Canonical state owns a monotonically increasing `revision`. A successful
@@ -11,10 +11,11 @@ mutation commits JSON first and marks rendering stale. Rendering then catches
 up to that exact revision. A render failure cannot roll back already committed
 learning evidence.
 
-Version-1 state migrates deterministically through versions 2, 3, 4, and 5;
-version-2 state migrates through versions 3, 4, and 5; version-3 state
-migrates through version 4 to version 5; and version-4 state migrates directly
-to version 5. The original is preserved under
+Version-1 state migrates deterministically through versions 2, 3, 4, 5, and 6;
+version-2 state migrates through versions 3, 4, 5, and 6; version-3 state
+migrates through versions 4, 5, and 6; version-4 state migrates through
+versions 5 and 6; and version-5 state migrates directly to version 6. The
+original is preserved under
 `.adaptive-learning/backups/` before canonical state changes. Visuals migrated
 from version 1 are marked `legacy-unverified`; newly registered visuals store
 byte count, media type, and SHA-256 as verified identity.
@@ -55,6 +56,36 @@ supplemental-only after an explicit learner choice. Pending materials block
 teaching. An unavailable anchor must be replaced with `add-material` or the
 learner must explicitly authorize `continue-supplemental-only`; adding a new
 material returns the session to anchored mode until it is resolved.
+
+Version 6 adds the adaptive learning evidence used to select and audit the next
+activity. Each concept has a `mastery` profile with independent `recall`,
+`explanation`, `prediction`, `application`, `discrimination`, `debugging`,
+`integration`, and `retention` records. It also stores the highest demonstrated
+transfer level, current support level, and linked misconception IDs. A correct
+answer in one dimension does not silently establish the others.
+
+Top-level `misconceptions` persist the exact mistaken model, status (`active`
+or `resolved`), confidence, occurrences, relapses, counterexample, repair, and
+evidence history. A later recurrence reactivates the same record and increments
+`relapses`; only clean durable transfer evidence can resolve it.
+
+Questions now support `free-response` mode. Responses can store the learner's
+exact `textAnswer`, `confidence`, `responseTimeMs`, rationale, attempt count,
+`supportLevel`, and `transferLevel`. Assessments carry the same calibration and
+strategy fields, plus any misconception records created or resolved by the
+evidence. The answer is persisted before assessment feedback is shown.
+
+Sessions store an auditable `activityHistory` for worked examples, faded
+examples, contrastive cases, transfer cases, and whole-system synthesis.
+Conditional `productiveAttempts` are separate, explicitly ungraded diagnostic
+records: they never become mastery evidence merely because the learner made an
+independent attempt.
+
+Review records add learner-specific scheduling fields: `stabilityDays`,
+`difficulty`, `lapses`, and append-only `history`. Each history entry preserves
+the grade, confidence, response time, attempt count, support level, computed
+interval, and due date that produced the next schedule. Legacy evidence without
+those metrics retains the established fixed review intervals.
 
 Do not edit canonical JSON by hand. Use the CLI or the shared host skill.
 
