@@ -101,7 +101,8 @@ evidence corrects, limits, or supplements the anchor material.
 
 Pi adds `/teach-from` alongside `/teach`. It rejects malformed input, refuses
 to overwrite a different active target, and resumes the same source-guided
-session when invoked without conflicting arguments. The dispatched skill
+session when invoked without arguments. Invoking it with another source and
+the same target appends a pending material for inspection. The dispatched skill
 message names both the persisted target and material so the host begins with
 the intended source.
 
@@ -124,6 +125,9 @@ For local notes, PDFs, or repositories:
 - Invalid or unsafe references fail before state mutation.
 - An inaccessible material becomes `unavailable` with explicit evidence; it is
   not silently treated as verified.
+- Pending material blocks teaching. If every supplied material is unavailable,
+  the learner must add a replacement or explicitly authorize a persisted
+  supplemental-only continuation.
 - Anchor claims cannot be recorded against pending or unavailable material.
 - Coverage cannot point to missing sources or plan nodes.
 - Source-guided teaching cannot advance with an uncited node.

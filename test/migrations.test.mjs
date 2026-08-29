@@ -188,6 +188,12 @@ test("migrateV4ToV5 deterministically adds source-guided provenance fields", () 
   assert.equal(first.schemaVersion, 5);
   assert.deepEqual(first.sessions.s1.materials, []);
   assert.deepEqual(first.sessions.s1.sourceCoverage, []);
+  assert.deepEqual(first.sessions.s1.sourceGuidance, {
+    mode: "open",
+    reason: null,
+    updatedAt: first.sessions.s1.updatedAt,
+    history: [],
+  });
   assert.deepEqual(first.sessions.s1.sources[0], {
     ...versionFour.sessions.s1.sources[0],
     role: "supplemental",
@@ -210,6 +216,7 @@ test("readState backs up and migrates version-4 state before returning it", () =
   assert.equal(state.schemaVersion, 5);
   assert.deepEqual(state.sessions.s1.materials, []);
   assert.deepEqual(state.sessions.s1.sourceCoverage, []);
+  assert.equal(state.sessions.s1.sourceGuidance.mode, "open");
   const backups = fs.readdirSync(paths.backups);
   assert.equal(backups.length, 1);
   assert.equal(JSON.parse(fs.readFileSync(path.join(paths.backups, backups[0]), "utf8")).schemaVersion, 4);

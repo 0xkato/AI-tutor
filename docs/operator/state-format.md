@@ -50,6 +50,12 @@ include an exact locator. `sourceCoverage` binds those claim-level records to
 dependency-plan nodes. Source coverage is not learner evidence; assessments,
 transfer, retention, and synthesis continue to determine concept status.
 
+`sourceGuidance` records whether the session is open, anchored, or proceeding
+supplemental-only after an explicit learner choice. Pending materials block
+teaching. An unavailable anchor must be replaced with `add-material` or the
+learner must explicitly authorize `continue-supplemental-only`; adding a new
+material returns the session to anchored mode until it is resolved.
+
 Do not edit canonical JSON by hand. Use the CLI or the shared host skill.
 
 ## Render manifest

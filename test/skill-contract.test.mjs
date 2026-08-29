@@ -91,6 +91,10 @@ test("skill corpus preserves the complete adaptive-learning behavior", () => {
       /unavailable anchor[\s\S]*(blocks|stops)[\s\S]*source-guided teaching[\s\S]*(replacement|supplemental-only)/i,
     ],
     [
+      "supplemental-only mode requires an explicit persisted learner choice",
+      /continue-supplemental-only[\s\S]*only after[\s\S]*learner explicitly[\s\S]*never infer consent/i,
+    ],
+    [
       "source locator remains visible during teaching",
       /when teaching[\s\S]*claim[\s\S]*(show|cite)[\s\S]*exact locator/i,
     ],

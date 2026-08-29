@@ -4,6 +4,7 @@ import test from "node:test";
 import { recordAssessment } from "../src/assessment.mjs";
 import { conceptForNode } from "../src/concepts.mjs";
 import {
+  addMaterial,
   addSource,
   addVisual,
   beginTeach,
@@ -14,6 +15,7 @@ import {
   recordSourceCoverage,
   recordStep,
   resolveMaterial,
+  continueSupplementalOnly,
   setPlan,
   startSession,
 } from "../src/model.mjs";
@@ -92,19 +94,31 @@ test("sources require explicit claim support and verification", () => {
     () => addSource(state, { title: "Source", url: "https://example.test", supports: "A claim", now }),
     /source class is required/,
   );
+  assert.throws(
+    () => addSource(state, {
+      title: "Primary definition",
+      url: "https://example.test/covectors",
+      sourceClass: "primary",
+      supports: "The definition of a covector as a linear functional.",
+      verification: "Checked the definition and its assumptions against a second textbook.",
+      now,
+    }),
+    /source locator is required/,
+  );
 
   const next = addSource(state, {
     id: "source-1",
     title: "Primary definition",
     url: "https://example.test/covectors",
     sourceClass: "primary",
+    locator: "Heading: Covectors",
     supports: "The definition of a covector as a linear functional.",
     verification: "Checked the definition and its assumptions against a second textbook.",
     now,
   });
   assert.equal(getActiveSession(next).sources[0].sourceClass, "primary");
   assert.equal(getActiveSession(next).sources[0].role, "supplemental");
-  assert.equal(getActiveSession(next).sources[0].locator, "Whole source");
+  assert.equal(getActiveSession(next).sources[0].locator, "Heading: Covectors");
 });
 
 test("source-guided sessions preserve and resolve learner-supplied anchor material", () => {
@@ -163,6 +177,46 @@ test("a local path without a file extension is classified as a repository", () =
   });
 
   assert.equal(getActiveSession(state).materials[0].kind, "repository");
+});
+
+test("source-guided sessions can add a replacement material before teaching", () => {
+  let state = startSession(createInitialState({ now }), {
+    id: "guided-session",
+    topic: "Transformers",
+    target: "Understand attention",
+    materials: [{ id: "material-1", reference: "https://example.test/unavailable-video" }],
+    now,
+  });
+  state = resolveMaterial(state, {
+    materialId: "material-1",
+    status: "unavailable",
+    evidence: "The host could not retrieve a transcript or accessible page for this reference.",
+    now,
+  });
+  state = addMaterial(state, {
+    id: "material-2",
+    reference: "local:notes/attention.md",
+    now,
+  });
+
+  const session = getActiveSession(state);
+  assert.equal(session.materials.length, 2);
+  assert.equal(session.materials[1].status, "pending");
+  assert.equal(session.sourceGuidance.mode, "anchored");
+  assert.throws(
+    () => addMaterial(state, { reference: "local:notes/attention.md", now }),
+    /duplicate material/i,
+  );
+});
+
+test("ordinary sessions cannot become source-guided after teaching begins", () => {
+  let state = setPlan(planned(), { plan: dependencyPlan(), now });
+  state = beginTeach(state, { now });
+
+  assert.throws(
+    () => addMaterial(state, { reference: "local:notes/covectors.md", now }),
+    /cannot convert.*after teaching/i,
+  );
 });
 
 test("anchor claims require verified material while supplemental research stays distinct", () => {
@@ -306,6 +360,161 @@ test("source-guided teaching requires claim coverage for the exact plan node", (
   });
   state = recordStep(state, step);
   assert.equal(getActiveSession(state).sourceCoverage[0].nodeId, "covectors");
+  assert.equal(getActiveSession(state).activeStepId, "step-1");
+});
+
+function sourceGuidedTeachingState({ materialStatus = "pending" } = {}) {
+  let state = startSession(createInitialState({ now }), {
+    id: "guided-gate-session",
+    topic: "Attention",
+    target: "Understand the attention mechanism",
+    materials: [{ id: "material-1", reference: "https://example.test/attention" }],
+    now,
+  });
+  state = recordAssessment(state, {
+    id: "probe-a1",
+    questionId: "probe-q1",
+    nodeId: "vectors",
+    stage: "probe",
+    kind: "explanation",
+    question: "What is a vector?",
+    answer: "An ordered collection of scalar values.",
+    grade: "correct",
+    evidence: "Identified the scalar components and their ordered vector representation.",
+    now,
+  });
+  state = finishProbe(state, {
+    summary: "Vectors are established; attention is the missing mechanism.",
+    now,
+  });
+  if (materialStatus !== "pending") {
+    state = resolveMaterial(state, {
+      materialId: "material-1",
+      status: materialStatus,
+      title: materialStatus === "verified" ? "Attention guide" : undefined,
+      evidence: materialStatus === "verified"
+        ? "Opened the guide and inspected the complete attention section."
+        : "The host could not retrieve the supplied guide after checking the reference.",
+      now,
+    });
+  }
+  state = addSource(state, {
+    id: "supplemental-1",
+    title: "Attention Is All You Need",
+    url: "https://arxiv.org/abs/1706.03762",
+    sourceClass: "primary",
+    role: "supplemental",
+    locator: "Section 3.2.1",
+    supports: "Attention compares queries and keys to weight values.",
+    verification: "Checked the mechanism in the original paper.",
+    now,
+  });
+  state = setPlan(state, {
+    plan: {
+      targetNodeId: "attention",
+      nodes: [{ id: "attention", title: "Attention" }],
+      edges: [],
+    },
+    now,
+  });
+  state = recordSourceCoverage(state, {
+    id: "coverage-1",
+    nodeId: "attention",
+    sourceId: "supplemental-1",
+    summary: "The original paper supports the query-key-value attention mechanism.",
+    now,
+  });
+  return beginTeach(state, { now });
+}
+
+function attentionStep() {
+  return {
+    id: "step-1",
+    nodeId: "attention",
+    foundation: "A weighted sum can combine information from multiple tokens.",
+    motivation: "Each token needs relevant context from other tokens.",
+    explanation: "Attention weights values using query-key compatibility.",
+    checkpointQuestionId: "step-q1",
+    checkpointKind: "transfer",
+    checkpointQuestion: "How would a token select relevant context from two other tokens?",
+    now,
+  };
+}
+
+test("pending learner material blocks teaching even when supplemental coverage exists", () => {
+  const state = sourceGuidedTeachingState();
+  assert.throws(() => recordStep(state, attentionStep()), /material.*unresolved/i);
+});
+
+test("unavailable material requires an explicit supplemental-only decision", () => {
+  let state = sourceGuidedTeachingState({ materialStatus: "unavailable" });
+  assert.throws(() => recordStep(state, attentionStep()), /anchor.*unavailable/i);
+
+  state = continueSupplementalOnly(state, {
+    reason: "The learner explicitly chose to continue using verified supplemental research because the supplied guide was inaccessible.",
+    now,
+  });
+  state = recordStep(state, attentionStep());
+  assert.equal(getActiveSession(state).sourceGuidance.mode, "supplemental-only");
+  assert.equal(getActiveSession(state).activeStepId, "step-1");
+
+  state = addMaterial(state, {
+    id: "replacement-after-consent",
+    reference: "local:notes/replacement.md",
+    now,
+  });
+  assert.equal(getActiveSession(state).sourceGuidance.mode, "anchored");
+  assert.equal(getActiveSession(state).sourceGuidance.reason, null);
+  assert.deepEqual(getActiveSession(state).sourceGuidance.history, [
+    {
+      mode: "supplemental-only",
+      reason: "The learner explicitly chose to continue using verified supplemental research because the supplied guide was inaccessible.",
+      createdAt: now,
+    },
+    {
+      mode: "anchored",
+      reason: "Learner supplied additional material: local:notes/replacement.md",
+      createdAt: now,
+    },
+  ]);
+});
+
+test("a verified replacement anchor restores source-guided teaching", () => {
+  let state = sourceGuidedTeachingState({ materialStatus: "unavailable" });
+  state = addMaterial(state, {
+    id: "material-2",
+    reference: "local:notes/attention.md",
+    now,
+  });
+  state = resolveMaterial(state, {
+    materialId: "material-2",
+    status: "verified",
+    title: "Attention notes",
+    evidence: "Opened the replacement notes and inspected the complete attention section.",
+    now,
+  });
+  state = addSource(state, {
+    id: "anchor-2",
+    title: "Attention notes",
+    url: "local:notes/attention.md",
+    sourceClass: "learner-supplied",
+    role: "anchor",
+    locator: "Heading: Query-key-value attention",
+    materialId: "material-2",
+    supports: "Attention compares queries and keys to weight values.",
+    verification: "Matched the mechanism to the exact heading in the replacement notes.",
+    now,
+  });
+  state = recordSourceCoverage(state, {
+    id: "coverage-2",
+    nodeId: "attention",
+    sourceId: "anchor-2",
+    summary: "The replacement anchor directly supports the attention mechanism.",
+    now,
+  });
+
+  state = recordStep(state, attentionStep());
+  assert.equal(getActiveSession(state).sourceGuidance.mode, "anchored");
   assert.equal(getActiveSession(state).activeStepId, "step-1");
 });
 

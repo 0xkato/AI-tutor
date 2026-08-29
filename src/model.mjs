@@ -171,6 +171,12 @@ export function startSession(state, input) {
     questions: [],
     notes: [],
     materials,
+    sourceGuidance: {
+      mode: materials.length > 0 ? "anchored" : "open",
+      reason: null,
+      updatedAt: createdAt,
+      history: [],
+    },
     conceptIds: [],
     sources: [],
     sourceCoverage: [],
@@ -204,6 +210,66 @@ function materialKind(reference) {
   return "web";
 }
 
+export function addMaterial(state, input) {
+  const reference = validateSourceReference(input.reference);
+  const id = safeIdentifier(input.id ?? randomUUID(), "material id");
+  const createdAt = timestamp(input.now);
+  const material = {
+    id,
+    reference,
+    kind: materialKind(reference),
+    status: "pending",
+    title: null,
+    resolution: null,
+    createdAt,
+    updatedAt: createdAt,
+  };
+  return updateActiveSession(
+    state,
+    (session, next) => {
+      if (session.kind !== "learn" || session.phase === "complete") {
+        throw new LearningError(
+          `Cannot add learning material during ${session.phase}`,
+          "INVALID_PHASE",
+        );
+      }
+      if (session.materials.length === 0 && session.phase === "teach") {
+        throw new LearningError(
+          "Cannot convert an ordinary session to source-guided after teaching begins",
+          "SOURCE_GUIDANCE_TOO_LATE",
+        );
+      }
+      if (
+        Object.values(next.sessions).some((candidate) =>
+          candidate.materials?.some((item) => item.id === material.id),
+        )
+      ) {
+        throw new LearningError(`Duplicate material ID: ${material.id}`, "DUPLICATE_MATERIAL");
+      }
+      if (session.materials.some((item) => item.reference === material.reference)) {
+        throw new LearningError(
+          `Duplicate material reference: ${material.reference}`,
+          "DUPLICATE_MATERIAL",
+        );
+      }
+      session.materials.push(material);
+      const history = [...(session.sourceGuidance.history ?? [])];
+      history.push({
+        mode: "anchored",
+        reason: `Learner supplied additional material: ${reference}`,
+        createdAt,
+      });
+      session.sourceGuidance = {
+        mode: "anchored",
+        reason: null,
+        updatedAt: createdAt,
+        history,
+      };
+    },
+    { now: createdAt },
+  );
+}
+
 export function resolveMaterial(state, input) {
   const materialId = safeIdentifier(input.materialId, "material id");
   const status = safeSingleLine(input.status, "material status", { maxLength: 64 });
@@ -233,6 +299,44 @@ export function resolveMaterial(state, input) {
       material.updatedAt = resolvedAt;
     },
     { now: resolvedAt },
+  );
+}
+
+export function continueSupplementalOnly(state, input) {
+  const reason = safeText(input.reason, "supplemental-only reason");
+  const changedAt = timestamp(input.now);
+  return updateActiveSession(
+    state,
+    (session) => {
+      if (session.kind !== "learn" || session.materials.length === 0) {
+        throw new LearningError(
+          "Supplemental-only continuation requires a source-guided learning session",
+          "SOURCE_GUIDANCE_REQUIRED",
+        );
+      }
+      if (session.materials.some((material) => material.status === "pending")) {
+        throw new LearningError(
+          "Cannot continue supplemental-only while learner material is unresolved",
+          "MATERIAL_UNRESOLVED",
+        );
+      }
+      if (session.materials.some((material) => material.status === "verified")) {
+        throw new LearningError(
+          "Supplemental-only continuation is unnecessary while a verified anchor is available",
+          "ANCHOR_AVAILABLE",
+        );
+      }
+      session.sourceGuidance = {
+        mode: "supplemental-only",
+        reason,
+        updatedAt: changedAt,
+        history: [
+          ...(session.sourceGuidance.history ?? []),
+          { mode: "supplemental-only", reason, createdAt: changedAt },
+        ],
+      };
+    },
+    { now: changedAt },
   );
 }
 
@@ -550,9 +654,7 @@ export function addSource(state, input) {
     supports: safeText(input.supports, "supported claim"),
     verification: safeText(input.verification, "source verification"),
     role,
-    locator: input.locator === undefined
-      ? "Whole source"
-      : safeSingleLine(input.locator, "source locator", { maxLength: 2_048 }),
+    locator: safeSingleLine(input.locator, "source locator", { maxLength: 2_048 }),
     materialId: input.materialId === undefined || input.materialId === null
       ? null
       : safeIdentifier(input.materialId, "material id"),
@@ -667,6 +769,22 @@ export function recordStep(state, input) {
     (session, next) => {
       if (session.phase !== "teach") {
         throw new LearningError(`Cannot record a teaching step during ${session.phase}`, "INVALID_PHASE");
+      }
+      if (session.materials.some((material) => material.status === "pending")) {
+        throw new LearningError(
+          "Source-guided teaching cannot begin while learner material is unresolved",
+          "MATERIAL_UNRESOLVED",
+        );
+      }
+      if (
+        session.materials.length > 0 &&
+        session.sourceGuidance.mode === "anchored" &&
+        !session.materials.some((material) => material.status === "verified")
+      ) {
+        throw new LearningError(
+          "The supplied anchor is unavailable; add a replacement or record the learner's supplemental-only decision",
+          "ANCHOR_UNAVAILABLE",
+        );
       }
       if (
         session.materials.length > 0 &&

@@ -12,10 +12,12 @@ import { exportLearnerRecord } from "../src/export.mjs";
 import { inspectVisual, safeVaultDir } from "../src/inputs.mjs";
 import { submitQuestion } from "../src/interactive.mjs";
 import {
+  addMaterial,
   addSource,
   addVisual,
   beginTeach,
   closeSession,
+  continueSupplementalOnly,
   finishProbe,
   getActiveSession,
   recordSourceCoverage,
@@ -65,7 +67,9 @@ const commands = [
   ["cancel-question", "Cancel the unresolved question"],
   ["add-note", "Attach a learner note to a session learning object"],
   ["finish-probe", "Finish diagnosis and record the learner map"],
+  ["add-material", "Add another or replacement learner-supplied material"],
   ["resolve-material", "Record whether learner-supplied material was usable"],
+  ["continue-supplemental-only", "Record the learner's decision to continue without an anchor"],
   ["add-source", "Attach a verified source and supported claim"],
   ["record-source-coverage", "Bind a claim-level source to one dependency node"],
   ["set-plan", "Validate and store a dependency plan"],
@@ -149,7 +153,9 @@ const COMMAND_OPTIONS = {
   "cancel-question": ["question-id"],
   "add-note": ["id", "target-type", "target-id", "body"],
   "finish-probe": ["summary"],
+  "add-material": ["id", "reference"],
   "resolve-material": ["material-id", "status", "title", "evidence"],
+  "continue-supplemental-only": ["reason"],
   "add-source": [
     "id",
     "title",
@@ -240,6 +246,7 @@ const OPTION_DESCRIPTIONS = {
   "topic-id": "Stable topic identifier",
   "reuse-concept": "Existing concept identifier (repeatable)",
   material: "Learner-supplied source reference (repeatable)",
+  reference: "Additional or replacement learning material",
   "question-id": "Stable question identifier",
   node: "Dependency-plan node identifier",
   stage: "Assessment stage",
@@ -292,11 +299,17 @@ const OPTION_DESCRIPTIONS = {
   gap: "Unresolved gap (repeatable)",
 };
 const COMMAND_OPTION_DESCRIPTIONS = {
+  "add-material": {
+    reference: "Additional or replacement learning material",
+  },
   "resolve-material": {
     "material-id": "Learner-supplied material identifier",
     status: "verified or unavailable",
     title: "Resolved material title (required when verified)",
     evidence: "Exact material resolution evidence",
+  },
+  "continue-supplemental-only": {
+    reason: "Learner-approved reason for continuing without a verified anchor",
   },
   "add-source": {
     role: "Anchor material or supplemental research",
@@ -598,12 +611,25 @@ function commandResult(command, options, root) {
       now: last(options, "now"),
       });
     }
+    if (command === "add-material") {
+      return addMaterial(current, {
+        id: last(options, "id"),
+        reference: last(options, "reference"),
+        now: last(options, "now"),
+      });
+    }
     if (command === "resolve-material") {
       return resolveMaterial(current, {
         materialId: last(options, "material-id"),
         status: last(options, "status"),
         title: last(options, "title"),
         evidence: last(options, "evidence"),
+        now: last(options, "now"),
+      });
+    }
+    if (command === "continue-supplemental-only") {
+      return continueSupplementalOnly(current, {
+        reason: last(options, "reason"),
         now: last(options, "now"),
       });
     }

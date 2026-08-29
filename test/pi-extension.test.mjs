@@ -113,7 +113,7 @@ test("/teach-from persists an anchor material before dispatching source-guided l
   assert.match(h.messages[0].message, /inspect.*material/i);
 });
 
-test("/teach-from normalizes a local path and refuses a conflicting active guide", async () => {
+test("/teach-from normalizes a local path and adds another guide to the same target", async () => {
   const created = harness({
     status: { active: null },
     init: { active: null },
@@ -133,10 +133,37 @@ test("/teach-from normalizes a local path and refuses a conflicting active guide
     ["--material", "local:./notes/attention.md"],
   );
 
+  const activeMaterials = [{ reference: "local:./notes/attention.md" }];
   const active = harness({
     status: {
       active: { target: "Understand attention", phase: "teach" },
     },
+    context: () => ({
+      session: {
+        target: "Understand attention",
+        materials: activeMaterials,
+      },
+    }),
+    "add-material": ({ args }) => {
+      activeMaterials.push({ reference: args[args.indexOf("--reference") + 1] });
+      return { active: true };
+    },
+  });
+  await active.commands
+    .get("teach-from")
+    .handler("./other.md :: Understand attention", active.ctx);
+  assert.deepEqual(active.calls.map((call) => call.command), [
+    "status",
+    "context",
+    "add-material",
+    "context",
+  ]);
+  assert.deepEqual(active.calls[2].args, ["--reference", "local:./other.md"]);
+  assert.match(active.messages[0].message, /inspect unresolved material/i);
+  assert.match(active.messages[0].message, /local:\.\/other\.md/);
+
+  const conflictingTarget = harness({
+    status: { active: { target: "Understand attention", phase: "teach" } },
     context: {
       session: {
         target: "Understand attention",
@@ -144,12 +171,11 @@ test("/teach-from normalizes a local path and refuses a conflicting active guide
       },
     },
   });
-  await active.commands
+  await conflictingTarget.commands
     .get("teach-from")
-    .handler("./other.md :: Understand attention", active.ctx);
-  assert.equal(active.messages.length, 0);
-  assert.match(active.notifications[0].message, /different source guide/i);
-  assert.equal(active.notifications[0].level, "warning");
+    .handler("./other.md :: Understand optimization", conflictingTarget.ctx);
+  assert.equal(conflictingTarget.messages.length, 0);
+  assert.match(conflictingTarget.notifications[0].message, /different active target/i);
 });
 
 test("/teach creates a new learner-owned target and expands the shared skill", async () => {

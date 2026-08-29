@@ -64,7 +64,10 @@ substitute model recall for an unavailable source.
 
 - An unavailable anchor blocks source-guided teaching. Tell the learner and
   wait for an accessible replacement or an explicit choice to continue as a
-  supplemental-only lesson.
+  supplemental-only lesson. Persist a replacement with `add-material
+  --reference ...`. Persist supplemental-only continuation with
+  `continue-supplemental-only --reason ...` only after the learner explicitly
+  makes that choice; never infer consent from source failure.
 - Preserve the supplied material as the **anchor**. Record its supported claims
   with `add-source --role anchor --material-id ...` and an exact timestamp,
   page, section, heading, or file locator.

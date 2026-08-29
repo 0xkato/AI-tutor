@@ -227,6 +227,12 @@ export function migrateV4ToV5(value) {
   for (const session of Object.values(next.sessions ?? {})) {
     session.materials = [];
     session.sourceCoverage = [];
+    session.sourceGuidance = {
+      mode: "open",
+      reason: null,
+      updatedAt: session.updatedAt,
+      history: [],
+    };
     for (const source of session.sources ?? []) {
       source.role = "supplemental";
       source.locator = "Whole source";

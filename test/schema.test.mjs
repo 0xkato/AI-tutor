@@ -54,6 +54,7 @@ test("validateState additively upgrades sessions created before later session fi
   delete state.sessions["legacy-v2-session"].notes;
   delete state.sessions["legacy-v2-session"].materials;
   delete state.sessions["legacy-v2-session"].sourceCoverage;
+  delete state.sessions["legacy-v2-session"].sourceGuidance;
 
   const validated = validateState(state);
   assert.equal(validated.sessions["legacy-v2-session"].synthesisRequired, false);
@@ -64,6 +65,32 @@ test("validateState additively upgrades sessions created before later session fi
   assert.deepEqual(validated.sessions["legacy-v2-session"].notes, []);
   assert.deepEqual(validated.sessions["legacy-v2-session"].materials, []);
   assert.deepEqual(validated.sessions["legacy-v2-session"].sourceCoverage, []);
+  assert.deepEqual(validated.sessions["legacy-v2-session"].sourceGuidance, {
+    mode: "open",
+    reason: null,
+    updatedAt: NOW,
+    history: [],
+  });
+});
+
+test("validateState defaults source guidance to anchored when materials already exist", () => {
+  let state = createInitialState({ now: NOW });
+  state = startSession(state, {
+    id: "guided-session",
+    topic: "Transformers",
+    target: "Understand attention",
+    materials: [{ id: "material-1", reference: "local:notes/attention.md" }],
+    now: NOW,
+  });
+  delete state.sessions["guided-session"].sourceGuidance;
+
+  const validated = validateState(state);
+  assert.deepEqual(validated.sessions["guided-session"].sourceGuidance, {
+    mode: "anchored",
+    reason: null,
+    updatedAt: NOW,
+    history: [],
+  });
 });
 
 test("validateState rejects structurally incomplete version-5 state", () => {

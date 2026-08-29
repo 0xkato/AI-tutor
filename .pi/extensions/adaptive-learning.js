@@ -864,8 +864,8 @@ export function createAdaptiveLearningExtension({
 
           const supplied = parseSourceGuidedTarget(args);
           if (status.active) {
-            const context = await runCli("context", [], ctx.cwd, runOptions(ctx));
-            const materials = context.session?.materials ?? [];
+            let context = await runCli("context", [], ctx.cwd, runOptions(ctx));
+            let materials = context.session?.materials ?? [];
             if (materials.length === 0) {
               ctx.ui.notify(
                 "The active target is not source-guided. Resume it with /teach or close it before starting /teach-from.",
@@ -884,16 +884,19 @@ export function createAdaptiveLearningExtension({
               supplied &&
               !materials.some((material) => material.reference === supplied.reference)
             ) {
-              ctx.ui.notify(
-                "A different source guide is already active. Resume it with /teach-from or close it before supplying another source.",
-                "warning",
+              await runCli(
+                "add-material",
+                ["--reference", supplied.reference],
+                ctx.cwd,
+                runOptions(ctx),
               );
-              return;
+              context = await runCli("context", [], ctx.cwd, runOptions(ctx));
+              materials = context.session?.materials ?? [];
             }
             const references = materials.map((material) => material.reference).join(", ");
             dispatchSkill(
               pi,
-              `Resume the source-guided learning session from durable context. The learner supplied this target: ${status.active.target}. The persisted anchor material is: ${references}. Inspect unresolved material before teaching and preserve exact source locators.`,
+              `Resume the source-guided learning session from durable context. The learner supplied this target: ${status.active.target}. The persisted anchor materials are: ${references}. Inspect unresolved material before teaching and preserve exact source locators. If every supplied anchor is unavailable, do not teach until the learner explicitly chooses supplemental-only continuation and that decision is persisted.`,
             );
             return;
           }

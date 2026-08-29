@@ -60,6 +60,23 @@ state.sessions.s1 = {
       updatedAt: "2026-08-24T08:30:00.000Z",
     },
   ],
+  sourceGuidance: {
+    mode: "anchored",
+    reason: null,
+    updatedAt: "2026-08-24T08:30:00.000Z",
+    history: [
+      {
+        mode: "supplemental-only",
+        reason: "The learner explicitly chose supplemental research while the original guide was unavailable.",
+        createdAt: "2026-08-24T08:28:00.000Z",
+      },
+      {
+        mode: "anchored",
+        reason: "Learner supplied an accessible replacement material.",
+        createdAt: "2026-08-24T08:30:00.000Z",
+      },
+    ],
+  },
   sources: [
     {
       id: "source-1",
@@ -168,6 +185,10 @@ test("renderSessionNote contains the complete inspectable learning record", () =
     "Definition of a covector",
     "## Supplied learning materials",
     "Opened the supplied page and inspected the covector section.",
+    "Source-guidance mode",
+    "Anchored",
+    "Guidance transition history",
+    "learner explicitly chose supplemental research",
     "Anchor",
     "Section: Linear functionals",
     "## Source coverage and understanding",

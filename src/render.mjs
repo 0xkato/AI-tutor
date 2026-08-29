@@ -100,6 +100,24 @@ export function renderSessionNote(state, session) {
   }
 
   lines.push("## Supplied learning materials", "");
+  const sourceGuidance = session.sourceGuidance ?? {
+    mode: session.materials?.length ? "anchored" : "open",
+    reason: null,
+  };
+  lines.push(
+    `- **Source-guidance mode:** ${listValue(titleCase(sourceGuidance.mode.replaceAll("-", " ")))}`,
+    `- **Continuation reason:** ${listValue(sourceGuidance.reason ?? "None")}`,
+    "",
+  );
+  if (sourceGuidance.history?.length) {
+    lines.push("### Guidance transition history", "");
+    for (const entry of sourceGuidance.history) {
+      lines.push(
+        `- **${listValue(entry.createdAt)} — ${listValue(titleCase(entry.mode.replaceAll("-", " ")))}:** ${listValue(entry.reason ?? "No reason recorded")}`,
+      );
+    }
+    lines.push("");
+  }
   if (session.materials?.length) {
     for (const material of session.materials) {
       lines.push(

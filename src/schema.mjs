@@ -35,6 +35,7 @@ const NOTE_TARGET_TYPES = new Set(["session", "question", "concept", "step"]);
 const MATERIAL_KINDS = new Set(["youtube", "pdf", "notes", "repository", "web"]);
 const MATERIAL_STATUSES = new Set(["pending", "verified", "unavailable"]);
 const SOURCE_ROLES = new Set(["anchor", "supplemental"]);
+const SOURCE_GUIDANCE_MODES = new Set(["open", "anchored", "supplemental-only"]);
 
 function invalid(message, code = "INVALID_STATE") {
   throw new LearningError(message, code);
@@ -450,6 +451,49 @@ function validateSession(
     }
   }
 
+  object(session.sourceGuidance, `${label}.sourceGuidance`);
+  oneOf(
+    session.sourceGuidance.mode,
+    SOURCE_GUIDANCE_MODES,
+    `${label}.sourceGuidance.mode`,
+  );
+  nullableText(session.sourceGuidance.reason, `${label}.sourceGuidance.reason`);
+  stateInstant(session.sourceGuidance.updatedAt, `${label}.sourceGuidance.updatedAt`);
+  for (const [index, entry] of array(
+    session.sourceGuidance.history,
+    `${label}.sourceGuidance.history`,
+  ).entries()) {
+    const entryLabel = `${label}.sourceGuidance.history[${index}]`;
+    object(entry, entryLabel);
+    oneOf(entry.mode, SOURCE_GUIDANCE_MODES, `${entryLabel}.mode`);
+    nullableText(entry.reason, `${entryLabel}.reason`);
+    stateInstant(entry.createdAt, `${entryLabel}.createdAt`);
+    if (entry.mode === "supplemental-only" && entry.reason === null) {
+      invalid(`${entryLabel}.reason is required for supplemental-only mode`);
+    }
+  }
+  if (session.materials.length === 0 && session.sourceGuidance.mode !== "open") {
+    invalid(`${label}.sourceGuidance must be open when no learner materials exist`);
+  }
+  if (session.materials.length > 0 && session.sourceGuidance.mode === "open") {
+    invalid(`${label}.sourceGuidance cannot be open when learner materials exist`);
+  }
+  if (
+    session.sourceGuidance.mode === "supplemental-only" &&
+    (session.sourceGuidance.reason === null ||
+      session.materials.some((material) => material.status !== "unavailable"))
+  ) {
+    invalid(
+      `${label}.sourceGuidance supplemental-only mode requires a reason and only unavailable materials`,
+    );
+  }
+  if (
+    session.sourceGuidance.mode !== "supplemental-only" &&
+    session.sourceGuidance.reason !== null
+  ) {
+    invalid(`${label}.sourceGuidance reason requires supplemental-only mode`);
+  }
+
   const localSourceIds = new Set();
   for (const [index, source] of array(session.sources, `${label}.sources`).entries()) {
     const sourceLabel = `${label}.sources[${index}]`;
@@ -831,6 +875,22 @@ export function validateState(value) {
     if (!("notes" in session)) session.notes = [];
     if (!("materials" in session)) session.materials = [];
     if (!("sourceCoverage" in session)) session.sourceCoverage = [];
+    if (!("sourceGuidance" in session)) {
+      session.sourceGuidance = {
+        mode: session.materials.length > 0 ? "anchored" : "open",
+        reason: null,
+        updatedAt: session.updatedAt,
+        history: [],
+      };
+    }
+    if (
+      session.sourceGuidance &&
+      typeof session.sourceGuidance === "object" &&
+      !Array.isArray(session.sourceGuidance) &&
+      !("history" in session.sourceGuidance)
+    ) {
+      session.sourceGuidance.history = [];
+    }
     if (!("synthesisRequired" in session)) session.synthesisRequired = false;
     if (!("checkpoint" in session)) session.checkpoint = null;
     if (!("synthesisCheckpoint" in session)) session.synthesisCheckpoint = null;

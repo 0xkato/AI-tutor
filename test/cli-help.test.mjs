@@ -20,7 +20,9 @@ test("help lists the complete learning-session lifecycle", () => {
     "record-probe",
     "record-admitted-gap",
     "finish-probe",
+    "add-material",
     "resolve-material",
+    "continue-supplemental-only",
     "add-source",
     "record-source-coverage",
     "set-plan",
@@ -95,6 +97,14 @@ test("version and command-specific help are available without reading state", ()
 });
 
 test("source-guided command help exposes material and provenance boundaries", () => {
+  const addMaterialHelp = spawnSync(
+    process.execPath,
+    [cli, "add-material", "--help"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.equal(addMaterialHelp.status, 0, addMaterialHelp.stderr);
+  assert.match(addMaterialHelp.stdout, /--reference <value>\s+Additional or replacement learning material/);
+
   const resolveHelp = spawnSync(
     process.execPath,
     [cli, "resolve-material", "--help"],
@@ -124,6 +134,14 @@ test("source-guided command help exposes material and provenance boundaries", ()
   assert.match(coverageHelp.stdout, /--node <value>\s+Dependency-plan node supported by the source/);
   assert.match(coverageHelp.stdout, /--source-id <value>\s+Claim-level source identifier/);
   assert.match(coverageHelp.stdout, /--summary <value>\s+Bounded mechanism or claim supported/);
+
+  const supplementalHelp = spawnSync(
+    process.execPath,
+    [cli, "continue-supplemental-only", "--help"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.equal(supplementalHelp.status, 0, supplementalHelp.stderr);
+  assert.match(supplementalHelp.stdout, /--reason <value>\s+Learner-approved reason for continuing without a verified anchor/);
 });
 
 test("admitted-gap help describes ungraded learner evidence without undefined text", () => {

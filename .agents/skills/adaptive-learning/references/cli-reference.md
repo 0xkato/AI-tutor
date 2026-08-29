@@ -156,6 +156,20 @@ node bin/learn.mjs resolve-material --root <root> \
   --title "Supplied attention lesson" \
   --evidence "Retrieved the complete transcript and checked timestamp order"
 
+# If the supplied reference is unavailable, preserve that result. A later
+# /teach-from for the same target uses add-material to persist a replacement.
+node bin/learn.mjs resolve-material --root <root> \
+  --material-id <material-id> \
+  --status unavailable \
+  --evidence "The source could not be retrieved after checking the supplied reference"
+node bin/learn.mjs add-material --root <root> \
+  --reference "local:notes/replacement.md"
+
+# Only after every supplied material is unavailable and the learner explicitly
+# chooses to proceed without an anchor:
+node bin/learn.mjs continue-supplemental-only --root <root> \
+  --reason "The learner explicitly chose verified supplemental research after the supplied anchors were unavailable"
+
 # Record a bounded anchor claim with an exact locator. External research uses
 # --role supplemental and omits --material-id.
 node bin/learn.mjs add-source --root <root> \

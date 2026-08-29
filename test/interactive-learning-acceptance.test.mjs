@@ -127,6 +127,7 @@ test("Pi tool persistence path records graded choice, learner notes, and adaptiv
       "--title", "Transformer attention reference",
       "--url", "https://arxiv.org/abs/1706.03762",
       "--source-class", "primary",
+      "--locator", "Section 3.2.1",
       "--supports", "Attention uses learned query, key, and value projections.",
       "--verification", "Checked the attention equations and projection roles in the original paper.",
     ],

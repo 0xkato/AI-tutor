@@ -51,6 +51,7 @@ test("complete adaptive session persists evidence, retry state, review, and Obsi
     "--title", "Primary covector reference",
     "--url", "https://example.test/covectors",
     "--source-class", "primary",
+    "--locator", "Heading: Covectors as linear functionals",
     "--supports", "A covector is a linear functional from vectors to scalars.",
     "--verification", "Definition and assumptions were checked against an independent textbook.",
     "--now", at,

@@ -22,6 +22,7 @@ test("README provides a concise public quickstart with honest boundaries", () =>
   assert.match(readme, /YouTube[\s\S]*PDF[\s\S]*notes[\s\S]*web page[\s\S]*repository/i);
   assert.match(readme, /anchor[\s\S]*supplemental/i);
   assert.match(readme, /source coverage[\s\S]*not[\s\S]*(understanding|mastery)/i);
+  assert.match(readme, /unavailable anchor[\s\S]*(replacement|supplemental-only)[\s\S]*(saves|saved|decision)/i);
   assert.match(readme, /I don['’]t know[^\n]*ungraded gap/i);
   assert.match(readme, /\.adaptive-learning\/[\s\S]*vault\/[\s\S]*ignored by Git/i);
   assert.match(readme, /no telemetry/i);
@@ -62,4 +63,5 @@ test("state format documents schema v5 source-guided provenance and migration", 
   assert.match(format, /materials[\s\S]*pending[\s\S]*(verified|unavailability)/i);
   assert.match(format, /anchor material[\s\S]*supplemental research/i);
   assert.match(format, /sourceCoverage[\s\S]*not learner evidence/i);
+  assert.match(format, /sourceGuidance[\s\S]*pending materials block[\s\S]*continue-supplemental-only/i);
 });

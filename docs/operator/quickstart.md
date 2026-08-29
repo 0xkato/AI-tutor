@@ -144,6 +144,11 @@ Launch Pi from the repository root, then use:
 `/teach` without an argument resumes the active target. A different target
 cannot silently replace an active session.
 
+Run `/teach-from` again with another source and the same target to add an
+accessible replacement or another guide. If every supplied source is
+unavailable, the lesson stays blocked until you explicitly choose to continue
+using verified supplemental research; that choice is saved in the session.
+
 The Pi extension provides the interactive version of the same question. Use
 the arrow keys to move between choices, press Tab to edit the optional note,
 Enter to submit or return to the choices, Ctrl+J for a note newline, Backspace

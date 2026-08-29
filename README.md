@@ -55,6 +55,11 @@ evidence, including where it corrects or limits the anchor. Source coverage
 shows what supports each lesson step; it is not evidence of your understanding
 or mastery.
 
+Run `/teach-from` again with another source and the same target to add a
+replacement or another guide. An unavailable anchor blocks teaching until you
+provide an accessible replacement or explicitly choose a supplemental-only
+lesson; the tutor saves that decision instead of assuming it.
+
 When a multiple-choice question appears:
 
 - use the arrow keys to choose an answer;

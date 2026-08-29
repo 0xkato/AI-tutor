@@ -47,6 +47,10 @@ A session with learner-supplied materials is source-guided.
    otherwise resolve it as `unavailable` and preserve that boundary. An
    unavailable anchor blocks source-guided teaching until the learner supplies
    an accessible replacement or explicitly chooses a supplemental-only lesson.
+   Add a replacement with `add-material --reference ...`. After every supplied
+   material has resolved unavailable, persist an explicit learner choice with
+   `continue-supplemental-only --reason ...`; never make that choice for the
+   learner.
 2. Record claims from the supplied material as anchor evidence with its
    material ID and an exact locator. A video claim needs a timestamp; a PDF
    claim needs a page; notes or a web page need a heading or section; a

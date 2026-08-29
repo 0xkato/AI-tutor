@@ -159,6 +159,70 @@ test("CLI persists a complete source-guided material and coverage lifecycle", ()
   assert.equal(context.session.sourceCoverage[0].nodeId, "attention");
 });
 
+test("CLI persists supplemental-only consent and later replacement material", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-source-recovery-"));
+  run(root, "init", "--now", "2026-08-29T08:00:00.000Z");
+  run(
+    root,
+    "start",
+    "--id",
+    "source-recovery-session",
+    "--topic",
+    "Transformers",
+    "--target",
+    "Understand attention",
+    "--material",
+    "https://example.test/unavailable-guide",
+    "--now",
+    "2026-08-29T08:01:00.000Z",
+  );
+  let context = JSON.parse(run(root, "context", "--json"));
+  const materialId = context.session.materials[0].id;
+  run(
+    root,
+    "resolve-material",
+    "--material-id",
+    materialId,
+    "--status",
+    "unavailable",
+    "--evidence",
+    "The host could not retrieve an accessible copy or transcript from the supplied reference.",
+    "--now",
+    "2026-08-29T08:02:00.000Z",
+  );
+  run(
+    root,
+    "continue-supplemental-only",
+    "--reason",
+    "The learner explicitly chose to continue with verified supplemental sources because the supplied guide was inaccessible.",
+    "--now",
+    "2026-08-29T08:03:00.000Z",
+  );
+  context = JSON.parse(run(root, "context", "--json"));
+  assert.equal(context.session.sourceGuidance.mode, "supplemental-only");
+
+  run(
+    root,
+    "add-material",
+    "--id",
+    "replacement-material",
+    "--reference",
+    "local:notes/attention.md",
+    "--now",
+    "2026-08-29T08:04:00.000Z",
+  );
+  context = JSON.parse(run(root, "context", "--json"));
+  assert.equal(context.session.sourceGuidance.mode, "anchored");
+  assert.equal(context.session.sourceGuidance.reason, null);
+  assert.equal(context.session.materials[1].id, "replacement-material");
+  assert.equal(context.session.materials[1].status, "pending");
+  assert.deepEqual(context.session.sourceGuidance.history.map((entry) => entry.mode), [
+    "supplemental-only",
+    "anchored",
+  ]);
+  assert.match(context.session.sourceGuidance.history[0].reason, /learner explicitly chose/i);
+});
+
 test("learner profile commands persist preferences atomically and render them to Obsidian", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-profile-cli-"));
   run(root, "init", "--now", "2026-08-24T08:00:00.000Z");
