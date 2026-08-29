@@ -10,6 +10,7 @@ import {
   migrateV2ToV3,
   migrateV3ToV4,
   migrateV4ToV5,
+  migrateV5ToV6,
 } from "../src/migrations.mjs";
 import { pathsFor, readState } from "../src/store.mjs";
 
@@ -126,8 +127,8 @@ test("readState backs up and migrates version-1 state before returning it", () =
 
   const state = readState(root);
 
-  assert.equal(state.schemaVersion, 5);
-  assert.equal(JSON.parse(fs.readFileSync(paths.state, "utf8")).schemaVersion, 5);
+  assert.equal(state.schemaVersion, 6);
+  assert.equal(JSON.parse(fs.readFileSync(paths.state, "utf8")).schemaVersion, 6);
   const backups = fs.readdirSync(paths.backups);
   assert.equal(backups.length, 1);
   assert.equal(JSON.parse(fs.readFileSync(path.join(paths.backups, backups[0]), "utf8")).schemaVersion, 1);
@@ -204,6 +205,34 @@ test("migrateV4ToV5 deterministically adds source-guided provenance fields", () 
   assert.equal("role" in versionFour.sessions.s1.sources[0], false);
 });
 
+test("migrateV5ToV6 deterministically derives adaptive evidence without losing assessments", () => {
+  const versionFive = migrateV4ToV5(
+    migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(versionOneFixture()))),
+  );
+
+  const first = migrateV5ToV6(versionFive);
+  const second = migrateV5ToV6(versionFive);
+  const conceptId = conceptIdForV1("s1", "gradient");
+  const concept = first.concepts[conceptId];
+  const review = first.reviews[concept.reviewId];
+
+  assert.deepEqual(first, second);
+  assert.equal(first.schemaVersion, 6);
+  assert.deepEqual(first.misconceptions, {});
+  assert.deepEqual(first.sessions.s1.activityHistory, []);
+  assert.deepEqual(first.sessions.s1.productiveAttempts, []);
+  assert.equal(concept.mastery.application.level, 2);
+  assert.deepEqual(concept.mastery.application.evidenceIds, ["a1"]);
+  assert.equal(concept.highestTransferLevel, 1);
+  assert.equal(concept.supportLevel, 2);
+  assert.deepEqual(concept.misconceptionIds, []);
+  assert.deepEqual(review.history, []);
+  assert.equal(review.stabilityDays, 0);
+  assert.equal(review.difficulty, 50);
+  assert.equal(review.lapses, 0);
+  assert.equal(versionFive.schemaVersion, 5, "migration must not mutate version 5");
+});
+
 test("readState backs up and migrates version-4 state before returning it", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-migrate-v4-"));
   const paths = pathsFor(root);
@@ -213,7 +242,7 @@ test("readState backs up and migrates version-4 state before returning it", () =
 
   const state = readState(root);
 
-  assert.equal(state.schemaVersion, 5);
+  assert.equal(state.schemaVersion, 6);
   assert.deepEqual(state.sessions.s1.materials, []);
   assert.deepEqual(state.sessions.s1.sourceCoverage, []);
   assert.equal(state.sessions.s1.sourceGuidance.mode, "open");
@@ -231,7 +260,7 @@ test("readState backs up and migrates version-2 state before returning it", () =
 
   const state = readState(root);
 
-  assert.equal(state.schemaVersion, 5);
+  assert.equal(state.schemaVersion, 6);
   assert.deepEqual(state.sessions.s1.questions, []);
   assert.deepEqual(state.sessions.s1.notes, []);
   const backups = fs.readdirSync(paths.backups);
@@ -248,7 +277,7 @@ test("readState backs up and migrates version-3 state before returning it", () =
 
   const state = readState(root);
 
-  assert.equal(state.schemaVersion, 5);
+  assert.equal(state.schemaVersion, 6);
   assert.deepEqual(state.learnerProfile, {
     teachingPhilosophy: "",
     explanationPreferences: "",

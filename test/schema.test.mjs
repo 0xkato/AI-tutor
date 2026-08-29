@@ -21,13 +21,14 @@ test("parseInstant accepts only canonical ISO instants", () => {
   }
 });
 
-test("validateState accepts and clones a complete version-5 initial state with a learner profile", () => {
+test("validateState accepts and clones a complete version-6 adaptive learning state", () => {
   const state = createInitialState({ now: NOW });
   const validated = validateState(state);
 
   assert.deepEqual(validated, state);
   assert.notEqual(validated, state);
-  assert.equal(validated.schemaVersion, 5);
+  assert.equal(validated.schemaVersion, 6);
+  assert.deepEqual(validated.misconceptions, {});
   assert.deepEqual(validated.learnerProfile, {
     teachingPhilosophy: "",
     explanationPreferences: "",
@@ -36,6 +37,21 @@ test("validateState accepts and clones a complete version-5 initial state with a
     sourcePreferences: "",
     updatedAt: null,
   });
+});
+
+test("new concepts, sessions, and reviews include neutral adaptive evidence fields", () => {
+  let state = createInitialState({ now: NOW });
+  state = startSession(state, {
+    id: "adaptive-session",
+    topicId: "adaptive-topic",
+    topic: "Transformers",
+    target: "Build transferable understanding",
+    now: NOW,
+  });
+
+  assert.deepEqual(state.sessions["adaptive-session"].activityHistory, []);
+  assert.deepEqual(state.sessions["adaptive-session"].productiveAttempts, []);
+  assert.deepEqual(state.misconceptions, {});
 });
 
 test("validateState additively upgrades sessions created before later session fields", () => {
@@ -93,9 +109,9 @@ test("validateState defaults source guidance to anchored when materials already 
   });
 });
 
-test("validateState rejects structurally incomplete version-5 state", () => {
+test("validateState rejects structurally incomplete version-6 state", () => {
   assert.throws(
-    () => validateState({ schemaVersion: 5, sessions: {} }),
+    () => validateState({ schemaVersion: 6, sessions: {} }),
     (error) => error.code === "INVALID_STATE" && /createdAt/.test(error.message),
   );
 });

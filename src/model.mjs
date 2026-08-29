@@ -56,6 +56,7 @@ export function createInitialState({ now } = {}) {
     sessions: {},
     topics: {},
     concepts: {},
+    misconceptions: {},
     reviews: {},
     reviewCount: 0,
     render: { revision: 0, status: "stale", error: null },
@@ -170,6 +171,8 @@ export function startSession(state, input) {
     assessments: [],
     questions: [],
     notes: [],
+    activityHistory: [],
+    productiveAttempts: [],
     materials,
     sourceGuidance: {
       mode: materials.length > 0 ? "anchored" : "open",

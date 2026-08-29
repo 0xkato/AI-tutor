@@ -2,7 +2,7 @@ import { LearningError } from "./errors.mjs";
 import { validatePlan } from "./graph.mjs";
 import { safeRelativeVaultPath, safeVaultDir, validateSourceReference } from "./inputs.mjs";
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 const SESSION_PHASES = new Set(["probe", "plan", "teach", "review", "complete"]);
 const SESSION_KINDS = new Set(["learn", "review"]);
@@ -36,6 +36,17 @@ const MATERIAL_KINDS = new Set(["youtube", "pdf", "notes", "repository", "web"])
 const MATERIAL_STATUSES = new Set(["pending", "verified", "unavailable"]);
 const SOURCE_ROLES = new Set(["anchor", "supplemental"]);
 const SOURCE_GUIDANCE_MODES = new Set(["open", "anchored", "supplemental-only"]);
+const MASTERY_DIMENSIONS = new Set([
+  "recall",
+  "explanation",
+  "prediction",
+  "application",
+  "discrimination",
+  "debugging",
+  "integration",
+  "retention",
+]);
+const MISCONCEPTION_STATUSES = new Set(["active", "repairing", "resolved"]);
 
 function invalid(message, code = "INVALID_STATE") {
   throw new LearningError(message, code);
@@ -63,6 +74,12 @@ function integer(value, label) {
   if (!Number.isSafeInteger(value) || value < 0) {
     invalid(`${label} must be a non-negative safe integer`);
   }
+  return value;
+}
+
+function boundedInteger(value, label, maximum) {
+  integer(value, label);
+  if (value > maximum) invalid(`${label} must be at most ${maximum}`);
   return value;
 }
 
@@ -220,6 +237,12 @@ function validateAssessment(item, label, globalAssessmentIds) {
   text(item.evidence, `${label}.evidence`);
   text(item.mistakeType, `${label}.mistakeType`, { allowEmpty: true });
   if (typeof item.contaminated !== "boolean") invalid(`${label}.contaminated must be boolean`);
+  if (item.confidence !== null) boundedInteger(item.confidence, `${label}.confidence`, 100);
+  if (item.responseTimeMs !== null) integer(item.responseTimeMs, `${label}.responseTimeMs`);
+  if (item.transferLevel !== null) boundedInteger(item.transferLevel, `${label}.transferLevel`, 4);
+  if (item.supportLevel !== null) boundedInteger(item.supportLevel, `${label}.supportLevel`, 4);
+  text(item.activityType, `${label}.activityType`);
+  uniqueTextArray(item.misconceptionIds, `${label}.misconceptionIds`);
   stateInstant(item.createdAt, `${label}.createdAt`);
 }
 
@@ -361,6 +384,41 @@ function validateSession(
     invalid(`${label}.completedAt requires the complete phase`);
   }
   text(session.probeSummary, `${label}.probeSummary`, { allowEmpty: true });
+
+  for (const [index, activity] of array(session.activityHistory, `${label}.activityHistory`).entries()) {
+    const activityLabel = `${label}.activityHistory[${index}]`;
+    object(activity, activityLabel);
+    text(activity.id, `${activityLabel}.id`);
+    text(activity.type, `${activityLabel}.type`);
+    text(activity.nodeId, `${activityLabel}.nodeId`);
+    nullableText(activity.questionId, `${activityLabel}.questionId`);
+    text(activity.reason, `${activityLabel}.reason`);
+    if (activity.transferLevel !== null) {
+      boundedInteger(activity.transferLevel, `${activityLabel}.transferLevel`, 4);
+    }
+    if (activity.supportLevel !== null) {
+      boundedInteger(activity.supportLevel, `${activityLabel}.supportLevel`, 4);
+    }
+    stateInstant(activity.createdAt, `${activityLabel}.createdAt`);
+  }
+
+  for (const [index, attempt] of array(session.productiveAttempts, `${label}.productiveAttempts`).entries()) {
+    const attemptLabel = `${label}.productiveAttempts[${index}]`;
+    object(attempt, attemptLabel);
+    text(attempt.id, `${attemptLabel}.id`);
+    text(attempt.nodeId, `${attemptLabel}.nodeId`);
+    text(attempt.questionId, `${attemptLabel}.questionId`);
+    text(attempt.prompt, `${attemptLabel}.prompt`);
+    text(attempt.answer, `${attemptLabel}.answer`);
+    text(attempt.rationale, `${attemptLabel}.rationale`);
+    if (attempt.confidence !== null) {
+      boundedInteger(attempt.confidence, `${attemptLabel}.confidence`, 100);
+    }
+    if (attempt.responseTimeMs !== null) {
+      integer(attempt.responseTimeMs, `${attemptLabel}.responseTimeMs`);
+    }
+    stateInstant(attempt.createdAt, `${attemptLabel}.createdAt`);
+  }
 
   const admittedGapNodes = new Set();
   for (const [index, gap] of array(session.admittedGaps, `${label}.admittedGaps`).entries()) {
@@ -793,6 +851,34 @@ function validateConcepts(state, allAssessmentIds) {
     if (concept.latestGrade !== null) oneOf(concept.latestGrade, GRADES, `${label}.latestGrade`);
     stateInstant(concept.createdAt, `${label}.createdAt`);
     stateInstant(concept.updatedAt, `${label}.updatedAt`);
+    const mastery = object(concept.mastery, `${label}.mastery`);
+    if (
+      Object.keys(mastery).length !== MASTERY_DIMENSIONS.size ||
+      [...MASTERY_DIMENSIONS].some((dimension) => !(dimension in mastery))
+    ) {
+      invalid(`${label}.mastery must contain every mastery dimension exactly once`);
+    }
+    for (const dimension of MASTERY_DIMENSIONS) {
+      const record = object(mastery[dimension], `${label}.mastery.${dimension}`);
+      boundedInteger(record.level, `${label}.mastery.${dimension}.level`, 4);
+      integer(record.attempts, `${label}.mastery.${dimension}.attempts`);
+      integer(record.correct, `${label}.mastery.${dimension}.correct`);
+      if (record.correct > record.attempts) {
+        invalid(`${label}.mastery.${dimension}.correct cannot exceed attempts`);
+      }
+      nullableInstant(record.lastAssessedAt, `${label}.mastery.${dimension}.lastAssessedAt`);
+      for (const evidenceId of uniqueTextArray(
+        record.evidenceIds,
+        `${label}.mastery.${dimension}.evidenceIds`,
+      )) {
+        if (!allAssessmentIds.has(evidenceId)) {
+          invalid(`${label}.mastery.${dimension} references unknown evidence: ${evidenceId}`);
+        }
+      }
+    }
+    boundedInteger(concept.highestTransferLevel, `${label}.highestTransferLevel`, 4);
+    boundedInteger(concept.supportLevel, `${label}.supportLevel`, 4);
+    uniqueTextArray(concept.misconceptionIds, `${label}.misconceptionIds`);
     for (const evidenceId of uniqueTextArray(concept.evidenceIds, `${label}.evidenceIds`)) {
       if (!allAssessmentIds.has(evidenceId)) invalid(`${label} references unknown evidence: ${evidenceId}`);
     }
@@ -824,6 +910,18 @@ function validateReviews(state) {
     integer(review.level, `${label}.level`);
     nullableInstant(review.dueAt, `${label}.dueAt`);
     integer(review.completed, `${label}.completed`);
+    integer(review.stabilityDays, `${label}.stabilityDays`);
+    boundedInteger(review.difficulty, `${label}.difficulty`, 100);
+    integer(review.lapses, `${label}.lapses`);
+    array(review.history, `${label}.history`).forEach((entry, index) => {
+      const entryLabel = `${label}.history[${index}]`;
+      object(entry, entryLabel);
+      text(entry.evidenceId, `${entryLabel}.evidenceId`);
+      oneOf(entry.grade, GRADES, `${entryLabel}.grade`);
+      integer(entry.intervalDays, `${entryLabel}.intervalDays`);
+      nullableInstant(entry.dueAt, `${entryLabel}.dueAt`);
+      stateInstant(entry.createdAt, `${entryLabel}.createdAt`);
+    });
     oneOf(review.status, REVIEW_STATUSES, `${label}.status`);
     nullableText(review.claimedBySessionId, `${label}.claimedBySessionId`);
     nullableInstant(review.claimedAt, `${label}.claimedAt`);
@@ -864,6 +962,7 @@ export function validateState(value) {
   validateLearnerProfile(state.learnerProfile);
   object(state.sessions, "sessions");
   object(state.concepts, "concepts");
+  object(state.misconceptions, "misconceptions");
   object(state.reviews, "reviews");
   integer(state.reviewCount, "reviewCount");
   for (const session of Object.values(state.sessions)) {
@@ -873,6 +972,8 @@ export function validateState(value) {
     if (!("checkpointGaps" in session)) session.checkpointGaps = [];
     if (!("questions" in session)) session.questions = [];
     if (!("notes" in session)) session.notes = [];
+    if (!("activityHistory" in session)) session.activityHistory = [];
+    if (!("productiveAttempts" in session)) session.productiveAttempts = [];
     if (!("materials" in session)) session.materials = [];
     if (!("sourceCoverage" in session)) session.sourceCoverage = [];
     if (!("sourceGuidance" in session)) {
@@ -913,12 +1014,36 @@ export function validateState(value) {
         if (!("materialId" in source)) source.materialId = null;
       }
     }
+    if (Array.isArray(session.assessments)) {
+      for (const assessment of session.assessments) {
+        if (!assessment || typeof assessment !== "object" || Array.isArray(assessment)) continue;
+        if (!("confidence" in assessment)) assessment.confidence = null;
+        if (!("responseTimeMs" in assessment)) assessment.responseTimeMs = null;
+        if (!("transferLevel" in assessment)) assessment.transferLevel = null;
+        if (!("supportLevel" in assessment)) assessment.supportLevel = null;
+        if (!("activityType" in assessment)) assessment.activityType = "assessment";
+        if (!("misconceptionIds" in assessment)) assessment.misconceptionIds = [];
+      }
+    }
+  }
+  for (const concept of Object.values(state.concepts)) {
+    if (!concept || typeof concept !== "object" || Array.isArray(concept)) continue;
+    if (!("mastery" in concept)) {
+      invalid(`concepts.${concept.id ?? "unknown"}.mastery is required`);
+    }
+    if (!("highestTransferLevel" in concept)) concept.highestTransferLevel = 0;
+    if (!("supportLevel" in concept)) concept.supportLevel = 4;
+    if (!("misconceptionIds" in concept)) concept.misconceptionIds = [];
   }
   for (const review of Object.values(state.reviews)) {
     if (!review || typeof review !== "object" || Array.isArray(review)) continue;
     if (!("claimedBySessionId" in review)) review.claimedBySessionId = null;
     if (!("claimedAt" in review)) review.claimedAt = null;
     if (!("deferredReason" in review)) review.deferredReason = null;
+    if (!("stabilityDays" in review)) review.stabilityDays = 0;
+    if (!("difficulty" in review)) review.difficulty = 50;
+    if (!("lapses" in review)) review.lapses = 0;
+    if (!("history" in review)) review.history = [];
   }
 
   const assessmentIds = new Map();
@@ -949,6 +1074,32 @@ export function validateState(value) {
   validateReviews(state);
   validateTopics(state);
   validateConcepts(state, assessmentIds);
+
+  for (const [id, misconception] of Object.entries(state.misconceptions)) {
+    const label = `misconceptions.${id}`;
+    object(misconception, label);
+    if (misconception.id !== id) invalid(`${label}.id must match its key`);
+    if (!state.concepts[misconception.conceptId]) {
+      invalid(`${label}.conceptId references an unknown concept`);
+    }
+    text(misconception.statement, `${label}.statement`);
+    oneOf(misconception.status, MISCONCEPTION_STATUSES, `${label}.status`);
+    boundedInteger(misconception.confidence, `${label}.confidence`, 100);
+    integer(misconception.occurrences, `${label}.occurrences`);
+    integer(misconception.relapses, `${label}.relapses`);
+    nullableText(misconception.counterexample, `${label}.counterexample`);
+    nullableText(misconception.repair, `${label}.repair`);
+    uniqueTextArray(misconception.evidenceIds, `${label}.evidenceIds`);
+    stateInstant(misconception.createdAt, `${label}.createdAt`);
+    stateInstant(misconception.updatedAt, `${label}.updatedAt`);
+    nullableInstant(misconception.resolvedAt, `${label}.resolvedAt`);
+    if (misconception.status === "resolved" && misconception.resolvedAt === null) {
+      invalid(`${label}.resolvedAt is required when resolved`);
+    }
+    if (!state.concepts[misconception.conceptId].misconceptionIds.includes(id)) {
+      invalid(`${label} is not referenced by its concept`);
+    }
+  }
 
   object(state.render, "render");
   integer(state.render.revision, "render.revision");

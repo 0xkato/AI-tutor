@@ -8,6 +8,7 @@ import {
   migrateV2ToV3,
   migrateV3ToV4,
   migrateV4ToV5,
+  migrateV5ToV6,
 } from "./migrations.mjs";
 import { createInitialState } from "./model.mjs";
 import { parseInstant, validateState } from "./schema.mjs";
@@ -253,12 +254,13 @@ function backupLegacyVersion(paths, state) {
 
 function readStateUnlocked(paths, ownership) {
   const original = parseState(paths);
-  if ([1, 2, 3, 4].includes(original.schemaVersion)) {
+  if ([1, 2, 3, 4, 5].includes(original.schemaVersion)) {
     backupLegacyVersion(paths, original);
     const versionTwo = original.schemaVersion === 1 ? migrateV1ToV2(original) : original;
     const versionThree = versionTwo.schemaVersion === 2 ? migrateV2ToV3(versionTwo) : versionTwo;
     const versionFour = versionThree.schemaVersion === 3 ? migrateV3ToV4(versionThree) : versionThree;
-    const migrated = migrateV4ToV5(versionFour);
+    const versionFive = versionFour.schemaVersion === 4 ? migrateV4ToV5(versionFour) : versionFour;
+    const migrated = migrateV5ToV6(versionFive);
     return writeStateUnlocked(paths, migrated, ownership);
   }
   return validateState(original);

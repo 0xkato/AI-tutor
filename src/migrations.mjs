@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { LearningError } from "./errors.mjs";
+import { legacySupportLevel, seedMasteryFromAssessments } from "./learning-strategy.mjs";
 import { validateState } from "./schema.mjs";
 
 function stableId(prefix, ...parts) {
@@ -239,5 +240,55 @@ export function migrateV4ToV5(value) {
       source.materialId = null;
     }
   }
+  return next;
+}
+
+export function migrateV5ToV6(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new LearningError("Version-5 state must be an object", "INVALID_STATE");
+  }
+  if (value.schemaVersion !== 5) {
+    throw new LearningError(`Cannot migrate schema version: ${value.schemaVersion}`, "UNSUPPORTED_SCHEMA");
+  }
+
+  const next = structuredClone(value);
+  next.schemaVersion = 6;
+  next.revision = (next.revision ?? 0) + 1;
+  next.misconceptions = {};
+  next.render = { revision: next.render?.revision ?? 0, status: "stale", error: null };
+
+  const assessments = new Map();
+  for (const session of Object.values(next.sessions ?? {})) {
+    session.activityHistory = [];
+    session.productiveAttempts = [];
+    for (const assessment of session.assessments ?? []) {
+      assessment.confidence = null;
+      assessment.responseTimeMs = null;
+      assessment.transferLevel = assessment.kind === "transfer" ? 1 : null;
+      assessment.supportLevel = null;
+      assessment.activityType = "assessment";
+      assessment.misconceptionIds = [];
+      assessments.set(assessment.id, assessment);
+    }
+  }
+
+  for (const concept of Object.values(next.concepts ?? {})) {
+    const conceptAssessments = (concept.evidenceIds ?? [])
+      .map((id) => assessments.get(id))
+      .filter(Boolean);
+    const seeded = seedMasteryFromAssessments(conceptAssessments);
+    concept.mastery = seeded.mastery;
+    concept.highestTransferLevel = seeded.highestTransferLevel;
+    concept.supportLevel = legacySupportLevel(concept.status);
+    concept.misconceptionIds = [];
+  }
+
+  for (const review of Object.values(next.reviews ?? {})) {
+    review.stabilityDays = 0;
+    review.difficulty = 50;
+    review.lapses = 0;
+    review.history = [];
+  }
+
   return validateState(next);
 }

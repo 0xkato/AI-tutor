@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { LearningError, requireText } from "./errors.mjs";
+import { createMasteryProfile } from "./learning-strategy.mjs";
 import { advanceReview } from "./retention.mjs";
 
 const DURABLE_KINDS = new Set(["transfer", "reconstruction", "debugging", "synthesis", "retention"]);
@@ -102,6 +103,10 @@ export function createConceptForSession(state, session, { id, nodeId, title, now
     status: "unknown",
     latestGrade: null,
     evidenceIds: [],
+    mastery: createMasteryProfile(),
+    highestTransferLevel: 0,
+    supportLevel: 4,
+    misconceptionIds: [],
     retry: null,
     reviewId,
     sourceSessionIds: [session.id],
@@ -115,6 +120,10 @@ export function createConceptForSession(state, session, { id, nodeId, title, now
     level: 0,
     dueAt: null,
     completed: 0,
+    stabilityDays: 0,
+    difficulty: 50,
+    lapses: 0,
+    history: [],
     status: "inactive",
     claimedBySessionId: null,
     claimedAt: null,
