@@ -1,4 +1,5 @@
 import { recordAssessment } from "./assessment.mjs";
+import { LearningError } from "./errors.mjs";
 import { getActiveSession, recordAdmittedGap } from "./model.mjs";
 import { answerQuestion } from "./questions.mjs";
 
@@ -20,6 +21,13 @@ export function submitQuestion(state, input = {}) {
   const answered = answerQuestion(state, input);
   const question = persistedQuestion(answered, input.questionId);
   const response = question.responses.at(-1);
+
+  if (question.mode === "free-response") {
+    throw new LearningError(
+      "Free responses require an explicit host assessment after the answer is persisted",
+      "EXPLICIT_ASSESSMENT_REQUIRED",
+    );
+  }
 
   if (response.dontKnow) {
     return recordAdmittedGap(answered, {

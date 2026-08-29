@@ -30,7 +30,15 @@ const QUESTION_STATUSES = new Set([
   "cancelled",
   "contaminated",
 ]);
-const QUESTION_MODES = new Set(["single-select", "multi-select"]);
+const QUESTION_MODES = new Set(["single-select", "multi-select", "free-response"]);
+const FREE_RESPONSE_KINDS = new Set([
+  "explanation",
+  "prediction",
+  "transfer",
+  "contrastive",
+  "reconstruction",
+  "debugging",
+]);
 const NOTE_TARGET_TYPES = new Set(["session", "question", "concept", "step"]);
 const MATERIAL_KINDS = new Set(["youtube", "pdf", "notes", "repository", "web"]);
 const MATERIAL_STATUSES = new Set(["pending", "verified", "unavailable"]);
@@ -259,13 +267,27 @@ function validateQuestion(item, label, questionIds, responseIds) {
   questionIds.add(item.id);
   oneOf(item.stage, QUESTION_STAGES, `${label}.stage`);
   text(item.nodeId, `${label}.nodeId`);
-  if (item.kind !== "multiple-choice") invalid(`${label}.kind must be multiple-choice`);
+  text(item.kind, `${label}.kind`);
   text(item.question, `${label}.question`);
   oneOf(item.mode, QUESTION_MODES, `${label}.mode`);
+  const isFreeResponse = item.mode === "free-response";
+  if (
+    (!isFreeResponse && item.kind !== "multiple-choice") ||
+    (isFreeResponse && !FREE_RESPONSE_KINDS.has(item.kind))
+  ) {
+    invalid(`${label}.kind is incompatible with ${item.mode}`);
+  }
+  text(item.activityType, `${label}.activityType`);
+  text(item.strategyReason, `${label}.strategyReason`);
+  if (item.supportLevel !== null) boundedInteger(item.supportLevel, `${label}.supportLevel`, 4);
+  if (item.transferLevel !== null) boundedInteger(item.transferLevel, `${label}.transferLevel`, 4);
 
   const choiceValues = new Set();
   const choices = array(item.choices, `${label}.choices`);
-  if (choices.length < 2 || choices.length > 12) invalid(`${label}.choices must contain 2 to 12 items`);
+  if (isFreeResponse && choices.length !== 0) invalid(`${label}.choices must be empty for free response`);
+  if (!isFreeResponse && (choices.length < 2 || choices.length > 12)) {
+    invalid(`${label}.choices must contain 2 to 12 items`);
+  }
   for (const [index, choice] of choices.entries()) {
     const choiceLabel = `${label}.choices[${index}]`;
     object(choice, choiceLabel);
@@ -276,14 +298,18 @@ function validateQuestion(item, label, questionIds, responseIds) {
     choiceValues.add(choice.value);
   }
   const correctValues = uniqueTextArray(item.correctChoiceValues, `${label}.correctChoiceValues`);
-  if (
+  if (isFreeResponse && correctValues.length !== 0) {
+    invalid(`${label}.correctChoiceValues must be empty for free response`);
+  }
+  if (!isFreeResponse && (
     correctValues.length === 0 ||
     correctValues.some((value) => !choiceValues.has(value)) ||
     (item.mode === "single-select" && correctValues.length !== 1)
-  ) {
+  )) {
     invalid(`${label}.correctChoiceValues do not match the choices and mode`);
   }
-  text(item.explanation, `${label}.explanation`);
+  if (isFreeResponse) nullableText(item.explanation, `${label}.explanation`);
+  else text(item.explanation, `${label}.explanation`);
   oneOf(item.status, QUESTION_STATUSES, `${label}.status`);
   nullableText(item.parentQuestionId, `${label}.parentQuestionId`);
   nullableText(item.adaptationReason, `${label}.adaptationReason`);
@@ -304,23 +330,38 @@ function validateQuestion(item, label, questionIds, responseIds) {
     if (selected.some((value) => !choiceValues.has(value))) {
       invalid(`${responseLabel} references an unknown choice`);
     }
+    nullableText(response.textAnswer, `${responseLabel}.textAnswer`);
     if (typeof response.dontKnow !== "boolean") invalid(`${responseLabel}.dontKnow must be boolean`);
-    if (typeof response.correct !== "boolean") invalid(`${responseLabel}.correct must be boolean`);
+    if (isFreeResponse) {
+      if (response.correct !== null) invalid(`${responseLabel}.correct must be null for free response`);
+    } else if (typeof response.correct !== "boolean") {
+      invalid(`${responseLabel}.correct must be boolean`);
+    }
+    if (response.confidence !== null) boundedInteger(response.confidence, `${responseLabel}.confidence`, 100);
+    if (response.responseTimeMs !== null) integer(response.responseTimeMs, `${responseLabel}.responseTimeMs`);
     nullableText(response.noteId, `${responseLabel}.noteId`);
     nullableText(response.assessmentId, `${responseLabel}.assessmentId`);
     stateInstant(response.createdAt, `${responseLabel}.createdAt`);
-    if (response.dontKnow && selected.length !== 0) {
-      invalid(`${responseLabel} cannot select choices with I don't know`);
+    if (response.dontKnow && (selected.length !== 0 || response.textAnswer !== null)) {
+      invalid(`${responseLabel} cannot include an answer with I don't know`);
     }
     if (
-      !response.dontKnow &&
+      !isFreeResponse && !response.dontKnow &&
       ((item.mode === "single-select" && selected.length !== 1) ||
         (item.mode === "multi-select" && selected.length === 0))
     ) {
       invalid(`${responseLabel} selections do not match the question mode`);
     }
-    const computedCorrect = !response.dontKnow && equalTextSets(selected, correctValues);
-    if (response.correct !== computedCorrect) invalid(`${responseLabel}.correct is inconsistent`);
+    if (isFreeResponse) {
+      if (!response.dontKnow && response.textAnswer === null) {
+        invalid(`${responseLabel}.textAnswer is required for free response`);
+      }
+      if (selected.length !== 0) invalid(`${responseLabel} cannot select choices for free response`);
+    } else {
+      if (response.textAnswer !== null) invalid(`${responseLabel}.textAnswer requires free response`);
+      const computedCorrect = !response.dontKnow && equalTextSets(selected, correctValues);
+      if (response.correct !== computedCorrect) invalid(`${responseLabel}.correct is inconsistent`);
+    }
   }
 
   const latest = responses.at(-1) ?? null;
@@ -335,13 +376,17 @@ function validateQuestion(item, label, questionIds, responseIds) {
   }
   if (
     item.status === "retry-required" &&
-    (!latest || latest.dontKnow || latest.correct || latest.assessmentId === null)
+    (!latest || latest.dontKnow || (!isFreeResponse && latest.correct) || latest.assessmentId === null)
   ) {
     invalid(`${label} requires an assessed incorrect response for retry`);
   }
   if (
     ["resolved", "contaminated"].includes(item.status) &&
-    (!latest || latest.dontKnow || latest.assessmentId === null)
+    (
+      !latest ||
+      latest.dontKnow ||
+      (latest.assessmentId === null && item.activityType !== "productive-failure")
+    )
   ) {
     invalid(`${label} requires an assessed response when ${item.status}`);
   }
@@ -693,9 +738,15 @@ function validateSession(
         ) {
           invalid(`${questionLabel} response references an incompatible assessment`);
         }
-        const expectedGrade = response.correct ? "correct" : "incorrect";
-        if (assessment.grade !== expectedGrade) {
-          invalid(`${questionLabel} response has an inconsistent assessment grade`);
+        if (question.mode === "free-response") {
+          if (assessment.answer !== response.textAnswer) {
+            invalid(`${questionLabel} assessment does not preserve the free response`);
+          }
+        } else {
+          const expectedGrade = response.correct ? "correct" : "incorrect";
+          if (assessment.grade !== expectedGrade) {
+            invalid(`${questionLabel} response has an inconsistent assessment grade`);
+          }
         }
         if (
           response === question.responses.at(-1) &&
@@ -1039,6 +1090,23 @@ export function validateState(value) {
         if (!("supportLevel" in assessment)) assessment.supportLevel = null;
         if (!("activityType" in assessment)) assessment.activityType = "assessment";
         if (!("misconceptionIds" in assessment)) assessment.misconceptionIds = [];
+      }
+    }
+    if (Array.isArray(session.questions)) {
+      for (const question of session.questions) {
+        if (!question || typeof question !== "object" || Array.isArray(question)) continue;
+        if (!("activityType" in question)) question.activityType = "multiple-choice";
+        if (!("strategyReason" in question)) question.strategyReason = "Legacy question activity.";
+        if (!("supportLevel" in question)) question.supportLevel = null;
+        if (!("transferLevel" in question)) question.transferLevel = null;
+        if (Array.isArray(question.responses)) {
+          for (const response of question.responses) {
+            if (!response || typeof response !== "object" || Array.isArray(response)) continue;
+            if (!("textAnswer" in response)) response.textAnswer = null;
+            if (!("confidence" in response)) response.confidence = null;
+            if (!("responseTimeMs" in response)) response.responseTimeMs = null;
+          }
+        }
       }
     }
   }

@@ -2,11 +2,20 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { LearningError } from "./errors.mjs";
 import { safeIdentifier, safeSingleLine, safeText } from "./inputs.mjs";
+import { recommendNextActivity } from "./learning-strategy.mjs";
 import { updateActiveSession } from "./model.mjs";
 import { parseInstant } from "./schema.mjs";
 
 const STAGES = new Set(["probe", "teach"]);
-const MODES = new Set(["single-select", "multi-select"]);
+const MODES = new Set(["single-select", "multi-select", "free-response"]);
+const FREE_RESPONSE_KINDS = new Set([
+  "explanation",
+  "prediction",
+  "transfer",
+  "contrastive",
+  "reconstruction",
+  "debugging",
+]);
 const UNRESOLVED_STATUSES = new Set([
   "awaiting-answer",
   "awaiting-assessment",
@@ -17,6 +26,14 @@ const NOTE_TARGETS = new Set(["session", "question", "concept", "step"]);
 
 function timestamp(now) {
   return parseInstant(now ?? new Date().toISOString(), "event time");
+}
+
+function optionalBoundedInteger(value, label, maximum = Number.MAX_SAFE_INTEGER) {
+  if (value === undefined || value === null) return null;
+  if (!Number.isSafeInteger(value) || value < 0 || value > maximum) {
+    throw new LearningError(`${label} must be an integer from 0 to ${maximum}`, "INVALID_RESPONSE_METRIC");
+  }
+  return value;
 }
 
 function uniqueValues(values, label) {
@@ -114,31 +131,54 @@ export function startQuestion(state, input = {}) {
     );
   }
   const kind = safeIdentifier(input.kind, "question kind");
-  if (kind !== "multiple-choice") {
-    throw new LearningError("Interactive questions must be multiple-choice", "INVALID_KIND");
-  }
   const mode = safeIdentifier(input.mode, "question mode");
   if (!MODES.has(mode)) {
     throw new LearningError(`Unknown question mode: ${mode}`, "INVALID_MODE");
   }
+  const isFreeResponse = mode === "free-response";
+  if (
+    (!isFreeResponse && kind !== "multiple-choice") ||
+    (isFreeResponse && !FREE_RESPONSE_KINDS.has(kind))
+  ) {
+    throw new LearningError(
+      isFreeResponse
+        ? `Free-response questions do not support kind: ${kind}`
+        : "Selectable questions must be multiple-choice",
+      "INVALID_KIND",
+    );
+  }
   const nodeId = safeIdentifier(input.nodeId, "nodeId");
   const question = safeText(input.question, "question");
-  const choices = normalizeChoices(input.choices);
-  const correctChoiceValues = uniqueValues(input.correctChoiceValues, "correctChoiceValues");
-  const choiceValues = new Set(choices.map((choice) => choice.value));
-  if (
-    correctChoiceValues.length === 0 ||
-    correctChoiceValues.some((value) => !choiceValues.has(value)) ||
-    (mode === "single-select" && correctChoiceValues.length !== 1)
-  ) {
-    throw new LearningError("correctChoiceValues do not match the question choices and mode", "INVALID_ANSWER_KEY");
+  const choices = isFreeResponse ? [] : normalizeChoices(input.choices);
+  const correctChoiceValues = isFreeResponse
+    ? []
+    : uniqueValues(input.correctChoiceValues, "correctChoiceValues");
+  if (!isFreeResponse) {
+    const choiceValues = new Set(choices.map((choice) => choice.value));
+    if (
+      correctChoiceValues.length === 0 ||
+      correctChoiceValues.some((value) => !choiceValues.has(value)) ||
+      (mode === "single-select" && correctChoiceValues.length !== 1)
+    ) {
+      throw new LearningError("correctChoiceValues do not match the question choices and mode", "INVALID_ANSWER_KEY");
+    }
   }
-  const explanation = safeText(input.explanation, "explanation");
+  const explanation = isFreeResponse
+    ? null
+    : safeText(input.explanation, "explanation");
+  const activityType = input.activityType === undefined
+    ? isFreeResponse ? "free-response" : "multiple-choice"
+    : safeSingleLine(input.activityType, "activity type", { maxLength: 128 });
+  const strategyReason = input.strategyReason === undefined
+    ? "Host-selected question activity."
+    : safeText(input.strategyReason, "strategy reason");
+  const supportLevel = optionalBoundedInteger(input.supportLevel, "supportLevel", 4);
+  const transferLevel = optionalBoundedInteger(input.transferLevel, "transferLevel", 4);
   const createdAt = timestamp(input.now);
 
   return updateActiveSession(
     state,
-    (session) => {
+    (session, next) => {
       if (session.phase !== stage) {
         throw new LearningError(
           `Interactive ${stage} questions require the ${stage} phase`,
@@ -151,23 +191,33 @@ export function startQuestion(state, input = {}) {
       if (stage === "teach") {
         const activeStep = session.steps.find((step) => step.id === session.activeStepId);
         const checkpoint = session.checkpoint;
-        if (
-          !activeStep ||
-          !checkpoint ||
-          activeStep.nodeId !== nodeId ||
-          activeStep.checkpointQuestionId !== id ||
-          activeStep.checkpointQuestion !== question ||
-          activeStep.checkpointKind !== kind ||
-          checkpoint.nodeId !== nodeId ||
-          checkpoint.questionId !== id ||
-          checkpoint.question !== question ||
-          checkpoint.kind !== kind ||
-          checkpoint.status !== "awaiting-answer"
-        ) {
-          throw new LearningError(
-            "Teach-stage interactive question does not match the active persisted checkpoint",
-            "CHECKPOINT_IDENTITY_MISMATCH",
-          );
+        if (activityType === "productive-failure") {
+          const recommendation = recommendNextActivity(next, session, nodeId);
+          if (!recommendation.productiveFailureAllowed || activeStep || checkpoint) {
+            throw new LearningError(
+              "Productive failure requires durable prerequisites, no admitted gap, and no active teaching checkpoint",
+              "PRODUCTIVE_FAILURE_NOT_ALLOWED",
+            );
+          }
+        } else {
+          if (
+            !activeStep ||
+            !checkpoint ||
+            activeStep.nodeId !== nodeId ||
+            activeStep.checkpointQuestionId !== id ||
+            activeStep.checkpointQuestion !== question ||
+            activeStep.checkpointKind !== kind ||
+            checkpoint.nodeId !== nodeId ||
+            checkpoint.questionId !== id ||
+            checkpoint.question !== question ||
+            checkpoint.kind !== kind ||
+            checkpoint.status !== "awaiting-answer"
+          ) {
+            throw new LearningError(
+              "Teach-stage interactive question does not match the active persisted checkpoint",
+              "CHECKPOINT_IDENTITY_MISMATCH",
+            );
+          }
         }
       }
       ensureNoPendingQuestion(session);
@@ -209,6 +259,10 @@ export function startQuestion(state, input = {}) {
         choices,
         correctChoiceValues,
         explanation,
+        activityType,
+        strategyReason,
+        supportLevel,
+        transferLevel,
         status: "awaiting-answer",
         parentQuestionId,
         adaptationReason,
@@ -281,23 +335,29 @@ export function answerQuestion(state, input = {}) {
         throw new LearningError(`Response already exists: ${responseId}`, "DUPLICATE_RESPONSE");
       }
       const dontKnow = input.dontKnow === true;
-      const selectedChoiceValues = uniqueValues(
-        input.selectedChoiceValues ?? [],
-        "selectedChoiceValues",
-      );
+      const selectedChoiceValues = uniqueValues(input.selectedChoiceValues ?? [], "selectedChoiceValues");
+      const isFreeResponse = question.mode === "free-response";
+      const textAnswer = isFreeResponse && !dontKnow
+        ? safeText(input.textAnswer, "text answer")
+        : null;
+      const confidence = optionalBoundedInteger(input.confidence, "confidence", 100);
+      const responseTimeMs = optionalBoundedInteger(input.responseTimeMs, "responseTimeMs");
       const choices = new Set(question.choices.map((choice) => choice.value));
       if (selectedChoiceValues.some((value) => !choices.has(value))) {
         throw new LearningError("selectedChoiceValues contain an unknown choice", "INVALID_RESPONSE");
       }
-      if (dontKnow && selectedChoiceValues.length > 0) {
-        throw new LearningError("I don't know cannot include selected choices", "INVALID_RESPONSE");
+      if (dontKnow && (selectedChoiceValues.length > 0 || input.textAnswer)) {
+        throw new LearningError("I don't know cannot include an answer", "INVALID_RESPONSE");
       }
       if (
-        !dontKnow &&
+        !isFreeResponse && !dontKnow &&
         ((question.mode === "single-select" && selectedChoiceValues.length !== 1) ||
           (question.mode === "multi-select" && selectedChoiceValues.length === 0))
       ) {
         throw new LearningError("selected choices do not match the question mode", "INVALID_RESPONSE");
+      }
+      if (isFreeResponse && selectedChoiceValues.length > 0) {
+        throw new LearningError("Free responses cannot include selected choices", "INVALID_RESPONSE");
       }
 
       let noteId = null;
@@ -318,16 +378,37 @@ export function answerQuestion(state, input = {}) {
         throw new LearningError("noteId requires note text", "INVALID_NOTE");
       }
 
-      question.responses.push({
+      const response = {
         id: responseId,
         selectedChoiceValues,
+        textAnswer,
         dontKnow,
-        correct: dontKnow ? false : sameSet(selectedChoiceValues, question.correctChoiceValues),
+        correct: isFreeResponse ? null : dontKnow ? false : sameSet(selectedChoiceValues, question.correctChoiceValues),
+        confidence,
+        responseTimeMs,
         noteId,
         assessmentId: null,
         createdAt,
-      });
-      question.status = dontKnow ? "gap" : "awaiting-assessment";
+      };
+      question.responses.push(response);
+      if (!dontKnow && question.activityType === "productive-failure") {
+        session.productiveAttempts.push({
+          id: response.id,
+          nodeId: question.nodeId,
+          questionId: question.id,
+          prompt: question.question,
+          answer: response.textAnswer,
+          rationale: input.rationale === undefined
+            ? response.textAnswer
+            : safeText(input.rationale, "productive attempt rationale"),
+          confidence,
+          responseTimeMs,
+          createdAt,
+        });
+        question.status = "resolved";
+      } else {
+        question.status = dontKnow ? "gap" : "awaiting-assessment";
+      }
     },
     { now: createdAt },
   );
@@ -378,12 +459,21 @@ export function bindQuestionAssessment(session, assessment, retry) {
       "QUESTION_RESPONSE_MISSING",
     );
   }
-  const expectedGrade = response.correct ? "correct" : "incorrect";
-  if (assessment.grade !== expectedGrade) {
-    throw new LearningError(
-      `Multiple-choice response requires grade ${expectedGrade}`,
-      "QUESTION_GRADE_MISMATCH",
-    );
+  if (question.mode === "free-response") {
+    if (assessment.answer !== response.textAnswer) {
+      throw new LearningError(
+        "Free-response assessment must preserve the persisted learner answer exactly",
+        "QUESTION_IDENTITY_MISMATCH",
+      );
+    }
+  } else {
+    const expectedGrade = response.correct ? "correct" : "incorrect";
+    if (assessment.grade !== expectedGrade) {
+      throw new LearningError(
+        `Multiple-choice response requires grade ${expectedGrade}`,
+        "QUESTION_GRADE_MISMATCH",
+      );
+    }
   }
   response.assessmentId = assessment.id;
   if (assessment.contaminated) {

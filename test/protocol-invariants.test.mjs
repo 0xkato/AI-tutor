@@ -13,6 +13,7 @@ import {
   setPlan,
   startSession,
 } from "../src/model.mjs";
+import { startQuestion } from "../src/questions.mjs";
 
 const NOW = "2026-08-24T08:00:00.000Z";
 
@@ -110,6 +111,51 @@ test("assessment stages and session kinds are explicit", () => {
   assert.throws(
     () => recordAssessment(afterValidProbe(), answer({ id: "late-probe" })),
     /probe assessments require the probe phase/i,
+  );
+});
+
+test("productive failure is rejected for an admitted knowledge gap", () => {
+  let state = recordAssessment(fresh(), answer({
+    grade: "incorrect",
+    answer: "Only vector addition.",
+    evidence: "The learner omitted scalar multiplication from the vector-space structure.",
+    mistakeType: "admitted-gap",
+  }));
+  state = recordAssessment(state, answer({
+    id: "a2",
+    grade: "incorrect",
+    answer: "Vector addition and vector multiplication.",
+    evidence: "The retry still replaced scalar multiplication with an invalid vector product.",
+  }));
+  state = finishProbe(state, {
+    summary: "Vector operations are an established gap and must be taught.",
+    now: "2026-08-24T08:01:00.000Z",
+  });
+  state = setPlan(state, {
+    plan: {
+      targetNodeId: "vectors",
+      nodes: [{ id: "vectors", title: "Vectors" }],
+      edges: [],
+    },
+    now: "2026-08-24T08:02:00.000Z",
+  });
+  state = beginTeach(state, { now: "2026-08-24T08:03:00.000Z" });
+
+  assert.throws(
+    () => startQuestion(state, {
+      id: "invalid-productive-q1",
+      stage: "teach",
+      nodeId: "vectors",
+      kind: "prediction",
+      question: "Invent the missing vector-space operation before it is taught.",
+      mode: "free-response",
+      activityType: "productive-failure",
+      strategyReason: "Attempt the admitted gap independently.",
+      supportLevel: 0,
+      transferLevel: 0,
+      now: "2026-08-24T08:04:00.000Z",
+    }),
+    (error) => error.code === "PRODUCTIVE_FAILURE_NOT_ALLOWED",
   );
 });
 

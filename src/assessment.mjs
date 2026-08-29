@@ -313,7 +313,22 @@ function updateTeachingCheckpoint(session, assessment, retry) {
 }
 
 export function recordAssessment(state, input) {
-  const assessment = validate(input);
+  const activeSession = state.sessions?.[state.activeSessionId];
+  const persistedQuestion = activeSession?.questions?.find(
+    (question) => question.id === input.questionId,
+  );
+  const persistedResponse = persistedQuestion?.responses?.at(-1);
+  const enrichedInput = persistedResponse
+    ? {
+        ...input,
+        confidence: input.confidence ?? persistedResponse.confidence,
+        responseTimeMs: input.responseTimeMs ?? persistedResponse.responseTimeMs,
+        transferLevel: input.transferLevel ?? persistedQuestion.transferLevel,
+        supportLevel: input.supportLevel ?? persistedQuestion.supportLevel,
+        activityType: input.activityType ?? persistedQuestion.activityType,
+      }
+    : input;
+  const assessment = validate(enrichedInput);
   const misconceptionInput = {
     id: typeof input.misconceptionId === "string" && input.misconceptionId.trim()
       ? input.misconceptionId.trim()

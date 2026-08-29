@@ -55,6 +55,23 @@ function firstQuestion(overrides = {}) {
   };
 }
 
+function freeQuestion(overrides = {}) {
+  return {
+    id: "free-q1",
+    stage: "probe",
+    nodeId: "attention",
+    kind: "explanation",
+    question: "Explain how self-attention changes one token representation.",
+    mode: "free-response",
+    activityType: "free-response",
+    strategyReason: "Recognition is insufficient; collect the learner's causal model.",
+    supportLevel: 0,
+    transferLevel: 1,
+    now: T1,
+    ...overrides,
+  };
+}
+
 test("a pending question is durable and learner-facing output redacts its key", () => {
   const state = startQuestion(fresh(), firstQuestion());
   const stored = state.sessions["session-1"].questions[0];
@@ -68,6 +85,124 @@ test("a pending question is durable and learner-facing output redacts its key", 
   assert.deepEqual(visible.choices, stored.choices);
   assert.equal("correctChoiceValues" in visible, false);
   assert.equal("explanation" in visible, false);
+});
+
+test("a free response is persisted with confidence and timing before assessment", () => {
+  let state = startQuestion(fresh(), freeQuestion());
+  let stored = state.sessions["session-1"].questions[0];
+  assert.equal(stored.mode, "free-response");
+  assert.deepEqual(stored.choices, []);
+  assert.deepEqual(stored.correctChoiceValues, []);
+  assert.equal(stored.activityType, "free-response");
+
+  assert.throws(
+    () => recordAssessment(state, {
+      id: "too-early-a1",
+      questionId: "free-q1",
+      nodeId: "attention",
+      stage: "probe",
+      kind: "explanation",
+      question: freeQuestion().question,
+      answer: "It mixes contextual information.",
+      grade: "partial",
+      evidence: "The answer names contextual mixing but omits how relevance controls it.",
+      now: T2,
+    }),
+    /not awaiting assessment/i,
+  );
+
+  state = answerQuestion(state, {
+    questionId: "free-q1",
+    responseId: "free-r1",
+    textAnswer: "It compares the token with other tokens, then mixes their information by relevance.",
+    confidence: 75,
+    responseTimeMs: 42_000,
+    note: "I am less certain about whether queries compare directly with values.",
+    now: T2,
+  });
+  stored = state.sessions["session-1"].questions[0];
+  assert.equal(stored.status, "awaiting-assessment");
+  assert.equal(stored.responses[0].textAnswer, "It compares the token with other tokens, then mixes their information by relevance.");
+  assert.equal(stored.responses[0].confidence, 75);
+  assert.equal(stored.responses[0].responseTimeMs, 42_000);
+  assert.equal(stored.responses[0].correct, null);
+
+  state = recordAssessment(state, {
+    id: "free-a1",
+    questionId: "free-q1",
+    nodeId: "attention",
+    stage: "probe",
+    kind: "explanation",
+    question: freeQuestion().question,
+    answer: stored.responses[0].textAnswer,
+    grade: "partial",
+    evidence: "Correctly described relevance-weighted mixing but did not separate query-key scoring from values.",
+    mistakeType: "score-versus-content",
+    now: T3,
+  });
+  const assessment = state.sessions["session-1"].assessments[0];
+  assert.equal(assessment.confidence, 75);
+  assert.equal(assessment.responseTimeMs, 42_000);
+  assert.equal(state.sessions["session-1"].questions[0].status, "retry-required");
+  assert.doesNotThrow(() => validateState(state));
+});
+
+test("a guarded productive-failure response is stored as an ungraded attempt", () => {
+  let state = recordAssessment(fresh(), {
+    id: "prerequisite-a1",
+    questionId: "prerequisite-q1",
+    nodeId: "token-representations",
+    stage: "probe",
+    kind: "explanation",
+    question: "What does a token embedding represent before contextual mixing?",
+    answer: "A learned vector associated with that token ID.",
+    grade: "correct",
+    evidence: "Explained that the initial vector is learned from token identity before contextual mixing.",
+    now: T1,
+  });
+  state = finishProbe(state, {
+    summary: "Token representations are established; self-attention is the next target.",
+    now: T2,
+  });
+  state = setPlan(state, {
+    plan: {
+      targetNodeId: "self-attention",
+      nodes: [
+        { id: "token-representations", title: "Token representations" },
+        { id: "self-attention", title: "Self-attention" },
+      ],
+      edges: [{ from: "token-representations", to: "self-attention", reason: "Attention mixes token representations" }],
+    },
+    now: T2,
+  });
+  state = beginTeach(state, { now: T2 });
+  state = startQuestion(state, freeQuestion({
+    id: "productive-q1",
+    stage: "teach",
+    nodeId: "self-attention",
+    kind: "prediction",
+    question: "Before being taught the mechanism, predict how a token could choose relevant context.",
+    activityType: "productive-failure",
+    strategyReason: "Prerequisites are durable and the target has not been attempted.",
+    transferLevel: 0,
+    now: T3,
+  }));
+  state = answerQuestion(state, {
+    questionId: "productive-q1",
+    responseId: "productive-r1",
+    textAnswer: "Perhaps it learns a score for each other token and averages their vectors.",
+    confidence: 35,
+    responseTimeMs: 55_000,
+    now: T3,
+  });
+
+  const session = state.sessions["session-1"];
+  assert.equal(session.questions.at(-1).status, "resolved");
+  assert.equal(session.questions.at(-1).responses[0].assessmentId, null);
+  assert.equal(session.productiveAttempts.length, 1);
+  assert.equal(session.productiveAttempts[0].answer, "Perhaps it learns a score for each other token and averages their vectors.");
+  assert.equal(session.assessments.length, 1, "the productive attempt adds no grade");
+  assert.doesNotThrow(() => validateState(state));
 });
 
 test("only one unresolved question may exist in a session", () => {
@@ -158,8 +293,11 @@ test("answer and optional note persist atomically before assessment", () => {
   assert.deepEqual(question.responses[0], {
     id: "response-1",
     selectedChoiceValues: ["context"],
+    textAnswer: null,
     dontKnow: false,
     correct: true,
+    confidence: null,
+    responseTimeMs: null,
     noteId: "note-1",
     assessmentId: null,
     createdAt: T2,
