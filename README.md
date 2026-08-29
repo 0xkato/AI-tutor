@@ -1,86 +1,64 @@
 # AI Tutor
 
-AI Tutor helps you learn a subject through Pi or Codex. Give it a learning
-target, answer short questions, add notes when useful, and return later for
-review. Your progress stays on your computer and can be opened in Obsidian.
+AI Tutor is a local tutor for Pi and Codex. It calibrates, teaches, tests your
+reasoning, and schedules review. Your progress stays on your computer.
 
-## Install
+## Quick start
 
-You need macOS and Node.js 22.19 or newer. Obsidian is optional.
+Requires macOS and Node.js 22.19 or newer. Obsidian is optional.
 
 ```sh
 git clone https://github.com/0xkato/AI-tutor.git
 cd AI-tutor
 npm ci
 npm run setup
-npm run doctor
-```
-
-## Learn with Pi
-
-Start Pi from inside the repository:
-
-```sh
 npm run pi
 ```
 
-Then enter a learning target:
+In Pi, enter what you want to learn:
 
 ```text
 /teach Understand how Transformers work
 ```
 
-The tutor will establish what you already know, teach the next missing idea,
-and check whether you can use it in a new example. It can research the subject
-itself when the lesson needs sources.
+The tutor starts with a short calibration, teaches one step at a time, and
+adapts future questions and reviews to your answers.
 
-To learn from material you already have, use:
+## Learn from a source
 
 ```text
 /teach-from <source> :: <learning target>
 ```
 
-The source can be a YouTube video, PDF, notes file, web page, or repository.
-For example:
+The source can be a YouTube video, PDF, notes file, web page, or repository:
 
 ```text
 /teach-from https://www.youtube.com/watch?v=... :: Understand self-attention
-/teach-from ./notes/attention.md :: Test what I retained about attention
 ```
 
-The tutor saves the supplied material before inspecting it. Claims from that
-material remain the **anchor** and keep an exact timestamp, page, heading, or
-file location. Any extra research is recorded separately as **supplemental**
-evidence, including where it corrects or limits the anchor. Source coverage
-shows what supports each lesson step; it is not evidence of your understanding
-or mastery.
+Your supplied source is the anchor; independent research remains supplemental.
+Source coverage shows lesson support, not mastery. Replace an unavailable
+anchor or choose supplemental-only; that decision is saved.
 
-Run `/teach-from` again with another source and the same target to add a
-replacement or another guide. An unavailable anchor blocks teaching until you
-provide an accessible replacement or explicitly choose a supplemental-only
-lesson; the tutor saves that decision instead of assuming it.
+## Answer questions in Pi
 
-When a multiple-choice question appears:
+- Arrow keys: choose an answer
+- Enter: submit
+- **I don't know**: record an ungraded gap
+- Tab: add an optional note
+- Esc: cancel
 
-- use the arrow keys to choose an answer;
-- press Enter to submit it;
-- choose **I don't know** to record an ungraded gap;
-- press Tab to add an optional note;
-- press Esc to cancel.
+Sessions save automatically. Use:
 
-Your session is saved automatically. Useful commands are:
-
-- `/teach` — resume the active lesson;
-- `/teach-from` — start from a supplied source and learning target;
-- `/learn-status` — see the current target and next step;
-- `/learn-review` — run due review work;
-- `/learn-profile` — change how the tutor teaches you.
+- `/teach` to resume
+- `/learn-status` to see your next step
+- `/learn-review` to complete due review work
+- `/learn-profile` to optionally change the teaching style
 
 Built-in defaults work immediately. The optional learner profile stores your
-personal teaching philosophy in `vault/Profile.md`; use `/learn-profile` only
-when you want to customize it.
+teaching philosophy in `vault/Profile.md`.
 
-## Learn with Codex
+## Use Codex
 
 Open this repository in Codex and ask:
 
@@ -88,42 +66,25 @@ Open this repository in Codex and ask:
 Teach me Transformers, starting from what I already know.
 ```
 
-Codex uses numbered questions instead of Pi's interactive quiz.
-Codex and Pi use the same saved learning state, so you can move between them
-without starting over.
+Codex uses numbered questions. Codex and Pi use the same saved learning state,
+so you can switch between them without starting over.
 
-## View your progress in Obsidian
+## Progress and privacy
 
-Open the repository's `vault/` folder as an Obsidian vault. It contains your
-profile, lesson questions, notes, progress, and review material. Obsidian is a
-view of the saved state; you do not need it to use the tutor.
-
-## Your data
-
-- `.adaptive-learning/` contains the canonical learning state.
-- `vault/` contains the Obsidian view of that state.
+- `.adaptive-learning/` stores the canonical learning state.
+- `vault/` is the optional Obsidian view of your progress and notes.
 - Both folders are ignored by Git.
-- The project has no telemetry and does not store model credentials.
+- There is no telemetry, and model credentials are not stored.
 
 Do not put passwords, API keys, or other secrets in learning notes.
 
-## Useful commands
-
-```sh
-npm run pi             # Start Pi
-npm run doctor         # Check the local installation
-npm test               # Run the test suite
-npm run release-check  # Run the complete release gate
-```
-
 ## Status
 
-This repository is a release candidate, not a stable release. The learning
-engine, persistence, recovery, and Pi input paths are covered by automated
-tests. Native Pi quiz behavior still requires final human acceptance testing in
-a real terminal.
+This is a release candidate. The learning engine and persistence paths are
+automatically tested. Native Pi quiz behavior still requires final human
+acceptance testing in a real terminal.
 
-For troubleshooting and operating details, see
-[`docs/operator/quickstart.md`](docs/operator/quickstart.md). For the behavior
-contract behind the project, see
-[`docs/product/video-parity.md`](docs/product/video-parity.md).
+No license is included; public access does not grant reuse or redistribution.
+
+See the [operator quickstart](docs/operator/quickstart.md) for troubleshooting or
+the [behavior contract](docs/product/video-parity.md) for implementation details.

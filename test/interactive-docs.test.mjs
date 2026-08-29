@@ -13,6 +13,10 @@ function read(relative) {
 test("README provides a concise public quickstart with honest boundaries", () => {
   const readme = read("README.md");
 
+  assert.ok(
+    readme.trimEnd().split(/\r?\n/).length <= 90,
+    "README should remain fast to scan",
+  );
   assert.match(readme, /^# AI Tutor/m);
   assert.match(readme, /Node\.js 22\.19 or newer/i);
   assert.ok(readme.indexOf("npm ci") < readme.indexOf("npm run setup"));
@@ -22,12 +26,12 @@ test("README provides a concise public quickstart with honest boundaries", () =>
   assert.match(readme, /YouTube[\s\S]*PDF[\s\S]*notes[\s\S]*web page[\s\S]*repository/i);
   assert.match(readme, /anchor[\s\S]*supplemental/i);
   assert.match(readme, /source coverage[\s\S]*not[\s\S]*(understanding|mastery)/i);
-  assert.match(readme, /unavailable anchor[\s\S]*(replacement|supplemental-only)[\s\S]*(saves|saved|decision)/i);
+  assert.match(readme, /unavailable\s+anchor[\s\S]*(replacement|supplemental-only)[\s\S]*(saves|saved|decision)/i);
   assert.match(readme, /I don['’]t know[^\n]*ungraded gap/i);
   assert.match(readme, /\.adaptive-learning\/[\s\S]*vault\/[\s\S]*ignored by Git/i);
   assert.match(readme, /no telemetry/i);
   assert.match(readme, /release candidate/i);
-  assert.match(readme, /Native\s+Pi quiz behavior[\s\S]*human acceptance/i);
+  assert.match(readme, /Native\s+Pi\s+quiz\s+behavior[\s\S]*human\s+acceptance/i);
   assert.match(readme, /docs\/operator\/quickstart\.md/);
 });
 
