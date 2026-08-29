@@ -123,6 +123,38 @@ test("a teaching step persists the selected adaptive strategy", () => {
   });
 });
 
+test("an evidence-backed fading step may reinforce a demonstrated node after it leaves the dependency frontier", () => {
+  let state = setPlan(planned(), { plan: dependencyPlan(), now });
+  state = beginTeach(state, { now });
+  const session = getActiveSession(state);
+  const concept = conceptForNode(state, session, "covectors");
+  concept.status = "developing";
+  concept.supportLevel = 2;
+  concept.mastery.application.attempts = 1;
+  concept.mastery.application.correct = 1;
+  concept.mastery.application.level = 2;
+  concept.highestTransferLevel = 1;
+  session.frontier = [];
+
+  state = recordStep(state, {
+    id: "faded-reinforcement-step",
+    nodeId: "covectors",
+    foundation: "The mechanism transferred once with two remaining support levels.",
+    motivation: "The next check should remove one scaffold without changing the mechanism.",
+    explanation: "Only the evidence-backed faded scaffold is supplied.",
+    checkpointQuestionId: "faded-reinforcement-q1",
+    checkpointKind: "transfer",
+    checkpointQuestion: "Apply the same mechanism to a changed displacement example.",
+    activityType: "faded-example",
+    strategyReason: "Prior evidence supports fading the worked example at support level 2.",
+    supportLevel: 2,
+    transferLevel: null,
+    now,
+  });
+
+  assert.equal(getActiveSession(state).activeStepId, "faded-reinforcement-step");
+});
+
 test("sources require explicit claim support and verification", () => {
   const state = planned();
   assert.throws(

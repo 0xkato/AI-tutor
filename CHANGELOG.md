@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Free-response explanation, prediction, transfer, contrastive, reconstruction,
+  and debugging checkpoints in Pi, with exact learner wording, confidence,
+  response timing, rationale, and notes persisted before a separate assessment.
+- Mastery evidence tracked independently across recognition, explanation,
+  application, and transfer instead of reducing learning to one quiz score.
+- Durable misconceptions with occurrence, relapse, counterexample, repair, and
+  resolution history that can drive later contrastive practice.
+- Evidence-driven worked examples whose support fades one level at a time once
+  the learner succeeds, followed by independent transfer.
+- Contrastive cases that distinguish a learner's active misconception from the
+  correct mechanism using a minimally different example.
+- Interleaved practice plans across due topics, with no consecutive same-topic
+  items when another due topic is available.
+- A transfer ladder that records how far a concept has generalized and advances
+  only after supported and independent evidence.
+- Confidence calibration and response-time evidence used to distinguish
+  uncertain success, calibrated understanding, and confidently wrong answers.
+- Learner-specific forgetting schedules based on each concept's observed
+  stability, difficulty, lapses, support, confidence, and response time.
+- Bounded productive-failure attempts when prerequisites have durable evidence;
+  these attempts are recorded as diagnostic evidence and never graded as
+  mastery.
+
+### Fixed
+
+- Evidence-backed fading, contrastive, and transfer activities may reinforce a
+  demonstrated concept after it leaves the dependency frontier, while all
+  other off-frontier teaching remains rejected.
+- Pi's free-response transfer path now has deterministic end-to-end acceptance
+  coverage through persistence, assessment, and Obsidian rendering.
+
+### Verification boundary
+
+- Deterministic model, CLI, Pi adapter, complete adaptive-session, persistence,
+  migration, rendering, and release checks are locally testable.
+- Native human interaction in a real Pi terminal and the educational quality of
+  generated questions remain separate acceptance gates; this section does not
+  declare a stable release.
+
 ## 0.2.0-rc.2 — 2026-08-25
 
 ### Fixed

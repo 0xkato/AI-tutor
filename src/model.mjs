@@ -10,6 +10,7 @@ import {
 } from "./concepts.mjs";
 import { LearningError, requireText } from "./errors.mjs";
 import { nextFrontier, validatePlan } from "./graph.mjs";
+import { recommendNextActivity } from "./learning-strategy.mjs";
 import {
   safeIdentifier,
   safeRelativeVaultPath,
@@ -854,7 +855,19 @@ export function recordStep(state, input) {
         throw new LearningError(`Unknown plan node: ${step.nodeId}`, "UNKNOWN_NODE");
       }
       if (!session.frontier.includes(step.nodeId)) {
-        throw new LearningError(`Node is not on the teachable frontier: ${step.nodeId}`, "INVALID_FRONTIER");
+        const recommendation = recommendNextActivity(next, session, step.nodeId);
+        const evidenceBackedReinforcement =
+          ["faded-example", "contrastive-case", "transfer-case"].includes(recommendation.type) &&
+          step.activityType === recommendation.type &&
+          step.strategyReason === recommendation.reason &&
+          step.supportLevel === recommendation.supportLevel &&
+          step.transferLevel === recommendation.transferLevel;
+        if (!evidenceBackedReinforcement) {
+          throw new LearningError(
+            `Node is not on the teachable frontier: ${step.nodeId}`,
+            "INVALID_FRONTIER",
+          );
+        }
       }
       if (session.steps.some((item) => item.id === step.id)) {
         throw new LearningError(`Teaching step already exists: ${step.id}`, "DUPLICATE_STEP");

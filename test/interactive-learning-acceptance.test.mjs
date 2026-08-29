@@ -43,7 +43,7 @@ function question(overrides = {}) {
   };
 }
 
-test("Pi tool persistence path records graded choice, learner notes, and adaptive gap to Obsidian", async () => {
+test("Pi tool persistence path records recognition, adaptive gap, free-response transfer, and learner notes to Obsidian", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learning-interactive-acceptance-"));
   await runAdaptiveLearningCli("init", [], root);
   await runAdaptiveLearningCli(
@@ -85,6 +85,12 @@ test("Pi tool persistence path records graded choice, learner notes, and adaptiv
         note: "I need query, key, and value roles taught before this boundary.",
       });
     },
+    askResponse: async ({ submit }) => submit({
+      textAnswer: "The current token's query describes what it seeks, each other token's key describes what it can match, and the matched values carry the information combined into the result.",
+      confidence: 86,
+      note: "The library analogy helped separate matching from carried information.",
+      rationale: "A query is compared with keys; the resulting weights combine values.",
+    }),
   })(pi.api);
 
   const tool = pi.registered.tools.get("adaptive_learning_quiz");
@@ -172,6 +178,73 @@ test("Pi tool persistence path records graded choice, learner notes, and adaptiv
   const taught = await tool.execute("call-3", teachQuestion, undefined, undefined, ctx);
   assert.match(taught.content[0].text, /answered correctly/i);
 
+  const recommendation = await runAdaptiveLearningCli(
+    "recommend-next",
+    ["--node", "query-key-value"],
+    root,
+  );
+  const transferQuestion = "In a library analogy, explain the distinct jobs of queries, keys, and values.";
+  await runAdaptiveLearningCli(
+    "record-step",
+    [
+      "--id", "attention-transfer-step",
+      "--node", "query-key-value",
+      "--foundation", "The query represents what the current token seeks from other tokens.",
+      "--motivation", "A new analogy checks whether all three roles transfer beyond recognition.",
+      "--explanation", "A query states the request, keys describe what can match, and values carry the information returned by the match.",
+      "--question-id", "teach-transfer-q1",
+      "--kind", "transfer",
+      "--question", transferQuestion,
+      "--activity-type", recommendation.type,
+      "--strategy-reason", recommendation.reason,
+      "--support-level", String(recommendation.supportLevel),
+      ...(recommendation.transferLevel === null
+        ? []
+        : ["--transfer-level", String(recommendation.transferLevel)]),
+    ],
+    root,
+  );
+  const responseTool = pi.registered.tools.get("adaptive_learning_response");
+  const assessmentTool = pi.registered.tools.get("adaptive_learning_assess_response");
+  assert.ok(responseTool);
+  assert.ok(assessmentTool);
+  const transferParams = {
+    id: "teach-transfer-q1",
+    stage: "teach",
+    nodeId: "query-key-value",
+    kind: "transfer",
+    question: transferQuestion,
+    activityType: recommendation.type,
+    strategyReason: recommendation.reason,
+    supportLevel: recommendation.supportLevel,
+    ...(recommendation.transferLevel === null
+      ? {}
+      : { transferLevel: recommendation.transferLevel }),
+    parentQuestionId: "teach-q1",
+    adaptationReason: "Recognition passed, so the next checkpoint requires an explanation in a new analogy.",
+  };
+  const transferred = await responseTool.execute(
+    "call-4",
+    transferParams,
+    undefined,
+    undefined,
+    ctx,
+  );
+  assert.match(transferred.content[0].text, /awaiting an explicit.*assessment/i);
+  const assessed = await assessmentTool.execute(
+    "call-5",
+    {
+      id: "teach-transfer-a1",
+      questionId: "teach-transfer-q1",
+      grade: "correct",
+      evidence: "The answer independently separates matching intent, matchable descriptors, and the information carried by weighted values.",
+    },
+    undefined,
+    undefined,
+    ctx,
+  );
+  assert.match(assessed.content[0].text, /^Correct\./);
+
   fs.mkdirSync(path.join(root, "vault", "Assets"), { recursive: true });
   fs.writeFileSync(
     path.join(root, "vault", "Assets", "attention-flow.svg"),
@@ -191,7 +264,7 @@ test("Pi tool persistence path records graded choice, learner notes, and adaptiv
   const state = readState(root);
   const session = state.sessions["session-1"];
   assert.equal(state.learnerProfile.teachingPhilosophy.includes("causal understanding"), true);
-  assert.equal(session.questions.length, 3);
+  assert.equal(session.questions.length, 4);
   assert.equal(session.questions[0].status, "resolved");
   assert.equal(session.questions[0].responses[0].correct, true);
   assert.equal(session.questions[0].responses[0].assessmentId !== null, true);
@@ -205,14 +278,18 @@ test("Pi tool persistence path records graded choice, learner notes, and adaptiv
       "A token representation becomes contextual here.",
       "I need query, key, and value roles taught before this boundary.",
       "The query represents what the current token is looking for.",
+      "The library analogy helped separate matching from carried information.",
     ],
   );
-  assert.equal(session.assessments.length, 2);
+  assert.equal(session.assessments.length, 3);
   assert.equal(session.admittedGaps.length, 1);
   assert.equal(session.plan.targetNodeId, "query-key-value");
   assert.equal(session.steps[0].checkpointQuestionId, "teach-q1");
   assert.equal(session.questions[2].status, "resolved");
-  assert.equal(session.checkpoint.status, "new-transfer-required");
+  assert.equal(session.questions[3].status, "resolved");
+  assert.equal(session.questions[3].mode, "free-response");
+  assert.equal(session.questions[3].responses[0].confidence, 86);
+  assert.equal(session.checkpoint.status, "resolved");
   assert.equal(session.visuals[0].id, "attention-visual");
 
   const sessionFile = fs.readdirSync(path.join(root, "vault", "Sessions"))[0];
@@ -224,6 +301,9 @@ test("Pi tool persistence path records graded choice, learner notes, and adaptiv
   assert.match(rendered, /I need query, key, and value roles taught/);
   assert.match(rendered, /```mermaid/);
   assert.match(rendered, /Which learned object represents what the current token is looking for\?/);
+  assert.match(rendered, /In a library analogy, explain the distinct jobs of queries, keys, and values\./);
+  assert.match(rendered, /The current token's query describes what it seeks/);
+  assert.match(rendered, /\*\*Confidence:\*\* 86%/);
   assert.match(rendered, /!\[\[Assets\/attention-flow\.svg\]\]/);
   assert.match(fs.readFileSync(path.join(root, "vault", "Profile.md"), "utf8"), /causal understanding/);
 });
