@@ -49,12 +49,107 @@ function harness(responses = {}) {
 
 test("Pi extension registers the chat-first learning commands", () => {
   const { commands, tools } = harness();
-  assert.deepEqual([...commands.keys()], ["teach", "learn-profile", "learn-status", "learn-review"]);
+  assert.deepEqual([...commands.keys()], [
+    "teach",
+    "teach-from",
+    "learn-profile",
+    "learn-status",
+    "learn-review",
+  ]);
   for (const command of commands.values()) {
     assert.equal(typeof command.description, "string");
     assert.equal(typeof command.handler, "function");
   }
   assert.equal(tools.has("adaptive_learning_quiz"), true);
+});
+
+test("/teach-from persists an anchor material before dispatching source-guided learning", async () => {
+  const state = { active: null };
+  const h = harness({
+    status: () => state,
+    init: () => ({ active: null }),
+    start: ({ args }) => {
+      state.active = {
+        topic: args[args.indexOf("--topic") + 1],
+        target: args[args.indexOf("--target") + 1],
+        phase: "probe",
+      };
+      return state;
+    },
+    context: ({ calls }) => {
+      const start = calls.find((call) => call.command === "start");
+      return {
+        session: {
+          target: state.active.target,
+          materials: [{ reference: start.args[start.args.indexOf("--material") + 1] }],
+        },
+      };
+    },
+  });
+
+  await h.commands
+    .get("teach-from")
+    .handler(
+      "https://www.youtube.com/watch?v=attention :: Understand self-attention causally",
+      h.ctx,
+    );
+
+  assert.deepEqual(h.calls.map((call) => call.command), ["status", "init", "start", "context"]);
+  assert.deepEqual(h.calls[2], {
+    command: "start",
+    args: [
+      "--topic",
+      "Understand self-attention causally",
+      "--target",
+      "Understand self-attention causally",
+      "--material",
+      "https://www.youtube.com/watch?v=attention",
+    ],
+    root: h.ctx.cwd,
+  });
+  assert.match(h.messages[0].message, /source-guided learning session/i);
+  assert.match(h.messages[0].message, /https:\/\/www\.youtube\.com\/watch\?v=attention/);
+  assert.match(h.messages[0].message, /Understand self-attention causally/);
+  assert.match(h.messages[0].message, /inspect.*material/i);
+});
+
+test("/teach-from normalizes a local path and refuses a conflicting active guide", async () => {
+  const created = harness({
+    status: { active: null },
+    init: { active: null },
+    start: { active: { target: "Understand attention", phase: "probe" } },
+    context: {
+      session: {
+        target: "Understand attention",
+        materials: [{ reference: "local:./notes/attention.md" }],
+      },
+    },
+  });
+  await created.commands
+    .get("teach-from")
+    .handler("./notes/attention.md :: Understand attention", created.ctx);
+  assert.deepEqual(
+    created.calls.find((call) => call.command === "start").args.slice(-2),
+    ["--material", "local:./notes/attention.md"],
+  );
+
+  const active = harness({
+    status: {
+      active: { target: "Understand attention", phase: "teach" },
+    },
+    context: {
+      session: {
+        target: "Understand attention",
+        materials: [{ reference: "local:./notes/attention.md" }],
+      },
+    },
+  });
+  await active.commands
+    .get("teach-from")
+    .handler("./other.md :: Understand attention", active.ctx);
+  assert.equal(active.messages.length, 0);
+  assert.match(active.notifications[0].message, /different source guide/i);
+  assert.equal(active.notifications[0].level, "warning");
 });
 
 test("/teach creates a new learner-owned target and expands the shared skill", async () => {

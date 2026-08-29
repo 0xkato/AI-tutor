@@ -186,3 +186,126 @@ test("complete adaptive session persists evidence, retry state, review, and Obsi
   assert.match(note, /!\[\[Assets\/covector\.svg\]\]/);
   assert.match(note, /Alternating multilinearity still needs a later teaching step/);
 });
+
+test("complete source-guided session preserves its anchor, coverage, and separate understanding evidence", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-source-e2e-"));
+  const at = "2026-08-29T08:00:00.000Z";
+  const planPath = path.join(root, "attention-plan.json");
+  fs.writeFileSync(planPath, JSON.stringify({
+    targetNodeId: "attention",
+    nodes: [{ id: "attention", title: "Self-attention" }],
+    edges: [],
+  }));
+
+  invoke(root, "init", ["--now", at]);
+  invoke(root, "start", [
+    "--id", "guided-1",
+    "--topic", "Transformers",
+    "--target", "Understand self-attention from the supplied lesson",
+    "--material", "https://www.youtube.com/watch?v=example",
+    "--now", at,
+  ]);
+
+  const materialId = JSON.parse(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+  ).sessions["guided-1"].materials[0].id;
+  invoke(root, "resolve-material", [
+    "--material-id", materialId,
+    "--status", "verified",
+    "--title", "Supplied self-attention lesson",
+    "--evidence", "Retrieved the complete transcript and checked timestamp order.",
+    "--now", at,
+  ]);
+  invoke(root, "record-probe", [
+    "--id", "probe-a1",
+    "--question-id", "probe-q1",
+    "--node", "token-representations",
+    "--kind", "explanation",
+    "--question", "What information does one token representation contain before attention?",
+    "--answer", "Its learned token embedding and position information.",
+    "--grade", "correct",
+    "--evidence", "Distinguished initial token identity and position from later contextual mixing.",
+    "--now", at,
+  ]);
+  invoke(root, "finish-probe", [
+    "--summary", "Token representations are usable; attention is the first missing mechanism.",
+    "--now", at,
+  ]);
+  invoke(root, "add-source", [
+    "--id", "anchor-attention",
+    "--title", "Supplied self-attention lesson",
+    "--url", "https://www.youtube.com/watch?v=example",
+    "--source-class", "learner-supplied",
+    "--role", "anchor",
+    "--locator", "08:12-09:05",
+    "--material-id", materialId,
+    "--supports", "Query-key scores determine how value vectors are mixed.",
+    "--verification", "Matched the claim to the cited transcript segment.",
+    "--now", at,
+  ]);
+  invoke(root, "set-plan", ["--file", planPath, "--now", at]);
+  invoke(root, "record-source-coverage", [
+    "--id", "coverage-attention",
+    "--node", "attention",
+    "--source-id", "anchor-attention",
+    "--summary", "The timestamped segment supports the query-key scoring and value-mixing mechanism.",
+    "--now", at,
+  ]);
+  invoke(root, "begin-teach", ["--now", at]);
+  invoke(root, "record-step", [
+    "--id", "step-attention",
+    "--node", "attention",
+    "--foundation", "Each token has a representation that can be compared with other token representations.",
+    "--motivation", "A token needs a content-dependent way to select relevant context.",
+    "--explanation", "Queries compare with keys to weight the value vectors mixed into the token's new representation.",
+    "--question-id", "teach-attention-q1",
+    "--kind", "transfer",
+    "--question", "Explain how one token can selectively use two other tokens in a new sentence.",
+    "--now", at,
+  ]);
+  invoke(root, "record-assessment", [
+    "--id", "teach-attention-a1",
+    "--question-id", "teach-attention-q1",
+    "--node", "attention",
+    "--stage", "teach",
+    "--kind", "transfer",
+    "--question", "Explain how one token can selectively use two other tokens in a new sentence.",
+    "--answer", "Its query scores both keys, normalizes those scores, and uses the weights to mix both values.",
+    "--grade", "correct",
+    "--evidence", "Transferred query-key scoring and weighted value mixing to an unfamiliar sequence.",
+    "--now", at,
+  ]);
+  invoke(root, "start-synthesis", [
+    "--question-id", "synthesis-q1",
+    "--question", "Connect token representations, query-key scores, and value mixing.",
+    "--now", at,
+  ]);
+  invoke(root, "record-synthesis", [
+    "--id", "synthesis-a1",
+    "--question-id", "synthesis-q1",
+    "--question", "Connect token representations, query-key scores, and value mixing.",
+    "--answer", "A token's query scores other keys and the normalized scores weight their values to form contextual information.",
+    "--grade", "correct",
+    "--evidence", "Connected the complete source-supported mechanism without relying on recognition.",
+    "--now", at,
+  ]);
+  invoke(root, "close", ["--now", at]);
+
+  const state = JSON.parse(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+  );
+  const session = state.sessions["guided-1"];
+  assert.equal(session.phase, "complete");
+  assert.equal(session.materials[0].status, "verified");
+  assert.equal(session.sources[0].role, "anchor");
+  assert.equal(session.sources[0].locator, "08:12-09:05");
+  assert.equal(session.sourceCoverage[0].nodeId, "attention");
+  assert.equal(session.assessments.some((item) => item.id === "teach-attention-a1"), true);
+
+  const sessionFile = fs.readdirSync(path.join(root, "vault", "Sessions"))[0];
+  const note = fs.readFileSync(path.join(root, "vault", "Sessions", sessionFile), "utf8");
+  assert.match(note, /Supplied learning materials/);
+  assert.match(note, /08:12-09:05/);
+  assert.match(note, /Source coverage and understanding/);
+  assert.match(note, /Transferred query-key scoring and weighted value mixing/);
+});

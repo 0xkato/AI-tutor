@@ -153,6 +153,18 @@ test("source-guided sessions preserve and resolve learner-supplied anchor materi
   );
 });
 
+test("a local path without a file extension is classified as a repository", () => {
+  const state = startSession(createInitialState({ now }), {
+    id: "local-repository-session",
+    topic: "Repository architecture",
+    target: "Understand the supplied codebase",
+    materials: [{ id: "material-1", reference: "local:./transformer-repo" }],
+    now,
+  });
+
+  assert.equal(getActiveSession(state).materials[0].kind, "repository");
+});
+
 test("anchor claims require verified material while supplemental research stays distinct", () => {
   let state = startSession(createInitialState({ now }), {
     id: "guided-session",

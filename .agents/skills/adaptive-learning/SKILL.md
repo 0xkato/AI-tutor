@@ -55,6 +55,32 @@ The learner supplies the learning target; do not silently replace or broaden it.
   same plan as Mermaid so the route and target remain visible.
 - Begin at the first teachable frontier.
 
+### Source-guided target
+
+When `session.materials` is non-empty, this is a source-guided session. Inspect
+every learner-supplied material before teaching from it, then persist whether
+each material is `verified` or `unavailable` with `resolve-material`. Do not
+substitute model recall for an unavailable source.
+
+- An unavailable anchor blocks source-guided teaching. Tell the learner and
+  wait for an accessible replacement or an explicit choice to continue as a
+  supplemental-only lesson.
+- Preserve the supplied material as the **anchor**. Record its supported claims
+  with `add-source --role anchor --material-id ...` and an exact timestamp,
+  page, section, heading, or file locator.
+- Research may correct, limit, or supplement the anchor, but record that work
+  as **supplemental** evidence. Keep anchor and supplemental evidence distinct.
+- Make any disagreement or conflict visible: state whether the supplemental
+  evidence corrects, limits, or supplements the anchor before using the claim.
+- After validating the dependency DAG, run `record-source-coverage` for every
+  plan node before teaching that node. Coverage must identify the sources and
+  explain why they support the node.
+- When teaching from a recorded claim, show or cite its exact locator next to
+  the explanation so the learner can inspect the basis without hunting for it.
+- Source coverage is not learner understanding or mastery evidence. Only the
+  learner's persisted answers, transfers, reconstructions, or other assessed
+  work can demonstrate understanding.
+
 ### Teaching
 
 - Begin from unconditional foundations, definitions and invariants already

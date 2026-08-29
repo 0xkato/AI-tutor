@@ -226,6 +226,30 @@ function parseTarget(raw) {
   return { topic, target };
 }
 
+function parseSourceGuidedTarget(raw) {
+  const input = raw.trim();
+  if (!input) return null;
+  const separator = input.indexOf("::");
+  if (separator === -1) {
+    throw new AdaptiveLearningCliError(
+      "Use /teach-from <source> :: <specific learning target>.",
+      "INVALID_SOURCE_GUIDE",
+    );
+  }
+  const suppliedReference = input.slice(0, separator).trim();
+  const target = input.slice(separator + 2).trim();
+  if (!suppliedReference || !target) {
+    throw new AdaptiveLearningCliError(
+      "Use /teach-from <source> :: <specific learning target>.",
+      "INVALID_SOURCE_GUIDE",
+    );
+  }
+  const reference = /^(?:https?:\/\/|local:)/i.test(suppliedReference)
+    ? suppliedReference
+    : `local:${suppliedReference}`;
+  return { reference, topic: target, target };
+}
+
 const PROFILE_FIELDS = new Map([
   ["teaching", "--teaching-philosophy"],
   ["philosophy", "--teaching-philosophy"],
@@ -811,6 +835,95 @@ export function createAdaptiveLearningExtension({
           dispatchSkill(
             pi,
             `Start the active learning session from its durable context. The learner supplied this target: ${supplied.target}`,
+          );
+        } catch (error) {
+          notifyError(ctx, error);
+        }
+      },
+    });
+
+    pi.registerCommand("teach-from", {
+      description: "Start or resume learning from a supplied video, PDF, notes, page, or repository",
+      handler: async (args, ctx) => {
+        if (!ctx.isIdle()) {
+          ctx.ui.notify(
+            "The agent is busy. Run /teach-from again when the current turn finishes.",
+            "warning",
+          );
+          return;
+        }
+
+        try {
+          let status;
+          try {
+            status = await runCli("status", [], ctx.cwd, runOptions(ctx));
+          } catch (error) {
+            if (error?.code !== "STATE_NOT_INITIALIZED") throw error;
+            status = { active: null };
+          }
+
+          const supplied = parseSourceGuidedTarget(args);
+          if (status.active) {
+            const context = await runCli("context", [], ctx.cwd, runOptions(ctx));
+            const materials = context.session?.materials ?? [];
+            if (materials.length === 0) {
+              ctx.ui.notify(
+                "The active target is not source-guided. Resume it with /teach or close it before starting /teach-from.",
+                "warning",
+              );
+              return;
+            }
+            if (supplied && supplied.target !== status.active.target) {
+              ctx.ui.notify(
+                `A different active target already exists: ${status.active.target}. Resume it with /teach-from or close it before starting another target.`,
+                "warning",
+              );
+              return;
+            }
+            if (
+              supplied &&
+              !materials.some((material) => material.reference === supplied.reference)
+            ) {
+              ctx.ui.notify(
+                "A different source guide is already active. Resume it with /teach-from or close it before supplying another source.",
+                "warning",
+              );
+              return;
+            }
+            const references = materials.map((material) => material.reference).join(", ");
+            dispatchSkill(
+              pi,
+              `Resume the source-guided learning session from durable context. The learner supplied this target: ${status.active.target}. The persisted anchor material is: ${references}. Inspect unresolved material before teaching and preserve exact source locators.`,
+            );
+            return;
+          }
+
+          if (!supplied) {
+            ctx.ui.notify(
+              "Usage: /teach-from <source> :: <specific learning target>",
+              "warning",
+            );
+            return;
+          }
+
+          await runCli("init", [], ctx.cwd, runOptions(ctx));
+          await runCli(
+            "start",
+            [
+              "--topic",
+              supplied.topic,
+              "--target",
+              supplied.target,
+              "--material",
+              supplied.reference,
+            ],
+            ctx.cwd,
+            runOptions(ctx),
+          );
+          await runCli("context", [], ctx.cwd, runOptions(ctx));
+          dispatchSkill(
+            pi,
+            `Start the source-guided learning session from durable context. The learner supplied this target: ${supplied.target}. The persisted anchor material is: ${supplied.reference}. Inspect and resolve the material before teaching, cite exact locations, and keep supplemental research distinct.`,
           );
         } catch (error) {
           notifyError(ctx, error);

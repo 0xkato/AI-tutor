@@ -70,6 +70,38 @@ test("skill corpus preserves the complete adaptive-learning behavior", () => {
     ["claim-level provenance fields", /supported claim/i],
     ["source class provenance", /source class/i],
     ["verification provenance", /verification note/i],
+    [
+      "source-guided material is inspected before teaching",
+      /source-guided[\s\S]*inspect[\s\S]*learner-supplied material[\s\S]*before teaching/i,
+    ],
+    [
+      "exact source locators",
+      /exact (timestamp|page|section|heading|file)[\s\S]*locator/i,
+    ],
+    [
+      "anchor and supplemental evidence stay distinct",
+      /anchor[\s\S]*supplemental[\s\S]*(distinct|separate)/i,
+    ],
+    [
+      "source disagreement is visible",
+      /(disagreement|conflict)[\s\S]*(corrects|limits|supplements|visible)/i,
+    ],
+    [
+      "unavailable anchor cannot silently become a research-only lesson",
+      /unavailable anchor[\s\S]*(blocks|stops)[\s\S]*source-guided teaching[\s\S]*(replacement|supplemental-only)/i,
+    ],
+    [
+      "source locator remains visible during teaching",
+      /when teaching[\s\S]*claim[\s\S]*(show|cite)[\s\S]*exact locator/i,
+    ],
+    [
+      "plan-node source coverage before source-guided teaching",
+      /record-source-coverage[\s\S]*plan node[\s\S]*before teaching/i,
+    ],
+    [
+      "source coverage is not understanding evidence",
+      /source coverage[\s\S]*(not|never)[\s\S]*(understanding|learner evidence|mastery)/i,
+    ],
     ["DAG before teaching", /validated.*dependency DAG.*before teaching/i],
     ["Mermaid plan", /Mermaid/i],
     ["unconditional foundations", /unconditional foundations|definitions and invariants/i],

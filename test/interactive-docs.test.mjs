@@ -18,6 +18,10 @@ test("README provides a concise public quickstart with honest boundaries", () =>
   assert.ok(readme.indexOf("npm ci") < readme.indexOf("npm run setup"));
   assert.ok(readme.indexOf("npm run setup") < readme.indexOf("npm run pi"));
   assert.match(readme, /Codex and Pi use the same saved learning state/i);
+  assert.match(readme, /\/teach-from <source> :: <learning target>/i);
+  assert.match(readme, /YouTube[\s\S]*PDF[\s\S]*notes[\s\S]*web page[\s\S]*repository/i);
+  assert.match(readme, /anchor[\s\S]*supplemental/i);
+  assert.match(readme, /source coverage[\s\S]*not[\s\S]*(understanding|mastery)/i);
   assert.match(readme, /I don['’]t know[^\n]*ungraded gap/i);
   assert.match(readme, /\.adaptive-learning\/[\s\S]*vault\/[\s\S]*ignored by Git/i);
   assert.match(readme, /no telemetry/i);
@@ -46,13 +50,16 @@ test("operator quickstart tells a learner what they will see and how to answer",
   assert.match(quickstart, /open-ended teaching or review checkpoint[\s\S]*I don['’]t know[\s\S]*ungraded admission/i);
 });
 
-test("state format documents schema v4 profile, interactive records, and migration", () => {
+test("state format documents schema v5 source-guided provenance and migration", () => {
   const format = read("docs/operator/state-format.md");
 
-  assert.match(format, /current schema version is `4`/i);
-  assert.match(format, /Version-1[\s\S]*version 2[\s\S]*version 3[\s\S]*version 4/i);
+  assert.match(format, /current schema version is `5`/i);
+  assert.match(format, /Version-1[\s\S]*versions 2, 3, 4, and 5/i);
   assert.match(format, /learnerProfile[\s\S]*teaching[\s\S]*preferences/i);
   assert.match(format, /question[\s\S]*response[\s\S]*learner note/i);
   assert.match(format, /answer key[\s\S]*redact/i);
   assert.match(format, /checkpointGaps[\s\S]*teaching, retention, or[\s\S]*synthesis/i);
+  assert.match(format, /materials[\s\S]*pending[\s\S]*(verified|unavailability)/i);
+  assert.match(format, /anchor material[\s\S]*supplemental research/i);
+  assert.match(format, /sourceCoverage[\s\S]*not learner evidence/i);
 });

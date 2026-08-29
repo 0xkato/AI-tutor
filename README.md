@@ -34,6 +34,27 @@ The tutor will establish what you already know, teach the next missing idea,
 and check whether you can use it in a new example. It can research the subject
 itself when the lesson needs sources.
 
+To learn from material you already have, use:
+
+```text
+/teach-from <source> :: <learning target>
+```
+
+The source can be a YouTube video, PDF, notes file, web page, or repository.
+For example:
+
+```text
+/teach-from https://www.youtube.com/watch?v=... :: Understand self-attention
+/teach-from ./notes/attention.md :: Test what I retained about attention
+```
+
+The tutor saves the supplied material before inspecting it. Claims from that
+material remain the **anchor** and keep an exact timestamp, page, heading, or
+file location. Any extra research is recorded separately as **supplemental**
+evidence, including where it corrects or limits the anchor. Source coverage
+shows what supports each lesson step; it is not evidence of your understanding
+or mastery.
+
 When a multiple-choice question appears:
 
 - use the arrow keys to choose an answer;
@@ -45,6 +66,7 @@ When a multiple-choice question appears:
 Your session is saved automatically. Useful commands are:
 
 - `/teach` — resume the active lesson;
+- `/teach-from` — start from a supplied source and learning target;
 - `/learn-status` — see the current target and next step;
 - `/learn-review` — run due review work;
 - `/learn-profile` — change how the tutor teaches you.

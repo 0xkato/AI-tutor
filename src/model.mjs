@@ -200,6 +200,7 @@ function materialKind(reference) {
     return "repository";
   }
   if (/\.(?:md|mdx|txt|json|jsonl|csv)(?:$|[?#])/.test(lower)) return "notes";
+  if (lower.startsWith("local:")) return "repository";
   return "web";
 }
 

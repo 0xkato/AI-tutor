@@ -64,6 +64,18 @@ Then start with a learning target inside Pi:
 /teach Understand why gradient descent subtracts the gradient
 ```
 
+To anchor the lesson in material you supply, use a YouTube URL, PDF, notes
+file, web page, or repository followed by `::` and the learning target:
+
+```text
+/teach-from ./notes/gradient-descent.md :: Test and deepen what I retained
+```
+
+The supplied reference is persisted before the host inspects it. The host
+records exact source locations and keeps later independent research separate
+from the anchor. The Obsidian session note shows both source coverage and the
+learner's distinct understanding evidence.
+
 In Codex, state the same target naturally. Both hosts load the complete
 adaptive-learning protocol before calibration or teaching.
 
@@ -123,6 +135,7 @@ Launch Pi from the repository root, then use:
 
 ```text
 /teach Understand why gradient descent subtracts the gradient
+/teach-from https://www.youtube.com/watch?v=... :: Understand the video's attention mechanism
 /learn-profile
 /learn-status
 /learn-review

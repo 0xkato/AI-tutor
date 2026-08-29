@@ -99,6 +99,23 @@ export function renderSessionNote(state, session) {
     lines.push("None recorded.", "");
   }
 
+  lines.push("## Supplied learning materials", "");
+  if (session.materials?.length) {
+    for (const material of session.materials) {
+      lines.push(
+        `### ${headingText(material.title ?? material.reference)}`,
+        "",
+        `- **Reference:** ${listValue(material.reference)}`,
+        `- **Kind:** ${listValue(titleCase(material.kind))}`,
+        `- **Status:** ${listValue(titleCase(material.status))}`,
+        `- **Resolution:** ${listValue(material.resolution ?? "Pending host inspection")}`,
+        "",
+      );
+    }
+  } else {
+    lines.push("No learner-supplied anchor material recorded.", "");
+  }
+
   lines.push("", "## Sources and verification", "");
   if (session.sources?.length) {
     for (const source of session.sources) {
@@ -106,6 +123,9 @@ export function renderSessionNote(state, session) {
         `### ${markdownLink(source.title, source.url)}`,
         "",
         `- **Class:** ${listValue(source.sourceClass)}`,
+        `- **Role:** ${listValue(titleCase(source.role ?? "supplemental"))}`,
+        `- **Locator:** ${listValue(source.locator ?? "Whole source")}`,
+        `- **Material:** ${source.materialId ? inlineCode(source.materialId) : "None — external or general research"}`,
         `- **Supports:** ${listValue(source.supports)}`,
         `- **Verification:** ${listValue(source.verification)}`,
         "",
@@ -115,9 +135,41 @@ export function renderSessionNote(state, session) {
     lines.push("No sources recorded.", "");
   }
 
+  lines.push("## Source coverage and understanding", "");
+  if (session.sourceCoverage?.length) {
+    const concepts = conceptsForSession(state, session);
+    for (const coverage of session.sourceCoverage) {
+      const source = session.sources?.find((candidate) => candidate.id === coverage.sourceId);
+      const concept = concepts.find((candidate) => candidate.key === coverage.nodeId);
+      const latestAssessment = [...(session.assessments ?? [])]
+        .reverse()
+        .find((assessment) => assessment.conceptId === concept?.id && !assessment.contaminated);
+      lines.push(
+        `### ${headingText(coverage.nodeId)}`,
+        "",
+        `- **Source:** ${listValue(source?.title ?? coverage.sourceId)}`,
+        `- **Role:** ${listValue(titleCase(source?.role ?? "supplemental"))}`,
+        `- **Locator:** ${listValue(source?.locator ?? "Whole source")}`,
+        `- **Coverage:** ${listValue(coverage.summary)}`,
+        `- **Understanding status:** ${listValue(concept ? titleCase(concept.status) : "Not demonstrated")}`,
+        `- **Latest learner evidence:** ${listValue(latestAssessment?.evidence ?? "None recorded")}`,
+        "",
+      );
+    }
+  } else {
+    lines.push("No plan-node source coverage recorded.", "");
+  }
+
   lines.push("## Teaching steps", "");
   if (session.steps?.length) {
     session.steps.forEach((step, index) => {
+      const sourceBasis = (session.sourceCoverage ?? [])
+        .filter((coverage) => coverage.nodeId === step.nodeId)
+        .map((coverage) => {
+          const source = session.sources?.find((candidate) => candidate.id === coverage.sourceId);
+          return `${source?.title ?? coverage.sourceId} — ${source?.locator ?? "Whole source"}`;
+        })
+        .join("; ");
       lines.push(
         `### ${index + 1}\. ${headingText(step.nodeId)}`,
         "",
@@ -125,6 +177,7 @@ export function renderSessionNote(state, session) {
         `- **Motivation:** ${listValue(step.motivation)}`,
         `- **Explanation:** ${listValue(step.explanation)}`,
         `- **Checkpoint:** ${listValue(step.checkpointQuestion)}`,
+        `- **Source basis:** ${listValue(sourceBasis || "No source coverage recorded")}`,
         "",
       );
     });
@@ -192,6 +245,14 @@ export function renderSessionNote(state, session) {
         `- **Outcome:** ${listValue(outcome)}`,
         `- **Selected:** ${listValue(selected)}`,
       );
+      const questionSourceBasis = (session.sourceCoverage ?? [])
+        .filter((coverage) => coverage.nodeId === question.nodeId)
+        .map((coverage) => {
+          const source = session.sources?.find((candidate) => candidate.id === coverage.sourceId);
+          return `${source?.title ?? coverage.sourceId} — ${source?.locator ?? "Whole source"}`;
+        })
+        .join("; ");
+      lines.push(`- **Source basis:** ${listValue(questionSourceBasis || "No source coverage recorded")}`);
       if (question.parentQuestionId) {
         lines.push(
           `- **Parent question:** ${inlineCode(question.parentQuestionId)}`,

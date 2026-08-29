@@ -48,6 +48,18 @@ state.sessions.s1 = {
       createdAt: "2026-08-24T09:00:00.000Z",
     },
   ],
+  materials: [
+    {
+      id: "material-1",
+      reference: "https://example.test/reference",
+      kind: "web",
+      status: "verified",
+      title: "Primary reference",
+      resolution: "Opened the supplied page and inspected the covector section.",
+      createdAt: "2026-08-24T08:25:00.000Z",
+      updatedAt: "2026-08-24T08:30:00.000Z",
+    },
+  ],
   sources: [
     {
       id: "source-1",
@@ -56,6 +68,9 @@ state.sessions.s1 = {
       sourceClass: "primary",
       supports: "Definition of a covector",
       verification: "Checked the definition against a second textbook.",
+      role: "anchor",
+      locator: "Section: Linear functionals",
+      materialId: "material-1",
       createdAt: "2026-08-24T08:30:00.000Z",
     },
   ],
@@ -67,6 +82,15 @@ state.sessions.s1 = {
     ],
     edges: [{ from: "vectors", to: "forms", reason: "Generalization" }],
   },
+  sourceCoverage: [
+    {
+      id: "coverage-1",
+      nodeId: "forms",
+      sourceId: "source-1",
+      summary: "The supplied section supports the covector-to-form foundation used in this node.",
+      createdAt: "2026-08-24T08:40:00.000Z",
+    },
+  ],
   frontier: ["forms"],
   steps: [
     {
@@ -142,8 +166,18 @@ test("renderSessionNote contains the complete inspectable learning record", () =
     "covector-to-form connection as missing",
     "```mermaid",
     "Definition of a covector",
+    "## Supplied learning materials",
+    "Opened the supplied page and inspected the covector section.",
+    "Anchor",
+    "Section: Linear functionals",
+    "## Source coverage and understanding",
+    "The supplied section supports the covector-to-form foundation used in this node.",
+    "Understanding status",
+    "Latest learner evidence",
+    "Not demonstrated",
     "## Teaching steps",
     "A linear functional is defined by linearity.",
+    "Source basis",
     "Correct",
     "![[Assets/covector.svg]]",
     "2026-08-25T08:00:00.000Z",
