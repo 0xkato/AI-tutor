@@ -48,6 +48,117 @@ test("independent CLI invocations initialize, mutate, render, and resume state",
   );
 });
 
+test("CLI persists a complete source-guided material and coverage lifecycle", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-source-guided-cli-"));
+  const planFile = path.join(root, "plan.json");
+  fs.writeFileSync(planFile, JSON.stringify({
+    targetNodeId: "attention",
+    nodes: [{ id: "attention", title: "Self-attention" }],
+    edges: [],
+  }));
+
+  run(root, "init", "--now", "2026-08-29T08:00:00.000Z");
+  run(
+    root,
+    "start",
+    "--id",
+    "source-guided-session",
+    "--topic",
+    "Transformers",
+    "--target",
+    "Understand self-attention from the supplied notes",
+    "--material",
+    "local:notes/attention.md",
+    "--now",
+    "2026-08-29T08:01:00.000Z",
+  );
+  let context = JSON.parse(run(root, "context", "--json"));
+  const materialId = context.session.materials[0].id;
+  assert.equal(context.session.materials[0].status, "pending");
+
+  run(
+    root,
+    "resolve-material",
+    "--material-id",
+    materialId,
+    "--status",
+    "verified",
+    "--title",
+    "Attention notes",
+    "--evidence",
+    "Opened the local notes and inspected the complete self-attention section.",
+    "--now",
+    "2026-08-29T08:02:00.000Z",
+  );
+  run(
+    root,
+    "add-source",
+    "--id",
+    "anchor-attention",
+    "--title",
+    "Attention notes",
+    "--url",
+    "local:notes/attention.md",
+    "--source-class",
+    "learner-supplied",
+    "--role",
+    "anchor",
+    "--locator",
+    "Heading: Self-attention",
+    "--material-id",
+    materialId,
+    "--supports",
+    "Each token compares its query with keys to determine weighted value mixing.",
+    "--verification",
+    "Matched the mechanism to the exact heading in the learner-supplied notes.",
+    "--now",
+    "2026-08-29T08:03:00.000Z",
+  );
+  run(
+    root,
+    "record-admitted-gap",
+    "--id",
+    "attention-gap",
+    "--node",
+    "attention",
+    "--statement",
+    "I do not yet understand how query-key scores control value mixing.",
+    "--evidence",
+    "The learner explicitly identified query-key scoring and value mixing as the missing mechanism.",
+    "--now",
+    "2026-08-29T08:04:00.000Z",
+  );
+  run(
+    root,
+    "finish-probe",
+    "--summary",
+    "Self-attention is an admitted gap and must be taught from the supplied material.",
+    "--now",
+    "2026-08-29T08:05:00.000Z",
+  );
+  run(root, "set-plan", "--file", planFile, "--now", "2026-08-29T08:06:00.000Z");
+  run(
+    root,
+    "record-source-coverage",
+    "--id",
+    "attention-coverage",
+    "--node",
+    "attention",
+    "--source-id",
+    "anchor-attention",
+    "--summary",
+    "The supplied section supports the query-key scoring and weighted value-mixing mechanism.",
+    "--now",
+    "2026-08-29T08:07:00.000Z",
+  );
+
+  context = JSON.parse(run(root, "context", "--json"));
+  assert.equal(context.session.materials[0].status, "verified");
+  assert.equal(context.session.sources[0].role, "anchor");
+  assert.equal(context.session.sources[0].locator, "Heading: Self-attention");
+  assert.equal(context.session.sourceCoverage[0].nodeId, "attention");
+});
+
 test("learner profile commands persist preferences atomically and render them to Obsidian", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-profile-cli-"));
   run(root, "init", "--now", "2026-08-24T08:00:00.000Z");

@@ -11,7 +11,9 @@ import {
   createInitialState,
   finishProbe,
   getActiveSession,
+  recordSourceCoverage,
   recordStep,
+  resolveMaterial,
   setPlan,
   startSession,
 } from "../src/model.mjs";
@@ -101,6 +103,198 @@ test("sources require explicit claim support and verification", () => {
     now,
   });
   assert.equal(getActiveSession(next).sources[0].sourceClass, "primary");
+  assert.equal(getActiveSession(next).sources[0].role, "supplemental");
+  assert.equal(getActiveSession(next).sources[0].locator, "Whole source");
+});
+
+test("source-guided sessions preserve and resolve learner-supplied anchor material", () => {
+  let state = startSession(createInitialState({ now }), {
+    id: "guided-session",
+    topic: "Transformers",
+    target: "Understand self-attention from the supplied video",
+    materials: [{
+      id: "material-1",
+      reference: "https://www.youtube.com/watch?v=example",
+    }],
+    now,
+  });
+
+  let session = getActiveSession(state);
+  assert.deepEqual(session.materials[0], {
+    id: "material-1",
+    reference: "https://www.youtube.com/watch?v=example",
+    kind: "youtube",
+    status: "pending",
+    title: null,
+    resolution: null,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  state = resolveMaterial(state, {
+    materialId: "material-1",
+    status: "verified",
+    title: "Transformer lesson",
+    evidence: "Retrieved the complete video transcript and checked its timestamp order.",
+    now,
+  });
+  session = getActiveSession(state);
+  assert.equal(session.materials[0].status, "verified");
+  assert.equal(session.materials[0].title, "Transformer lesson");
+
+  assert.throws(
+    () => resolveMaterial(state, {
+      materialId: "material-1",
+      status: "unavailable",
+      evidence: "A later attempt failed.",
+      now,
+    }),
+    /already resolved/,
+  );
+});
+
+test("anchor claims require verified material while supplemental research stays distinct", () => {
+  let state = startSession(createInitialState({ now }), {
+    id: "guided-session",
+    topic: "Transformers",
+    target: "Understand attention",
+    materials: [{ id: "material-1", reference: "local:notes/attention.md" }],
+    now,
+  });
+
+  assert.throws(
+    () => addSource(state, {
+      id: "anchor-1",
+      title: "Attention notes",
+      url: "local:notes/attention.md",
+      sourceClass: "learner-supplied",
+      role: "anchor",
+      locator: "Heading: Scaled dot-product attention",
+      materialId: "material-1",
+      supports: "The query-key comparison produces attention weights.",
+      verification: "Matched the heading and surrounding explanation in the supplied notes.",
+      now,
+    }),
+    /verified/,
+  );
+
+  state = resolveMaterial(state, {
+    materialId: "material-1",
+    status: "verified",
+    title: "Attention notes",
+    evidence: "Opened the local notes and inspected the complete attention section.",
+    now,
+  });
+  state = addSource(state, {
+    id: "anchor-1",
+    title: "Attention notes",
+    url: "local:notes/attention.md",
+    sourceClass: "learner-supplied",
+    role: "anchor",
+    locator: "Heading: Scaled dot-product attention",
+    materialId: "material-1",
+    supports: "The query-key comparison produces attention weights.",
+    verification: "Matched the claim to the exact heading in the supplied notes.",
+    now,
+  });
+  state = addSource(state, {
+    id: "supplemental-1",
+    title: "Attention Is All You Need",
+    url: "https://arxiv.org/abs/1706.03762",
+    sourceClass: "primary",
+    role: "supplemental",
+    locator: "Section 3.2.1",
+    supports: "Scaled dot-product attention divides logits by the square root of key dimension.",
+    verification: "Checked the equation and definitions in the original paper.",
+    now,
+  });
+
+  const [anchor, supplemental] = getActiveSession(state).sources;
+  assert.equal(anchor.materialId, "material-1");
+  assert.equal(anchor.role, "anchor");
+  assert.equal(supplemental.materialId, null);
+  assert.equal(supplemental.role, "supplemental");
+});
+
+test("source-guided teaching requires claim coverage for the exact plan node", () => {
+  let state = startSession(createInitialState({ now }), {
+    id: "guided-session",
+    topic: "Covectors",
+    target: "Understand covectors from supplied notes",
+    materials: [{ id: "material-1", reference: "local:notes/covectors.md" }],
+    now,
+  });
+  state = recordAssessment(state, {
+    id: "probe-a1",
+    questionId: "probe-q1",
+    nodeId: "vectors",
+    stage: "probe",
+    kind: "explanation",
+    question: "What operations define a vector space?",
+    answer: "Vector addition and scalar multiplication.",
+    grade: "correct",
+    evidence: "Named both defining operations and their role in a vector space.",
+    now,
+  });
+  state = finishProbe(state, {
+    summary: "Vectors are established; covectors are the missing mechanism.",
+    now,
+  });
+  state = resolveMaterial(state, {
+    materialId: "material-1",
+    status: "verified",
+    title: "Covector notes",
+    evidence: "Opened and inspected the complete local notes file.",
+    now,
+  });
+  state = addSource(state, {
+    id: "anchor-1",
+    title: "Covector notes",
+    url: "local:notes/covectors.md",
+    sourceClass: "learner-supplied",
+    role: "anchor",
+    locator: "Heading: Linear functionals",
+    materialId: "material-1",
+    supports: "A covector is a linear map from vectors to scalars.",
+    verification: "Matched the definition to the supplied heading.",
+    now,
+  });
+  state = setPlan(state, {
+    plan: {
+      targetNodeId: "covectors",
+      nodes: [
+        { id: "vectors", title: "Vectors" },
+        { id: "covectors", title: "Covectors" },
+      ],
+      edges: [{ from: "vectors", to: "covectors", reason: "Covectors act on vectors" }],
+    },
+    now,
+  });
+  state = beginTeach(state, { now });
+
+  const step = {
+    id: "step-1",
+    nodeId: "covectors",
+    foundation: "A linear map preserves vector addition and scalar multiplication.",
+    motivation: "We need an object that measures a vector linearly.",
+    explanation: "A covector maps a vector to a scalar linearly.",
+    checkpointQuestionId: "step-1-q1",
+    checkpointKind: "transfer",
+    checkpointQuestion: "What must a covector consume and produce?",
+    now,
+  };
+  assert.throws(() => recordStep(state, step), /source coverage.*covectors/i);
+
+  state = recordSourceCoverage(state, {
+    id: "coverage-1",
+    nodeId: "covectors",
+    sourceId: "anchor-1",
+    summary: "The supplied linear-functionals section supports the covector input, output, and linearity mechanism.",
+    now,
+  });
+  state = recordStep(state, step);
+  assert.equal(getActiveSession(state).sourceCoverage[0].nodeId, "covectors");
+  assert.equal(getActiveSession(state).activeStepId, "step-1");
 });
 
 test("only one teaching step may remain unresolved", () => {

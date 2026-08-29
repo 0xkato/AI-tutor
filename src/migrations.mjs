@@ -209,5 +209,29 @@ export function migrateV3ToV4(value) {
     updatedAt: null,
   };
   next.render = { revision: next.render?.revision ?? 0, status: "stale", error: null };
+  return next;
+}
+
+export function migrateV4ToV5(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new LearningError("Version-4 state must be an object", "INVALID_STATE");
+  }
+  if (value.schemaVersion !== 4) {
+    throw new LearningError(`Cannot migrate schema version: ${value.schemaVersion}`, "UNSUPPORTED_SCHEMA");
+  }
+
+  const next = structuredClone(value);
+  next.schemaVersion = 5;
+  next.revision = (next.revision ?? 0) + 1;
+  next.render = { revision: next.render?.revision ?? 0, status: "stale", error: null };
+  for (const session of Object.values(next.sessions ?? {})) {
+    session.materials = [];
+    session.sourceCoverage = [];
+    for (const source of session.sources ?? []) {
+      source.role = "supplemental";
+      source.locator = "Whole source";
+      source.materialId = null;
+    }
+  }
   return validateState(next);
 }

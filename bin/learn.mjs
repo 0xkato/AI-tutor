@@ -18,8 +18,10 @@ import {
   closeSession,
   finishProbe,
   getActiveSession,
+  recordSourceCoverage,
   recordStep,
   recordAdmittedGap,
+  resolveMaterial,
   setPlan,
   startSession,
   updateLearnerProfile,
@@ -63,7 +65,9 @@ const commands = [
   ["cancel-question", "Cancel the unresolved question"],
   ["add-note", "Attach a learner note to a session learning object"],
   ["finish-probe", "Finish diagnosis and record the learner map"],
+  ["resolve-material", "Record whether learner-supplied material was usable"],
   ["add-source", "Attach a verified source and supported claim"],
+  ["record-source-coverage", "Bind a claim-level source to one dependency node"],
   ["set-plan", "Validate and store a dependency plan"],
   ["begin-teach", "Begin one-step-at-a-time teaching"],
   ["record-step", "Record one motivated teaching step"],
@@ -97,7 +101,7 @@ const COMMAND_OPTIONS = {
     "visual-preferences",
     "source-preferences",
   ],
-  start: ["id", "topic", "target", "context", "topic-id", "reuse-concept"],
+  start: ["id", "topic", "target", "context", "topic-id", "reuse-concept", "material"],
   "record-probe": [
     "id",
     "question-id",
@@ -145,7 +149,19 @@ const COMMAND_OPTIONS = {
   "cancel-question": ["question-id"],
   "add-note": ["id", "target-type", "target-id", "body"],
   "finish-probe": ["summary"],
-  "add-source": ["id", "title", "url", "source-class", "supports", "verification"],
+  "resolve-material": ["material-id", "status", "title", "evidence"],
+  "add-source": [
+    "id",
+    "title",
+    "url",
+    "source-class",
+    "role",
+    "locator",
+    "material-id",
+    "supports",
+    "verification",
+  ],
+  "record-source-coverage": ["id", "node", "source-id", "summary"],
   "set-plan": ["file"],
   "begin-teach": [],
   "record-step": [
@@ -199,7 +215,7 @@ const COMMAND_OPTIONS = {
 };
 const BOOLEAN_OPTIONS = new Set(["json", "contaminated", "dont-know", "help", "check"]);
 const REPEATABLE_OPTIONS = {
-  start: new Set(["reuse-concept"]),
+  start: new Set(["reuse-concept", "material"]),
   "start-review": new Set(["review"]),
   "start-question": new Set(["choice", "correct"]),
   "answer-question": new Set(["selected"]),
@@ -223,6 +239,7 @@ const OPTION_DESCRIPTIONS = {
   context: "Relevant learner context",
   "topic-id": "Stable topic identifier",
   "reuse-concept": "Existing concept identifier (repeatable)",
+  material: "Learner-supplied source reference (repeatable)",
   "question-id": "Stable question identifier",
   node: "Dependency-plan node identifier",
   stage: "Assessment stage",
@@ -252,6 +269,11 @@ const OPTION_DESCRIPTIONS = {
   title: "Source title",
   url: "http(s) URL or local:<reference>",
   "source-class": "Source provenance class",
+  role: "Anchor material or supplemental research",
+  locator: "Exact timestamp, page, section, heading, or file location",
+  "material-id": "Learner-supplied material identifier",
+  status: "verified or unavailable",
+  "source-id": "Claim-level source identifier",
   supports: "Claim supported by the source",
   verification: "Recorded verification or inspection",
   file: "Input JSON file",
@@ -270,6 +292,22 @@ const OPTION_DESCRIPTIONS = {
   gap: "Unresolved gap (repeatable)",
 };
 const COMMAND_OPTION_DESCRIPTIONS = {
+  "resolve-material": {
+    "material-id": "Learner-supplied material identifier",
+    status: "verified or unavailable",
+    title: "Resolved material title (required when verified)",
+    evidence: "Exact material resolution evidence",
+  },
+  "add-source": {
+    role: "Anchor material or supplemental research",
+    locator: "Exact timestamp, page, section, heading, or file location",
+    "material-id": "Verified learner material linked by an anchor claim",
+  },
+  "record-source-coverage": {
+    node: "Dependency-plan node supported by the source",
+    "source-id": "Claim-level source identifier",
+    summary: "Bounded mechanism or claim supported",
+  },
   "record-admitted-gap": {
     "question-id": "Exact active checkpoint question identifier (teach, retention, or synthesis)",
     statement: "Learner's exact admitted-gap statement",
@@ -556,7 +594,17 @@ function commandResult(command, options, root) {
       context: last(options, "context"),
       topicId: last(options, "topic-id"),
       reuseConceptIds: all(options, "reuse-concept"),
+      materials: all(options, "material"),
       now: last(options, "now"),
+      });
+    }
+    if (command === "resolve-material") {
+      return resolveMaterial(current, {
+        materialId: last(options, "material-id"),
+        status: last(options, "status"),
+        title: last(options, "title"),
+        evidence: last(options, "evidence"),
+        now: last(options, "now"),
       });
     }
     if (command === "start-review") {
@@ -654,9 +702,21 @@ function commandResult(command, options, root) {
       title: last(options, "title"),
       url: last(options, "url"),
       sourceClass: last(options, "source-class"),
+      role: last(options, "role"),
+      locator: last(options, "locator"),
+      materialId: last(options, "material-id"),
       supports: last(options, "supports"),
       verification: last(options, "verification"),
       now: last(options, "now"),
+      });
+    }
+    if (command === "record-source-coverage") {
+      return recordSourceCoverage(current, {
+        id: last(options, "id"),
+        nodeId: last(options, "node"),
+        sourceId: last(options, "source-id"),
+        summary: last(options, "summary"),
+        now: last(options, "now"),
       });
     }
     if (command === "set-plan") {

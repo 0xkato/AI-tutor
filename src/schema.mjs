@@ -2,7 +2,7 @@ import { LearningError } from "./errors.mjs";
 import { validatePlan } from "./graph.mjs";
 import { safeRelativeVaultPath, safeVaultDir, validateSourceReference } from "./inputs.mjs";
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 const SESSION_PHASES = new Set(["probe", "plan", "teach", "review", "complete"]);
 const SESSION_KINDS = new Set(["learn", "review"]);
@@ -32,6 +32,9 @@ const QUESTION_STATUSES = new Set([
 ]);
 const QUESTION_MODES = new Set(["single-select", "multi-select"]);
 const NOTE_TARGET_TYPES = new Set(["session", "question", "concept", "step"]);
+const MATERIAL_KINDS = new Set(["youtube", "pdf", "notes", "repository", "web"]);
+const MATERIAL_STATUSES = new Set(["pending", "verified", "unavailable"]);
+const SOURCE_ROLES = new Set(["anchor", "supplemental"]);
 
 function invalid(message, code = "INVALID_STATE") {
   throw new LearningError(message, code);
@@ -334,7 +337,9 @@ function validateSession(
   key,
   globalAssessmentIds,
   globalAdmittedGapIds,
+  globalMaterialIds,
   globalSourceIds,
+  globalCoverageIds,
   globalVisualIds,
 ) {
   const label = `sessions.${key}`;
@@ -414,24 +419,90 @@ function validateSession(
     invalid(`${label}.questions contains multiple unresolved questions`);
   }
 
+  const materialById = new Map();
+  for (const [index, material] of array(session.materials, `${label}.materials`).entries()) {
+    const materialLabel = `${label}.materials[${index}]`;
+    object(material, materialLabel);
+    text(material.id, `${materialLabel}.id`);
+    if (globalMaterialIds.has(material.id)) invalid(`duplicate material ID: ${material.id}`);
+    globalMaterialIds.add(material.id);
+    if (materialById.has(material.id)) invalid(`${label}.materials contains duplicate ID: ${material.id}`);
+    materialById.set(material.id, material);
+    try {
+      validateSourceReference(material.reference);
+    } catch (error) {
+      invalid(`${materialLabel}.reference is invalid: ${error.message}`);
+    }
+    oneOf(material.kind, MATERIAL_KINDS, `${materialLabel}.kind`);
+    oneOf(material.status, MATERIAL_STATUSES, `${materialLabel}.status`);
+    nullableText(material.title, `${materialLabel}.title`);
+    nullableText(material.resolution, `${materialLabel}.resolution`);
+    stateInstant(material.createdAt, `${materialLabel}.createdAt`);
+    stateInstant(material.updatedAt, `${materialLabel}.updatedAt`);
+    if (material.status === "pending" && (material.title !== null || material.resolution !== null)) {
+      invalid(`${materialLabel} cannot contain resolution data while pending`);
+    }
+    if (material.status === "verified" && (material.title === null || material.resolution === null)) {
+      invalid(`${materialLabel} requires a title and resolution when verified`);
+    }
+    if (material.status === "unavailable" && material.resolution === null) {
+      invalid(`${materialLabel}.resolution is required when unavailable`);
+    }
+  }
+
+  const localSourceIds = new Set();
   for (const [index, source] of array(session.sources, `${label}.sources`).entries()) {
     const sourceLabel = `${label}.sources[${index}]`;
     object(source, sourceLabel);
     text(source.id, `${sourceLabel}.id`);
     if (globalSourceIds.has(source.id)) invalid(`duplicate source ID: ${source.id}`);
     globalSourceIds.add(source.id);
+    localSourceIds.add(source.id);
     for (const field of ["title", "url", "sourceClass", "supports", "verification"]) {
       text(source[field], `${sourceLabel}.${field}`);
     }
+    oneOf(source.role, SOURCE_ROLES, `${sourceLabel}.role`);
+    text(source.locator, `${sourceLabel}.locator`);
+    nullableText(source.materialId, `${sourceLabel}.materialId`);
     try {
       validateSourceReference(source.url);
     } catch (error) {
       invalid(`${sourceLabel}.url is invalid: ${error.message}`);
     }
     stateInstant(source.createdAt, `${sourceLabel}.createdAt`);
+    if (source.role === "anchor") {
+      const material = materialById.get(source.materialId);
+      if (!material || material.status !== "verified" || material.reference !== source.url) {
+        invalid(`${sourceLabel} must reference matching verified anchor material`);
+      }
+    } else if (source.materialId !== null) {
+      invalid(`${sourceLabel}.materialId is only allowed for anchor sources`);
+    }
   }
 
   if (session.plan !== null) validatePlan(session.plan);
+  const planNodeIds = new Set(session.plan?.nodes?.map((node) => node.id) ?? []);
+  const coveragePairs = new Set();
+  for (const [index, coverage] of array(session.sourceCoverage, `${label}.sourceCoverage`).entries()) {
+    const coverageLabel = `${label}.sourceCoverage[${index}]`;
+    object(coverage, coverageLabel);
+    text(coverage.id, `${coverageLabel}.id`);
+    if (globalCoverageIds.has(coverage.id)) invalid(`duplicate source coverage ID: ${coverage.id}`);
+    globalCoverageIds.add(coverage.id);
+    text(coverage.nodeId, `${coverageLabel}.nodeId`);
+    text(coverage.sourceId, `${coverageLabel}.sourceId`);
+    text(coverage.summary, `${coverageLabel}.summary`);
+    stateInstant(coverage.createdAt, `${coverageLabel}.createdAt`);
+    if (!planNodeIds.has(coverage.nodeId)) {
+      invalid(`${coverageLabel}.nodeId references a missing plan node`);
+    }
+    if (!localSourceIds.has(coverage.sourceId)) {
+      invalid(`${coverageLabel}.sourceId references an unknown session source`);
+    }
+    const pair = `${coverage.nodeId}\u0000${coverage.sourceId}`;
+    if (coveragePairs.has(pair)) invalid(`${label}.sourceCoverage contains a duplicate node-source pair`);
+    coveragePairs.add(pair);
+  }
   uniqueTextArray(session.frontier, `${label}.frontier`);
 
   const stepIds = new Set();
@@ -758,6 +829,8 @@ export function validateState(value) {
     if (!("checkpointGaps" in session)) session.checkpointGaps = [];
     if (!("questions" in session)) session.questions = [];
     if (!("notes" in session)) session.notes = [];
+    if (!("materials" in session)) session.materials = [];
+    if (!("sourceCoverage" in session)) session.sourceCoverage = [];
     if (!("synthesisRequired" in session)) session.synthesisRequired = false;
     if (!("checkpoint" in session)) session.checkpoint = null;
     if (!("synthesisCheckpoint" in session)) session.synthesisCheckpoint = null;
@@ -772,6 +845,14 @@ export function validateState(value) {
         if (!("checkpointKind" in step)) step.checkpointKind = null;
       }
     }
+    if (Array.isArray(session.sources)) {
+      for (const source of session.sources) {
+        if (!source || typeof source !== "object" || Array.isArray(source)) continue;
+        if (!("role" in source)) source.role = "supplemental";
+        if (!("locator" in source)) source.locator = "Whole source";
+        if (!("materialId" in source)) source.materialId = null;
+      }
+    }
   }
   for (const review of Object.values(state.reviews)) {
     if (!review || typeof review !== "object" || Array.isArray(review)) continue;
@@ -782,10 +863,21 @@ export function validateState(value) {
 
   const assessmentIds = new Map();
   const admittedGapIds = new Set();
+  const materialIds = new Set();
   const sourceIds = new Set();
+  const coverageIds = new Set();
   const visualIds = new Set();
   for (const [id, session] of Object.entries(state.sessions)) {
-    validateSession(session, id, assessmentIds, admittedGapIds, sourceIds, visualIds);
+    validateSession(
+      session,
+      id,
+      assessmentIds,
+      admittedGapIds,
+      materialIds,
+      sourceIds,
+      coverageIds,
+      visualIds,
+    );
   }
   if (state.activeSessionId !== null && !state.sessions[state.activeSessionId]) {
     invalid("activeSessionId references an unknown session");

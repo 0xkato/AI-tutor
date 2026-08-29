@@ -29,6 +29,8 @@ const TEACHING_CHECKPOINT_KINDS = new Set([
   "reconstruction",
   "debugging",
 ]);
+const MATERIAL_RESOLUTION_STATUSES = new Set(["verified", "unavailable"]);
+const SOURCE_ROLES = new Set(["anchor", "supplemental"]);
 
 function timestamp(now) {
   return parseInstant(now ?? new Date().toISOString(), "event time");
@@ -118,6 +120,29 @@ export function startSession(state, input) {
     throw new LearningError(`Session already exists: ${id}`, "DUPLICATE_SESSION");
   }
   const createdAt = timestamp(input.now);
+  const materials = (input.materials ?? []).map((item) => {
+    const value = typeof item === "string" ? { reference: item } : item;
+    const reference = validateSourceReference(value.reference);
+    return {
+      id: safeIdentifier(value.id ?? randomUUID(), "material id"),
+      reference,
+      kind: materialKind(reference),
+      status: "pending",
+      title: null,
+      resolution: null,
+      createdAt,
+      updatedAt: createdAt,
+    };
+  });
+  if (new Set(materials.map((material) => material.id)).size !== materials.length) {
+    throw new LearningError("Learner-supplied materials contain duplicate IDs", "DUPLICATE_MATERIAL");
+  }
+  if (new Set(materials.map((material) => material.reference)).size !== materials.length) {
+    throw new LearningError(
+      "Learner-supplied materials contain duplicate references",
+      "DUPLICATE_MATERIAL",
+    );
+  }
   const next = structuredClone(state);
   const topicId = safeIdentifier(input.topicId ?? randomUUID(), "topic id");
   registerTopic(next, { id: topicId, name: topic, sessionId: id, now: createdAt });
@@ -145,8 +170,10 @@ export function startSession(state, input) {
     assessments: [],
     questions: [],
     notes: [],
+    materials,
     conceptIds: [],
     sources: [],
+    sourceCoverage: [],
     plan: null,
     frontier: [],
     steps: [],
@@ -163,6 +190,49 @@ export function startSession(state, input) {
     bindConceptToSession(next, next.sessions[id], conceptId);
   }
   return next;
+}
+
+function materialKind(reference) {
+  const lower = reference.toLowerCase();
+  if (/^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be)\//.test(lower)) return "youtube";
+  if (/\.pdf(?:$|[?#])/.test(lower)) return "pdf";
+  if (/^https?:\/\/(?:www\.)?github\.com\//.test(lower) || /(?:\.git|\/)$/i.test(reference)) {
+    return "repository";
+  }
+  if (/\.(?:md|mdx|txt|json|jsonl|csv)(?:$|[?#])/.test(lower)) return "notes";
+  return "web";
+}
+
+export function resolveMaterial(state, input) {
+  const materialId = safeIdentifier(input.materialId, "material id");
+  const status = safeSingleLine(input.status, "material status", { maxLength: 64 });
+  if (!MATERIAL_RESOLUTION_STATUSES.has(status)) {
+    throw new LearningError(`Unknown material status: ${status}`, "INVALID_MATERIAL_STATUS");
+  }
+  const title = status === "verified"
+    ? safeSingleLine(input.title, "material title", { maxLength: 1_024 })
+    : input.title === undefined
+      ? null
+      : safeSingleLine(input.title, "material title", { maxLength: 1_024 });
+  const resolution = safeText(input.evidence, "material resolution evidence");
+  const resolvedAt = timestamp(input.now);
+  return updateActiveSession(
+    state,
+    (session) => {
+      const material = session.materials.find((candidate) => candidate.id === materialId);
+      if (!material) {
+        throw new LearningError(`Unknown learner-supplied material: ${materialId}`, "MATERIAL_NOT_FOUND");
+      }
+      if (material.status !== "pending") {
+        throw new LearningError(`Material is already resolved: ${materialId}`, "MATERIAL_RESOLVED");
+      }
+      material.status = status;
+      material.title = title;
+      material.resolution = resolution;
+      material.updatedAt = resolvedAt;
+    },
+    { now: resolvedAt },
+  );
 }
 
 export function recordAdmittedGap(state, input = {}) {
@@ -465,6 +535,12 @@ export function beginTeach(state, { now } = {}) {
 }
 
 export function addSource(state, input) {
+  const role = input.role === undefined
+    ? "supplemental"
+    : safeSingleLine(input.role, "source role", { maxLength: 64 });
+  if (!SOURCE_ROLES.has(role)) {
+    throw new LearningError(`Unknown source role: ${role}`, "INVALID_SOURCE_ROLE");
+  }
   const source = {
     id: safeIdentifier(input.id ?? randomUUID(), "source id"),
     title: safeSingleLine(input.title, "source title", { maxLength: 1_024 }),
@@ -472,6 +548,13 @@ export function addSource(state, input) {
     sourceClass: safeSingleLine(input.sourceClass, "source class", { maxLength: 256 }),
     supports: safeText(input.supports, "supported claim"),
     verification: safeText(input.verification, "source verification"),
+    role,
+    locator: input.locator === undefined
+      ? "Whole source"
+      : safeSingleLine(input.locator, "source locator", { maxLength: 2_048 }),
+    materialId: input.materialId === undefined || input.materialId === null
+      ? null
+      : safeIdentifier(input.materialId, "material id"),
     createdAt: timestamp(input.now),
   };
   return updateActiveSession(
@@ -480,9 +563,77 @@ export function addSource(state, input) {
       if (session.sources.some((item) => item.id === source.id)) {
         throw new LearningError(`Source already exists: ${source.id}`, "DUPLICATE_SOURCE");
       }
+      if (source.role === "anchor") {
+        const material = session.materials.find((candidate) => candidate.id === source.materialId);
+        if (!material || material.status !== "verified") {
+          throw new LearningError(
+            "An anchor source must reference learner-supplied material that is verified",
+            "ANCHOR_MATERIAL_REQUIRED",
+          );
+        }
+        if (material.reference !== source.url) {
+          throw new LearningError(
+            "An anchor source must use the exact learner-supplied material reference",
+            "ANCHOR_REFERENCE_MISMATCH",
+          );
+        }
+      } else if (source.materialId !== null) {
+        throw new LearningError(
+          "Supplemental research cannot claim a learner-supplied material link",
+          "INVALID_SOURCE_ROLE",
+        );
+      }
       session.sources.push(source);
     },
     { now: source.createdAt },
+  );
+}
+
+export function recordSourceCoverage(state, input) {
+  const coverage = {
+    id: safeIdentifier(input.id ?? randomUUID(), "source coverage id"),
+    nodeId: safeIdentifier(input.nodeId, "nodeId"),
+    sourceId: safeIdentifier(input.sourceId, "source id"),
+    summary: safeText(input.summary, "source coverage summary"),
+    createdAt: timestamp(input.now),
+  };
+  return updateActiveSession(
+    state,
+    (session) => {
+      if (!session.plan) {
+        throw new LearningError("Source coverage requires a dependency plan", "PLAN_REQUIRED");
+      }
+      if (!session.plan.nodes.some((node) => node.id === coverage.nodeId)) {
+        throw new LearningError(
+          `Source coverage references a missing plan node: ${coverage.nodeId}`,
+          "UNKNOWN_PLAN_NODE",
+        );
+      }
+      if (!session.sources.some((source) => source.id === coverage.sourceId)) {
+        throw new LearningError(
+          `Source coverage references an unknown source: ${coverage.sourceId}`,
+          "SOURCE_NOT_FOUND",
+        );
+      }
+      if (session.sourceCoverage.some((item) => item.id === coverage.id)) {
+        throw new LearningError(
+          `Source coverage already exists: ${coverage.id}`,
+          "DUPLICATE_SOURCE_COVERAGE",
+        );
+      }
+      if (
+        session.sourceCoverage.some(
+          (item) => item.nodeId === coverage.nodeId && item.sourceId === coverage.sourceId,
+        )
+      ) {
+        throw new LearningError(
+          `Source coverage already links ${coverage.nodeId} to ${coverage.sourceId}`,
+          "DUPLICATE_SOURCE_COVERAGE",
+        );
+      }
+      session.sourceCoverage.push(coverage);
+    },
+    { now: coverage.createdAt },
   );
 }
 
@@ -515,6 +666,15 @@ export function recordStep(state, input) {
     (session, next) => {
       if (session.phase !== "teach") {
         throw new LearningError(`Cannot record a teaching step during ${session.phase}`, "INVALID_PHASE");
+      }
+      if (
+        session.materials.length > 0 &&
+        !session.sourceCoverage.some((coverage) => coverage.nodeId === step.nodeId)
+      ) {
+        throw new LearningError(
+          `Source-guided teaching requires source coverage for ${step.nodeId}`,
+          "SOURCE_COVERAGE_REQUIRED",
+        );
       }
       const unresolvedRetry = session.conceptIds
         .map((conceptId) => next.concepts[conceptId])

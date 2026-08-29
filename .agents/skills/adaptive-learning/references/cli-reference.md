@@ -139,6 +139,36 @@ node bin/learn.mjs start --root <root> \
   --target "Build a causal introduction" \
   --context "Knows basic calculus"
 
+# A source-guided session persists learner-supplied references before the host
+# retrieves them. Use local:<reference> for local files or repositories and
+# repeat --material when the learner supplied more than one.
+node bin/learn.mjs start --root <root> \
+  --topic "Transformers" \
+  --target "Understand self-attention from the supplied material" \
+  --material "https://www.youtube.com/watch?v=<video-id>" \
+  --material "local:notes/attention.md"
+
+# Read context to obtain the stable material ID, then record whether the host
+# could actually access it. Never disguise an inaccessible source as verified.
+node bin/learn.mjs resolve-material --root <root> \
+  --material-id <material-id> \
+  --status verified \
+  --title "Supplied attention lesson" \
+  --evidence "Retrieved the complete transcript and checked timestamp order"
+
+# Record a bounded anchor claim with an exact locator. External research uses
+# --role supplemental and omits --material-id.
+node bin/learn.mjs add-source --root <root> \
+  --id <anchor-claim-id> \
+  --title "Supplied attention lesson" \
+  --url "https://www.youtube.com/watch?v=<video-id>" \
+  --source-class learner-supplied \
+  --role anchor \
+  --locator "08:12-09:05" \
+  --material-id <material-id> \
+  --supports "Queries and keys determine the weights applied to values" \
+  --verification "Matched the claim to the cited transcript segment"
+
 # Persist the first multiple-choice probe before displaying it. Each --choice
 # value is JSON with a stable value and learner-facing label.
 node bin/learn.mjs start-question --root <root> \
@@ -202,6 +232,18 @@ node bin/learn.mjs record-admitted-gap --root <root> \
 
 node bin/learn.mjs finish-probe --root <root> \
   --summary "<demonstrated foundations and bounded gaps>"
+```
+
+After storing the dependency plan, bind claim-level sources to the exact nodes
+they support. Source-guided `record-step` fails closed until the current node
+has coverage. Coverage is provenance only; it is not learner evidence:
+
+```bash
+node bin/learn.mjs record-source-coverage --root <root> \
+  --id <coverage-id> \
+  --node <plan-node-id> \
+  --source-id <claim-level-source-id> \
+  --summary "The cited section supports the query-key scoring and weighted value-mixing mechanism"
 ```
 
 Pi uses the `adaptive_learning_quiz` tool for this lifecycle. The tool runs

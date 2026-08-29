@@ -3,7 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { LearningError } from "./errors.mjs";
-import { migrateV1ToV2, migrateV2ToV3, migrateV3ToV4 } from "./migrations.mjs";
+import {
+  migrateV1ToV2,
+  migrateV2ToV3,
+  migrateV3ToV4,
+  migrateV4ToV5,
+} from "./migrations.mjs";
 import { createInitialState } from "./model.mjs";
 import { parseInstant, validateState } from "./schema.mjs";
 
@@ -248,11 +253,12 @@ function backupLegacyVersion(paths, state) {
 
 function readStateUnlocked(paths, ownership) {
   const original = parseState(paths);
-  if ([1, 2, 3].includes(original.schemaVersion)) {
+  if ([1, 2, 3, 4].includes(original.schemaVersion)) {
     backupLegacyVersion(paths, original);
     const versionTwo = original.schemaVersion === 1 ? migrateV1ToV2(original) : original;
     const versionThree = versionTwo.schemaVersion === 2 ? migrateV2ToV3(versionTwo) : versionTwo;
-    const migrated = migrateV3ToV4(versionThree);
+    const versionFour = versionThree.schemaVersion === 3 ? migrateV3ToV4(versionThree) : versionThree;
+    const migrated = migrateV4ToV5(versionFour);
     return writeStateUnlocked(paths, migrated, ownership);
   }
   return validateState(original);
@@ -311,7 +317,7 @@ export function readState(root, options = {}) {
     throw new LearningError("Learning state is not initialized", "STATE_NOT_INITIALIZED");
   }
   const state = parseState(paths);
-  if (![1, 2, 3].includes(state.schemaVersion)) return validateState(state);
+  if (![1, 2, 3, 4].includes(state.schemaVersion)) return validateState(state);
   return withLock(root, options, (lockedPaths, ownership) =>
     readStateUnlocked(lockedPaths, ownership));
 }

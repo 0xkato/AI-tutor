@@ -20,7 +20,9 @@ test("help lists the complete learning-session lifecycle", () => {
     "record-probe",
     "record-admitted-gap",
     "finish-probe",
+    "resolve-material",
     "add-source",
+    "record-source-coverage",
     "set-plan",
     "begin-teach",
     "record-step",
@@ -88,7 +90,40 @@ test("version and command-specific help are available without reading state", ()
   assert.match(commandHelp.stdout, /Usage: adaptive-learn start/);
   assert.match(commandHelp.stdout, /--topic/);
   assert.match(commandHelp.stdout, /--target/);
+  assert.match(commandHelp.stdout, /--material <value>.*repeatable/i);
   assert.doesNotMatch(commandHelp.stdout, /--source-class/);
+});
+
+test("source-guided command help exposes material and provenance boundaries", () => {
+  const resolveHelp = spawnSync(
+    process.execPath,
+    [cli, "resolve-material", "--help"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.equal(resolveHelp.status, 0, resolveHelp.stderr);
+  assert.match(resolveHelp.stdout, /--material-id <value>\s+Learner-supplied material identifier/);
+  assert.match(resolveHelp.stdout, /--status <value>\s+verified or unavailable/);
+  assert.match(resolveHelp.stdout, /--evidence <value>\s+Exact material resolution evidence/);
+
+  const sourceHelp = spawnSync(
+    process.execPath,
+    [cli, "add-source", "--help"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.equal(sourceHelp.status, 0, sourceHelp.stderr);
+  assert.match(sourceHelp.stdout, /--role <value>\s+Anchor material or supplemental research/);
+  assert.match(sourceHelp.stdout, /--locator <value>\s+Exact timestamp, page, section, heading, or file location/);
+  assert.match(sourceHelp.stdout, /--material-id <value>\s+Verified learner material linked by an anchor claim/);
+
+  const coverageHelp = spawnSync(
+    process.execPath,
+    [cli, "record-source-coverage", "--help"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.equal(coverageHelp.status, 0, coverageHelp.stderr);
+  assert.match(coverageHelp.stdout, /--node <value>\s+Dependency-plan node supported by the source/);
+  assert.match(coverageHelp.stdout, /--source-id <value>\s+Claim-level source identifier/);
+  assert.match(coverageHelp.stdout, /--summary <value>\s+Bounded mechanism or claim supported/);
 });
 
 test("admitted-gap help describes ungraded learner evidence without undefined text", () => {

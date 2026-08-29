@@ -21,13 +21,13 @@ test("parseInstant accepts only canonical ISO instants", () => {
   }
 });
 
-test("validateState accepts and clones a complete version-4 initial state with a learner profile", () => {
+test("validateState accepts and clones a complete version-5 initial state with a learner profile", () => {
   const state = createInitialState({ now: NOW });
   const validated = validateState(state);
 
   assert.deepEqual(validated, state);
   assert.notEqual(validated, state);
-  assert.equal(validated.schemaVersion, 4);
+  assert.equal(validated.schemaVersion, 5);
   assert.deepEqual(validated.learnerProfile, {
     teachingPhilosophy: "",
     explanationPreferences: "",
@@ -52,6 +52,8 @@ test("validateState additively upgrades sessions created before later session fi
   delete state.sessions["legacy-v2-session"].admittedGaps;
   delete state.sessions["legacy-v2-session"].questions;
   delete state.sessions["legacy-v2-session"].notes;
+  delete state.sessions["legacy-v2-session"].materials;
+  delete state.sessions["legacy-v2-session"].sourceCoverage;
 
   const validated = validateState(state);
   assert.equal(validated.sessions["legacy-v2-session"].synthesisRequired, false);
@@ -60,11 +62,13 @@ test("validateState additively upgrades sessions created before later session fi
   assert.deepEqual(validated.sessions["legacy-v2-session"].checkpointGaps, []);
   assert.deepEqual(validated.sessions["legacy-v2-session"].questions, []);
   assert.deepEqual(validated.sessions["legacy-v2-session"].notes, []);
+  assert.deepEqual(validated.sessions["legacy-v2-session"].materials, []);
+  assert.deepEqual(validated.sessions["legacy-v2-session"].sourceCoverage, []);
 });
 
-test("validateState rejects structurally incomplete version-4 state", () => {
+test("validateState rejects structurally incomplete version-5 state", () => {
   assert.throws(
-    () => validateState({ schemaVersion: 4, sessions: {} }),
+    () => validateState({ schemaVersion: 5, sessions: {} }),
     (error) => error.code === "INVALID_STATE" && /createdAt/.test(error.message),
   );
 });
