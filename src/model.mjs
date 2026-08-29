@@ -26,6 +26,7 @@ const TEACHING_CHECKPOINT_KINDS = new Set([
   "explanation",
   "prediction",
   "transfer",
+  "contrastive",
   "reconstruction",
   "debugging",
 ]);
@@ -34,6 +35,14 @@ const SOURCE_ROLES = new Set(["anchor", "supplemental"]);
 
 function timestamp(now) {
   return parseInstant(now ?? new Date().toISOString(), "event time");
+}
+
+function optionalBoundedInteger(value, label, maximum) {
+  if (value === undefined || value === null) return null;
+  if (!Number.isSafeInteger(value) || value < 0 || value > maximum) {
+    throw new LearningError(`${label} must be an integer from 0 to ${maximum}`, "INVALID_ACTIVITY_METRIC");
+  }
+  return value;
 }
 
 export function createInitialState({ now } = {}) {
@@ -753,6 +762,14 @@ export function recordStep(state, input) {
       "INVALID_KIND",
     );
   }
+  const activityType = input.activityType === undefined
+    ? "guided-explanation"
+    : safeSingleLine(input.activityType, "activity type", { maxLength: 128 });
+  const strategyReason = input.strategyReason === undefined
+    ? "Host-selected teaching activity."
+    : safeText(input.strategyReason, "strategy reason");
+  const supportLevel = optionalBoundedInteger(input.supportLevel, "supportLevel", 4);
+  const transferLevel = optionalBoundedInteger(input.transferLevel, "transferLevel", 4);
   const step = {
     id: safeIdentifier(input.id ?? randomUUID(), "step id"),
     nodeId: safeIdentifier(input.nodeId, "nodeId"),
@@ -765,6 +782,10 @@ export function recordStep(state, input) {
     ),
     checkpointKind,
     checkpointQuestion: safeText(input.checkpointQuestion, "checkpoint question"),
+    activityType,
+    strategyReason,
+    supportLevel,
+    transferLevel,
     createdAt: timestamp(input.now),
   };
   return updateActiveSession(
@@ -839,6 +860,16 @@ export function recordStep(state, input) {
         throw new LearningError(`Teaching step already exists: ${step.id}`, "DUPLICATE_STEP");
       }
       session.steps.push(step);
+      session.activityHistory.push({
+        id: step.id,
+        type: step.activityType,
+        nodeId: step.nodeId,
+        questionId: step.checkpointQuestionId,
+        reason: step.strategyReason,
+        transferLevel: step.transferLevel,
+        supportLevel: step.supportLevel,
+        createdAt: step.createdAt,
+      });
       session.activeStepId = step.id;
       session.checkpoint = {
         status: "awaiting-answer",

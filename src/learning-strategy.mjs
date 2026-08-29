@@ -222,3 +222,129 @@ export function resolveMisconceptions(state, concept, assessment, ids = []) {
   }
   return concept;
 }
+
+function conceptForNode(state, session, nodeId) {
+  return session.conceptIds
+    .map((id) => state.concepts[id])
+    .find((candidate) => candidate?.key === nodeId) ?? null;
+}
+
+function admittedGapForNode(session, nodeId) {
+  return [...(session.admittedGaps ?? []), ...(session.checkpointGaps ?? [])]
+    .some((gap) => gap.nodeId === nodeId);
+}
+
+function hasDurableEvidence(concept) {
+  if (!concept || !["developing", "strong"].includes(concept.status)) return false;
+  return MASTERY_DIMENSIONS
+    .filter((dimension) => dimension !== "recall")
+    .some((dimension) => concept.mastery[dimension].level >= 2);
+}
+
+function recommendation(type, nodeId, reason, {
+  supportLevel = null,
+  transferLevel = null,
+  productiveFailureAllowed = false,
+} = {}) {
+  return {
+    type,
+    nodeId,
+    supportLevel,
+    transferLevel,
+    reason,
+    productiveFailureAllowed,
+  };
+}
+
+export function recommendNextActivity(state, session, nodeId) {
+  const concept = conceptForNode(state, session, nodeId);
+  if (!concept) {
+    throw new LearningError(`No concept is bound to node: ${nodeId}`, "CONCEPT_NOT_DECLARED");
+  }
+  const node = session.plan?.nodes.find((candidate) => candidate.id === nodeId);
+  if (!node) throw new LearningError(`Unknown plan node: ${nodeId}`, "UNKNOWN_NODE");
+
+  if (
+    concept.status === "gap" ||
+    admittedGapForNode(session, nodeId) ||
+    concept.retry?.mistakeType === "admitted-gap"
+  ) {
+    return recommendation(
+      "worked-example",
+      nodeId,
+      "The learner admitted a missing foundation, so teach the mechanism before testing it.",
+      { supportLevel: 4 },
+    );
+  }
+
+  const activeMisconception = concept.misconceptionIds
+    .map((id) => state.misconceptions[id])
+    .find((candidate) => candidate?.status === "active");
+  if (activeMisconception) {
+    return recommendation(
+      "contrastive-case",
+      nodeId,
+      `An active misconception (${activeMisconception.id}) needs a contrastive case before ordinary practice.`,
+      { supportLevel: Math.min(concept.supportLevel, 2), transferLevel: 2 },
+    );
+  }
+
+  const attempts = Object.values(concept.mastery)
+    .reduce((total, dimension) => total + dimension.attempts, 0);
+  if (concept.supportLevel > 0 && attempts > 0) {
+    return recommendation(
+      "faded-example",
+      nodeId,
+      `Prior evidence supports fading the worked example at support level ${concept.supportLevel}.`,
+      { supportLevel: concept.supportLevel },
+    );
+  }
+
+  if (
+    nodeId === session.plan.targetNodeId &&
+    concept.mastery.application.level >= 3 &&
+    concept.highestTransferLevel >= 3
+  ) {
+    return recommendation(
+      "whole-system-synthesis",
+      nodeId,
+      "The target concept has advanced transfer evidence, so test whole-system integration.",
+      { supportLevel: 0, transferLevel: 4 },
+    );
+  }
+
+  const prerequisiteIds = session.plan.edges
+    .filter((edge) => edge.to === nodeId)
+    .map((edge) => edge.from);
+  const prerequisitesReady = prerequisiteIds.every((id) =>
+    hasDurableEvidence(conceptForNode(state, session, id)),
+  );
+  const neverAttempted = attempts === 0;
+  if (neverAttempted && prerequisitesReady) {
+    return recommendation(
+      "productive-failure",
+      nodeId,
+      "Every prerequisite has durable evidence, so one bounded independent attempt can expose the learner's current model.",
+      { supportLevel: 0, transferLevel: 0, productiveFailureAllowed: true },
+    );
+  }
+  if (neverAttempted) {
+    return recommendation(
+      "worked-example",
+      nodeId,
+      "A prerequisite lacks durable evidence, so scaffold the mechanism before an independent attempt.",
+      { supportLevel: 4 },
+    );
+  }
+
+  const applicationAttempts = concept.mastery.application.attempts;
+  const transferLevel = applicationAttempts === 0
+    ? 0
+    : Math.min(4, concept.highestTransferLevel + 1);
+  return recommendation(
+    "transfer-case",
+    nodeId,
+    `Independent practice should advance to transfer level ${transferLevel}.`,
+    { supportLevel: 0, transferLevel },
+  );
+}

@@ -88,6 +88,41 @@ test("a verified plan is required before teaching begins", () => {
   assert.deepEqual(getActiveSession(state).frontier, ["covectors"]);
 });
 
+test("a teaching step persists the selected adaptive strategy", () => {
+  let state = setPlan(planned(), { plan: dependencyPlan(), now });
+  state = beginTeach(state, { now });
+  state = recordStep(state, {
+    id: "adaptive-step-1",
+    nodeId: "covectors",
+    foundation: "A covector is a linear functional.",
+    motivation: "It measures a vector along a chosen linear axis.",
+    explanation: "A covector consumes one vector and produces one scalar.",
+    checkpointQuestionId: "adaptive-step-q1",
+    checkpointKind: "transfer",
+    checkpointQuestion: "What must a new displacement-measuring object consume and produce?",
+    activityType: "faded-example",
+    strategyReason: "Prior explanation evidence permits one less scaffold.",
+    supportLevel: 2,
+    transferLevel: 1,
+    now,
+  });
+
+  const session = getActiveSession(state);
+  assert.equal(session.steps[0].activityType, "faded-example");
+  assert.equal(session.steps[0].supportLevel, 2);
+  assert.equal(session.steps[0].transferLevel, 1);
+  assert.deepEqual(session.activityHistory[0], {
+    id: "adaptive-step-1",
+    type: "faded-example",
+    nodeId: "covectors",
+    questionId: "adaptive-step-q1",
+    reason: "Prior explanation evidence permits one less scaffold.",
+    transferLevel: 1,
+    supportLevel: 2,
+    createdAt: now,
+  });
+});
+
 test("sources require explicit claim support and verification", () => {
   const state = planned();
   assert.throws(

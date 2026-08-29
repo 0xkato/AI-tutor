@@ -619,6 +619,10 @@ function validateSession(
     }
     nullableText(step.checkpointQuestionId, `${stepLabel}.checkpointQuestionId`);
     nullableText(step.checkpointKind, `${stepLabel}.checkpointKind`);
+    text(step.activityType, `${stepLabel}.activityType`);
+    text(step.strategyReason, `${stepLabel}.strategyReason`);
+    if (step.supportLevel !== null) boundedInteger(step.supportLevel, `${stepLabel}.supportLevel`, 4);
+    if (step.transferLevel !== null) boundedInteger(step.transferLevel, `${stepLabel}.transferLevel`, 4);
     stateInstant(step.createdAt, `${stepLabel}.createdAt`);
   }
   if (session.activeStepId !== null && !stepIds.has(session.activeStepId)) {
@@ -1004,6 +1008,10 @@ export function validateState(value) {
         if (!step || typeof step !== "object" || Array.isArray(step)) continue;
         if (!("checkpointQuestionId" in step)) step.checkpointQuestionId = null;
         if (!("checkpointKind" in step)) step.checkpointKind = null;
+        if (!("activityType" in step)) step.activityType = "guided-explanation";
+        if (!("strategyReason" in step)) step.strategyReason = "Legacy teaching activity.";
+        if (!("supportLevel" in step)) step.supportLevel = null;
+        if (!("transferLevel" in step)) step.transferLevel = null;
       }
     }
     if (Array.isArray(session.sources)) {
