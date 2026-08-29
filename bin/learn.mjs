@@ -12,6 +12,10 @@ import { exportLearnerRecord } from "../src/export.mjs";
 import { inspectVisual, safeVaultDir } from "../src/inputs.mjs";
 import { submitQuestion } from "../src/interactive.mjs";
 import {
+  buildInterleavedPracticeQueue,
+  recommendNextActivity,
+} from "../src/learning-strategy.mjs";
+import {
   addMaterial,
   addSource,
   addVisual,
@@ -60,9 +64,9 @@ const commands = [
   ["start", "Start a learning session from a learner-supplied target"],
   ["record-probe", "Record one diagnostic question and assessment"],
   ["record-admitted-gap", "Record an ungraded probe or active-checkpoint gap"],
-  ["start-question", "Persist a multiple-choice item before showing it"],
+  ["start-question", "Persist a selectable or free-response item before showing it"],
   ["pending-question", "Show the unresolved question without its answer key"],
-  ["answer-question", "Persist a selected answer and optional learner note"],
+  ["answer-question", "Persist the learner answer, confidence, timing, and optional note"],
   ["submit-question", "Atomically persist an answer, note, and deterministic outcome"],
   ["cancel-question", "Cancel the unresolved question"],
   ["add-note", "Attach a learner note to a session learning object"],
@@ -76,6 +80,8 @@ const commands = [
   ["begin-teach", "Begin one-step-at-a-time teaching"],
   ["record-step", "Record one motivated teaching step"],
   ["record-assessment", "Record a checkpoint or retention result"],
+  ["recommend-next", "Choose the next activity from durable learner evidence"],
+  ["practice-plan", "Build an interleaved queue of due retention work"],
   ["start-synthesis", "Persist the whole-system synthesis question"],
   ["record-synthesis", "Record the whole-system synthesis assessment"],
   ["add-visual", "Attach a verified visual artifact"],
@@ -131,6 +137,10 @@ const COMMAND_OPTIONS = {
     "explanation",
     "parent-question-id",
     "adaptation-reason",
+    "activity-type",
+    "strategy-reason",
+    "support-level",
+    "transfer-level",
   ],
   "pending-question": [],
   "answer-question": [
@@ -140,6 +150,10 @@ const COMMAND_OPTIONS = {
     "dont-know",
     "note-id",
     "note",
+    "text-answer",
+    "confidence",
+    "response-time-ms",
+    "rationale",
   ],
   "submit-question": [
     "question-id",
@@ -149,6 +163,8 @@ const COMMAND_OPTIONS = {
     "note-id",
     "note",
     "outcome-id",
+    "confidence",
+    "response-time-ms",
   ],
   "cancel-question": ["question-id"],
   "add-note": ["id", "target-type", "target-id", "body"],
@@ -179,6 +195,10 @@ const COMMAND_OPTIONS = {
     "question-id",
     "kind",
     "question",
+    "activity-type",
+    "strategy-reason",
+    "support-level",
+    "transfer-level",
   ],
   "record-assessment": [
     "id",
@@ -192,7 +212,19 @@ const COMMAND_OPTIONS = {
     "evidence",
     "mistake-type",
     "contaminated",
+    "confidence",
+    "response-time-ms",
+    "transfer-level",
+    "support-level",
+    "activity-type",
+    "misconception-id",
+    "misconception-statement",
+    "counterexample",
+    "repair",
+    "resolve-misconception",
   ],
+  "recommend-next": ["node"],
+  "practice-plan": [],
   "start-synthesis": ["question-id", "question"],
   "record-synthesis": [
     "id",
@@ -226,6 +258,7 @@ const REPEATABLE_OPTIONS = {
   "start-question": new Set(["choice", "correct"]),
   "answer-question": new Set(["selected"]),
   "submit-question": new Set(["selected"]),
+  "record-assessment": new Set(["resolve-misconception"]),
   close: new Set(["gap"]),
 };
 const OPTION_DESCRIPTIONS = {
@@ -257,18 +290,31 @@ const OPTION_DESCRIPTIONS = {
   evidence: "Exact assessment evidence",
   "mistake-type": "Specific mistake category",
   contaminated: "Exclude exposed-answer evidence",
-  mode: "single-select or multi-select",
+  mode: "single-select, multi-select, or free-response",
   choice: "Choice JSON with stable value, label, and optional description (repeatable)",
   correct: "Correct stable choice value (repeatable)",
   explanation: "Post-answer explanation retained by the engine",
   "parent-question-id": "Prior question that caused this adaptive item",
   "adaptation-reason": "Why the prior response led to this item",
+  "activity-type": "Adaptive learning activity type",
+  "strategy-reason": "Why durable learner evidence selected this activity",
+  "support-level": "Scaffold level from 0 (independent) to 4 (fully worked)",
+  "transfer-level": "Transfer distance from 0 (near) to 4 (whole system)",
   "response-id": "Stable response identifier",
   selected: "Selected stable choice value (repeatable)",
+  "text-answer": "Learner's own words for a free-response item",
+  confidence: "Learner confidence from 0 to 100",
+  "response-time-ms": "Elapsed response time in milliseconds",
+  rationale: "Learner rationale for a productive-failure attempt",
   "dont-know": "Record I don't know instead of a guess",
   "note-id": "Stable optional note identifier",
   note: "Optional note attached to the answered item",
   "outcome-id": "Stable assessment or admitted-gap identifier",
+  "misconception-id": "Stable misconception identifier",
+  "misconception-statement": "Specific durable misconception expressed by this answer",
+  counterexample: "Counterexample that distinguishes the misconception from the mechanism",
+  repair: "Mechanism-level correction for the misconception",
+  "resolve-misconception": "Misconception repaired by this durable evidence (repeatable)",
   "target-type": "session, question, concept, or step",
   "target-id": "Learning object receiving the note",
   body: "Learner note text",
@@ -417,6 +463,19 @@ function all(options, key) {
   return Array.isArray(value) ? value : [value];
 }
 
+function optionalInteger(options, key, maximum = Number.MAX_SAFE_INTEGER) {
+  const raw = last(options, key);
+  if (raw === undefined) return undefined;
+  if (!/^\d+$/.test(raw)) {
+    throw new LearningError(`--${key} must be an integer from 0 to ${maximum}`, "INVALID_ARGUMENT");
+  }
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value > maximum) {
+    throw new LearningError(`--${key} must be an integer from 0 to ${maximum}`, "INVALID_ARGUMENT");
+  }
+  return value;
+}
+
 function assessmentInput(options, stage) {
   return {
     id: last(options, "id"),
@@ -430,6 +489,16 @@ function assessmentInput(options, stage) {
     evidence: last(options, "evidence"),
     mistakeType: last(options, "mistake-type"),
     contaminated: options.contaminated === true,
+    confidence: optionalInteger(options, "confidence", 100),
+    responseTimeMs: optionalInteger(options, "response-time-ms"),
+    transferLevel: optionalInteger(options, "transfer-level", 4),
+    supportLevel: optionalInteger(options, "support-level", 4),
+    activityType: last(options, "activity-type"),
+    misconceptionId: last(options, "misconception-id"),
+    misconceptionStatement: last(options, "misconception-statement"),
+    counterexample: last(options, "counterexample"),
+    repair: last(options, "repair"),
+    resolveMisconceptionIds: all(options, "resolve-misconception"),
     now: last(options, "now"),
   };
 }
@@ -576,6 +645,17 @@ function commandResult(command, options, root) {
     const reviews = dueReviews(state, { now: last(options, "now") });
     return { reviews, synthesisDue: shouldSynthesize(state, reviews) };
   }
+  if (command === "recommend-next") {
+    const session = getActiveSession(state);
+    return recommendNextActivity(state, session, last(options, "node"));
+  }
+  if (command === "practice-plan") {
+    const reviews = dueReviews(state, { now: last(options, "now") });
+    return {
+      items: buildInterleavedPracticeQueue(state, reviews),
+      synthesisDue: shouldSynthesize(state, reviews),
+    };
+  }
   if (command === "context") {
     const session = getActiveSession(state);
     const reviews = dueReviews(state, { now: last(options, "now") });
@@ -675,6 +755,10 @@ function commandResult(command, options, root) {
         explanation: last(options, "explanation"),
         parentQuestionId: last(options, "parent-question-id"),
         adaptationReason: last(options, "adaptation-reason"),
+        activityType: last(options, "activity-type"),
+        strategyReason: last(options, "strategy-reason"),
+        supportLevel: optionalInteger(options, "support-level", 4),
+        transferLevel: optionalInteger(options, "transfer-level", 4),
         now: last(options, "now"),
       });
     }
@@ -683,7 +767,11 @@ function commandResult(command, options, root) {
         questionId: last(options, "question-id"),
         responseId: last(options, "response-id"),
         selectedChoiceValues: all(options, "selected"),
+        textAnswer: last(options, "text-answer"),
         dontKnow: options["dont-know"] === true,
+        confidence: optionalInteger(options, "confidence", 100),
+        responseTimeMs: optionalInteger(options, "response-time-ms"),
+        rationale: last(options, "rationale"),
         noteId: last(options, "note-id"),
         note: last(options, "note"),
         now: last(options, "now"),
@@ -695,6 +783,8 @@ function commandResult(command, options, root) {
         responseId: last(options, "response-id"),
         selectedChoiceValues: all(options, "selected"),
         dontKnow: options["dont-know"] === true,
+        confidence: optionalInteger(options, "confidence", 100),
+        responseTimeMs: optionalInteger(options, "response-time-ms"),
         noteId: last(options, "note-id"),
         note: last(options, "note"),
         outcomeId: last(options, "outcome-id"),
@@ -764,6 +854,10 @@ function commandResult(command, options, root) {
       checkpointQuestionId: last(options, "question-id"),
       checkpointKind: last(options, "kind"),
       checkpointQuestion: last(options, "question"),
+      activityType: last(options, "activity-type"),
+      strategyReason: last(options, "strategy-reason"),
+      supportLevel: optionalInteger(options, "support-level", 4),
+      transferLevel: optionalInteger(options, "transfer-level", 4),
       now: last(options, "now"),
       });
     }

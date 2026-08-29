@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   createAdaptiveLearningExtension,
   createQuizController,
+  createResponseController,
   showAdaptiveQuiz,
 } from "../.pi/extensions/adaptive-learning.js";
 
@@ -318,4 +319,217 @@ test("multi-select choices can be toggled on and back off before submission", as
     selectedChoiceValues: ["context"],
     dontKnow: false,
   });
+});
+
+test("multiple-choice confidence is captured before feedback", async () => {
+  let submitted = null;
+  const controller = createQuizController({
+    question: question(),
+    requestRender() {},
+    done() {},
+    submit: async (value) => {
+      submitted = value;
+      return { status: "resolved", responses: [{ ...value, correct: true }] };
+    },
+  });
+
+  assert.match(controller.render(100).join("\n"), /Confidence 0-100/);
+  controller.handleInput("\t");
+  controller.handleInput("\t");
+  controller.handleInput("92");
+  controller.handleInput("\t");
+  controller.handleInput("\x1b[B");
+  controller.handleInput("\r");
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(submitted, {
+    selectedChoiceValues: ["context"],
+    dontKnow: false,
+    confidence: 92,
+  });
+});
+
+function freeResponseQuestion(overrides = {}) {
+  return {
+    id: "probe-free-1",
+    stage: "probe",
+    nodeId: "attention",
+    kind: "explanation",
+    question: "Why can the same token have different contextual representations?",
+    activityType: "contrastive-case",
+    strategyReason: "Test the identity-versus-representation boundary.",
+    supportLevel: 1,
+    transferLevel: 2,
+    ...overrides,
+  };
+}
+
+function responseToolHarness(response) {
+  const tools = new Map();
+  const calls = [];
+  const persisted = {
+    ...freeResponseQuestion(),
+    mode: "free-response",
+    choices: [],
+    responses: [{
+      id: "response-free-1",
+      textAnswer: response?.textAnswer ?? "Its hidden state changes with context.",
+      dontKnow: response?.dontKnow ?? false,
+      confidence: response?.confidence ?? 80,
+      responseTimeMs: 12000,
+      assessmentId: null,
+    }],
+    status: "awaiting-assessment",
+  };
+  const pi = {
+    registerCommand() {},
+    registerTool(tool) { tools.set(tool.name, tool); },
+    sendUserMessage() {},
+  };
+  const ctx = {
+    cwd: "/tmp/adaptive-learning-root",
+    mode: "tui",
+    hasUI: true,
+    ui: { notify() {}, custom() {} },
+  };
+  const runCli = async (command, args, root, options) => {
+    calls.push({ command, args, root, options });
+    if (command === "start-question") {
+      return { active: { question: { ...persisted, responses: [], status: "awaiting-answer" } } };
+    }
+    if (command === "answer-question") {
+      const answerIndex = args.indexOf("--text-answer");
+      const confidenceIndex = args.indexOf("--confidence");
+      const dontKnow = args.includes("--dont-know");
+      return {
+        active: {
+          question: {
+            ...persisted,
+            status: dontKnow ? "gap" : "awaiting-assessment",
+            responses: [{
+              ...persisted.responses[0],
+              textAnswer: answerIndex >= 0 ? args[answerIndex + 1] : null,
+              confidence: confidenceIndex >= 0 ? Number(args[confidenceIndex + 1]) : null,
+              dontKnow,
+            }],
+          },
+        },
+      };
+    }
+    if (command === "pending-question") return { question: persisted };
+    if (command === "record-assessment") {
+      return {
+        active: {
+          question: {
+            ...persisted,
+            status: "retry-required",
+            responses: [{ ...persisted.responses[0], assessmentId: "assessment-free-1" }],
+          },
+        },
+      };
+    }
+    if (command === "cancel-question") {
+      return { active: { question: { ...persisted, status: "cancelled", responses: [] } } };
+    }
+    if (command === "record-admitted-gap") {
+      return { active: { question: { ...persisted, status: "gap" } } };
+    }
+    throw new Error(`Unexpected command: ${command}`);
+  };
+  const askResponse = async ({ submit }) => response === null ? null : submit(response);
+  createAdaptiveLearningExtension({ runCli, askResponse })(pi);
+  return { tools, calls, ctx };
+}
+
+test("Pi free-response tool persists the prompt before the learner's own words", async () => {
+  const response = {
+    textAnswer: "The token ID stays fixed, but attention changes its hidden representation using context.",
+    confidence: 82,
+    note: "Identity and representation are separate.",
+    dontKnow: false,
+  };
+  const h = responseToolHarness(response);
+  const result = await h.tools.get("adaptive_learning_response").execute(
+    "response-call-1",
+    freeResponseQuestion(),
+    undefined,
+    undefined,
+    h.ctx,
+  );
+
+  assert.deepEqual(h.calls.map((call) => call.command), ["start-question", "answer-question"]);
+  const startArgs = h.calls[0].args;
+  assert.deepEqual(startArgs.slice(startArgs.indexOf("--mode"), startArgs.indexOf("--mode") + 2), ["--mode", "free-response"]);
+  assert.equal(startArgs[startArgs.indexOf("--activity-type") + 1], "contrastive-case");
+  const answerArgs = h.calls[1].args;
+  assert.equal(answerArgs[answerArgs.indexOf("--text-answer") + 1], response.textAnswer);
+  assert.equal(answerArgs[answerArgs.indexOf("--confidence") + 1], "82");
+  assert.ok(Number(answerArgs[answerArgs.indexOf("--response-time-ms") + 1]) >= 0);
+  assert.match(result.content[0].text, /awaiting.*assessment/i);
+});
+
+test("Pi assessment tool grades the exact persisted answer and records a misconception", async () => {
+  const h = responseToolHarness({
+    textAnswer: "Attention changes the token ID.",
+    confidence: 90,
+    dontKnow: false,
+  });
+  const result = await h.tools.get("adaptive_learning_assess_response").execute(
+    "assessment-call-1",
+    {
+      id: "assessment-free-1",
+      questionId: "probe-free-1",
+      grade: "incorrect",
+      evidence: "The answer changes token identity instead of the contextual hidden representation.",
+      mistakeType: "identity-versus-representation",
+      misconceptionId: "misconception-token-id",
+      misconceptionStatement: "Attention changes token IDs rather than hidden representations.",
+      counterexample: "A repeated token keeps one ID while acquiring different hidden states.",
+      repair: "Separate token identity from contextual hidden state.",
+    },
+    undefined,
+    undefined,
+    h.ctx,
+  );
+
+  assert.deepEqual(h.calls.map((call) => call.command), ["pending-question", "record-assessment"]);
+  const args = h.calls[1].args;
+  assert.equal(args[args.indexOf("--answer") + 1], "Attention changes the token ID.");
+  assert.equal(args[args.indexOf("--misconception-statement") + 1], "Attention changes token IDs rather than hidden representations.");
+  assert.match(result.content[0].text, /^Incorrect\./);
+  assert.match(result.content[0].text, /contextual hidden representation/);
+});
+
+test("free-response controller keeps answer, confidence, note, and I don't know on one surface", async () => {
+  let submitted = null;
+  let completed = null;
+  const controller = createResponseController({
+    question: freeResponseQuestion(),
+    requestRender() {},
+    done(value) { completed = value; },
+    submit: async (value) => {
+      submitted = value;
+      return { status: "awaiting-assessment", responses: [{ ...value }] };
+    },
+  });
+
+  assert.match(controller.render(100).join("\n"), /Answer.*Confidence.*Note.*I don't know/s);
+  controller.handleInput("The token ID stays fixed while its hidden state changes.");
+  controller.handleInput("\t");
+  controller.handleInput("85");
+  controller.handleInput("\t");
+  controller.handleInput("Useful distinction.");
+  controller.handleInput("\t");
+  controller.handleInput("\r");
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(submitted, {
+    textAnswer: "The token ID stays fixed while its hidden state changes.",
+    confidence: 85,
+    note: "Useful distinction.",
+    dontKnow: false,
+  });
+  assert.match(controller.render(100).join("\n"), /saved.*assessment/i);
+  controller.handleInput("\r");
+  assert.equal(completed.status, "awaiting-assessment");
 });

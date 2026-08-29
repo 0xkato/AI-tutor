@@ -45,6 +45,45 @@ const AdaptiveQuizParameters = Type.Object({
   })),
 });
 
+const AdaptiveResponseParameters = Type.Object({
+  id: Type.String({ description: "Stable question identifier." }),
+  stage: Type.Union([Type.Literal("probe"), Type.Literal("teach")]),
+  nodeId: Type.String({ description: "Concept or prerequisite strand being tested." }),
+  kind: Type.Union([
+    Type.Literal("explanation"),
+    Type.Literal("prediction"),
+    Type.Literal("transfer"),
+    Type.Literal("contrastive"),
+    Type.Literal("reconstruction"),
+    Type.Literal("debugging"),
+  ]),
+  question: Type.String({ description: "One fully framed prompt answered in the learner's own words." }),
+  activityType: Type.Optional(Type.String({ description: "Adaptive activity selected from durable evidence." })),
+  strategyReason: Type.Optional(Type.String({ description: "Why this activity is the next useful learning move." })),
+  supportLevel: Type.Optional(Type.Integer({ minimum: 0, maximum: 4 })),
+  transferLevel: Type.Optional(Type.Integer({ minimum: 0, maximum: 4 })),
+  parentQuestionId: Type.Optional(Type.String({ description: "Prior resolved question that caused this branch." })),
+  adaptationReason: Type.Optional(Type.String({ description: "What the prior response changed." })),
+});
+
+const AdaptiveAssessmentParameters = Type.Object({
+  id: Type.String({ description: "Stable assessment identifier." }),
+  questionId: Type.String({ description: "Persisted free-response question being assessed." }),
+  grade: Type.Union([
+    Type.Literal("correct"),
+    Type.Literal("partial"),
+    Type.Literal("incorrect"),
+  ]),
+  evidence: Type.String({ description: "Exact demonstrated, missing, or incorrect mechanism." }),
+  mistakeType: Type.Optional(Type.String({ description: "Specific mistake category when not correct." })),
+  contaminated: Type.Optional(Type.Boolean({ description: "Exclude evidence if the answer was exposed." })),
+  misconceptionId: Type.Optional(Type.String({ description: "Stable misconception identifier." })),
+  misconceptionStatement: Type.Optional(Type.String({ description: "Specific misconception expressed by the persisted answer." })),
+  counterexample: Type.Optional(Type.String({ description: "Case that distinguishes the misconception from the correct mechanism." })),
+  repair: Type.Optional(Type.String({ description: "Mechanism-level correction for the misconception." })),
+  resolveMisconceptionIds: Type.Optional(Type.Array(Type.String(), { description: "Misconceptions repaired by durable evidence." })),
+});
+
 class AdaptiveLearningCliError extends Error {
   constructor(message, code = "CLI_ERROR", details = {}) {
     super(message);
@@ -354,6 +393,7 @@ export function createQuizController({ question, requestRender, done, submit, ke
   let optionIndex = 0;
   let focus = "options";
   let note = "";
+  let confidence = "";
   let phase = "select";
   let result = null;
   let failure = null;
@@ -373,6 +413,7 @@ export function createQuizController({ question, requestRender, done, submit, ke
     return {
       selectedChoiceValues: values,
       dontKnow,
+      ...(confidence === "" ? {} : { confidence: Number(confidence) }),
       ...(trimmed ? { note: trimmed } : {}),
     };
   }
@@ -458,7 +499,27 @@ export function createQuizController({ question, requestRender, done, submit, ke
     }
 
     if (matchesAction(data, "tui.input.tab", ["\t"])) {
-      focus = focus === "options" ? "note" : "options";
+      focus = { options: "note", note: "confidence", confidence: "options" }[focus];
+      refresh();
+      return;
+    }
+    if (focus === "confidence") {
+      if (matchesAction(data, "tui.select.cancel", ["\x1b"])) {
+        focus = "options";
+      } else if (
+        matchesAction(data, "tui.input.submit", ["\r"]) ||
+        matchesAction(data, "tui.select.confirm", ["\r"])
+      ) {
+        focus = "options";
+      } else if (matchesAction(data, "tui.editor.deleteCharBackward", ["\x7f", "\b"])) {
+        confidence = lastCodePoint(confidence);
+      } else {
+        const printable = decodeKittyPrintable(data);
+        const value = printable === undefined && !data.startsWith("\x1b") ? data : printable ?? "";
+        const digits = String(value).replace(/\D/g, "");
+        const next = `${confidence}${digits}`.slice(0, 3);
+        if (next === "" || Number(next) <= 100) confidence = next;
+      }
       refresh();
       return;
     }
@@ -535,6 +596,7 @@ export function createQuizController({ question, requestRender, done, submit, ke
         lines.push("", ...plainLines(question.explanation, width));
       }
       if (note.trim()) lines.push("", ...plainLines(`Your note: ${note.trim()}`, width));
+      if (confidence !== "") lines.push(...plainLines(`Confidence: ${confidence}%`, width));
       lines.push("", "Enter or Esc to continue");
       return lines.flatMap((line) => plainLines(line, width));
     }
@@ -562,14 +624,190 @@ export function createQuizController({ question, requestRender, done, submit, ke
     }
     lines.push("", focus === "note" ? "Note (optional) [editing]:" : "Note (optional):");
     lines.push(...plainLines(note || " ", width, " "));
+    lines.push(
+      "",
+      focus === "confidence"
+        ? "Confidence 0-100 (optional) [editing]:"
+        : "Confidence 0-100 (optional):",
+      ` ${confidence || " "}`,
+    );
     lines.push("");
     lines.push(
       focus === "note"
-        ? "Type note - Ctrl+J newline - Enter back - Tab choices - Esc back"
+        ? "Type note - Ctrl+J newline - Enter back - Tab confidence - Esc back"
+        : focus === "confidence"
+          ? "Type 0-100 - Enter choices - Tab choices - Esc back"
         : multi
-          ? "Up/Down navigate - Space/Enter toggle - Submit row - Tab note - Esc cancel"
-          : "Up/Down navigate - Enter answer - Tab note - Esc cancel",
+          ? "Up/Down navigate - Space/Enter toggle - Submit row - Tab note/confidence - Esc cancel"
+          : "Up/Down navigate - Enter answer - Tab note/confidence - Esc cancel",
     );
+    lines.push("-".repeat(Math.max(1, Math.min(width, 80))));
+    return lines.flatMap((line) => plainLines(line, width));
+  }
+
+  return { render, invalidate() {}, handleInput };
+}
+
+export function createResponseController({ question, requestRender, done, submit, keybindings }) {
+  let focus = "answer";
+  let answer = "";
+  let confidence = "";
+  let note = "";
+  let actionIndex = 0;
+  let phase = "input";
+  let result = null;
+  let failure = null;
+
+  const refresh = () => requestRender();
+  const matchesAction = (data, action, fallbacks = []) =>
+    keybindings?.matches?.(data, action) || fallbacks.includes(data);
+  const cleanText = (value) => stripTerminalSequences(String(value))
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
+  const printableText = (data) => {
+    const printable = decodeKittyPrintable(data);
+    if (printable !== undefined) return cleanText(printable);
+    if (!data.startsWith("\x1b")) return cleanText(data);
+    return "";
+  };
+  const validConfidence = () =>
+    confidence === "" || (/^\d{1,3}$/.test(confidence) && Number(confidence) <= 100);
+
+  function response(dontKnow) {
+    return {
+      ...(dontKnow ? {} : { textAnswer: answer.trim() }),
+      ...(confidence === "" ? {} : { confidence: Number(confidence) }),
+      ...(note.trim() ? { note: note.trim() } : {}),
+      dontKnow,
+    };
+  }
+
+  function beginSubmit(value) {
+    phase = "saving";
+    refresh();
+    Promise.resolve(submit(value)).then(
+      (saved) => {
+        result = saved;
+        phase = "feedback";
+        refresh();
+      },
+      (error) => {
+        failure = error instanceof Error ? error : new Error(String(error));
+        phase = "error";
+        refresh();
+      },
+    );
+  }
+
+  function appendToFocused(data) {
+    const text = printableText(data);
+    if (!text) return;
+    if (focus === "answer") answer += text;
+    else if (focus === "note") note += text;
+    else if (focus === "confidence") confidence += text.replace(/\D/g, "").slice(0, 3 - confidence.length);
+  }
+
+  function deleteFromFocused() {
+    if (focus === "answer") answer = lastCodePoint(answer);
+    else if (focus === "note") note = lastCodePoint(note);
+    else if (focus === "confidence") confidence = lastCodePoint(confidence);
+  }
+
+  function handleInput(data) {
+    if (phase === "saving") return;
+    if (["feedback", "error"].includes(phase)) {
+      if (
+        matchesAction(data, "tui.select.confirm", ["\r", "\n"]) ||
+        matchesAction(data, "tui.select.cancel", ["\x1b"])
+      ) done(phase === "error" ? { error: failure } : result);
+      return;
+    }
+
+    if (matchesAction(data, "tui.input.tab", ["\t"])) {
+      focus = {
+        answer: "confidence",
+        confidence: "note",
+        note: "actions",
+        actions: "answer",
+      }[focus];
+      refresh();
+      return;
+    }
+    if (focus === "actions") {
+      if (matchesAction(data, "tui.select.cancel", ["\x1b"])) {
+        done(null);
+        return;
+      }
+      if (matchesAction(data, "tui.select.up", ["\x1b[A"])) actionIndex = 0;
+      else if (matchesAction(data, "tui.select.down", ["\x1b[B"])) actionIndex = 1;
+      else if (matchesAction(data, "tui.select.confirm", ["\r", "\n"])) {
+        if (actionIndex === 1) beginSubmit(response(true));
+        else if (answer.trim() && validConfidence()) beginSubmit(response(false));
+      }
+      refresh();
+      return;
+    }
+    if (matchesAction(data, "tui.select.cancel", ["\x1b"])) {
+      focus = "actions";
+      refresh();
+      return;
+    }
+    if (matchesAction(data, "tui.editor.deleteCharBackward", ["\x7f", "\b"])) {
+      deleteFromFocused();
+      refresh();
+      return;
+    }
+    if (
+      focus !== "confidence" &&
+      matchesAction(data, "tui.input.newLine", ["\n"])
+    ) {
+      if (focus === "answer") answer += "\n";
+      else note += "\n";
+      refresh();
+      return;
+    }
+    appendToFocused(data);
+    refresh();
+  }
+
+  function render(width) {
+    const lines = ["-".repeat(Math.max(1, Math.min(width, 80)))];
+    lines.push(...plainLines(question.question, width));
+    if (phase === "saving") {
+      lines.push("", "Saving the learner's exact response before any assessment...");
+    } else if (phase === "feedback") {
+      lines.push("");
+      if (result?.status === "gap") {
+        lines.push("I don't know was saved as an admitted gap, not a graded answer.");
+      } else if (result?.status === "resolved" && question.activityType === "productive-failure") {
+        lines.push("The bounded independent attempt was saved ungraded for the teaching comparison.");
+      } else {
+        lines.push("Response saved and awaiting an explicit Correct, Partial, or Incorrect assessment.");
+      }
+      lines.push("", "Enter or Esc to continue");
+    } else if (phase === "error") {
+      lines.push("", `Could not persist this response: ${failure?.message ?? "Unknown error"}`);
+      lines.push("Enter or Esc to close without advancing.");
+    } else {
+      lines.push(
+        "",
+        focus === "answer" ? "Answer [editing]:" : "Answer:",
+        ...plainLines(answer || " ", width, " "),
+        "",
+        focus === "confidence" ? "Confidence 0-100 (optional) [editing]:" : "Confidence 0-100 (optional):",
+        ` ${confidence || " "}${validConfidence() ? "" : " (must be 0-100)"}`,
+        "",
+        focus === "note" ? "Note (optional) [editing]:" : "Note (optional):",
+        ...plainLines(note || " ", width, " "),
+        "",
+        `${focus === "actions" && actionIndex === 0 ? ">" : " "} Submit response`,
+        `${focus === "actions" && actionIndex === 1 ? ">" : " "} I don't know`,
+        "",
+        focus === "actions"
+          ? "Up/Down choose - Enter submit - Tab answer - Esc cancel"
+          : "Type - Ctrl+J newline - Tab next field - Esc actions",
+      );
+    }
     lines.push("-".repeat(Math.max(1, Math.min(width, 80))));
     return lines.flatMap((line) => plainLines(line, width));
   }
@@ -586,6 +824,23 @@ export function showAdaptiveQuiz({ ctx, question, submit }) {
   }
   return ctx.ui.custom((tui, _theme, keybindings, done) =>
     createQuizController({
+      question,
+      requestRender: () => tui.requestRender(),
+      done,
+      submit,
+      keybindings,
+    }));
+}
+
+export function showAdaptiveResponse({ ctx, question, submit }) {
+  if (ctx.mode !== "tui" || !ctx.hasUI || typeof ctx.ui?.custom !== "function") {
+    throw new AdaptiveLearningCliError(
+      "The adaptive-learning response requires Pi TUI mode; no prompt was shown.",
+      "RESPONSE_UI_UNAVAILABLE",
+    );
+  }
+  return ctx.ui.custom((tui, _theme, keybindings, done) =>
+    createResponseController({
       question,
       requestRender: () => tui.requestRender(),
       done,
@@ -675,7 +930,7 @@ function quizResult(question) {
   };
 }
 
-async function persistQuizResponse(runCli, ctx, params, response, signal) {
+async function persistQuizResponse(runCli, ctx, params, response, signal, responseTimeMs) {
   const responseId = randomUUID();
   const submitArgs = [
     "--question-id", params.id,
@@ -683,15 +938,102 @@ async function persistQuizResponse(runCli, ctx, params, response, signal) {
     "--outcome-id", `${responseId}-${response.dontKnow ? "gap" : "assessment"}`,
     ...response.selectedChoiceValues.flatMap((value) => ["--selected", value]),
     ...(response.dontKnow ? ["--dont-know"] : []),
+    ...(response.confidence === undefined ? [] : ["--confidence", String(response.confidence)]),
+    "--response-time-ms", String(responseTimeMs),
     ...(response.note ? ["--note-id", `${responseId}-note`, "--note", response.note] : []),
   ];
   const submitted = await runCli("submit-question", submitArgs, ctx.cwd, runOptions(ctx, signal));
   return submitted.active.question;
 }
 
+function freeResponseDefinition(params) {
+  return {
+    id: params.id,
+    stage: params.stage,
+    nodeId: params.nodeId,
+    kind: params.kind,
+    question: params.question,
+    mode: "free-response",
+    choices: [],
+    correctChoiceValues: [],
+    explanation: null,
+    parentQuestionId: params.parentQuestionId ?? null,
+    adaptationReason: params.adaptationReason ?? null,
+  };
+}
+
+function sameVisibleFreeResponse(persisted, params) {
+  return (
+    persisted.id === params.id &&
+    persisted.stage === params.stage &&
+    persisted.nodeId === params.nodeId &&
+    persisted.kind === params.kind &&
+    persisted.question === params.question &&
+    persisted.mode === "free-response" &&
+    persisted.activityType === (params.activityType ?? "free-response") &&
+    persisted.strategyReason === (params.strategyReason ?? "Host-selected question activity.") &&
+    (persisted.supportLevel ?? null) === (params.supportLevel ?? null) &&
+    (persisted.transferLevel ?? null) === (params.transferLevel ?? null) &&
+    (persisted.parentQuestionId ?? null) === (params.parentQuestionId ?? null) &&
+    (persisted.adaptationReason ?? null) === (params.adaptationReason ?? null)
+  );
+}
+
+function responseResult(question) {
+  const latest = question.responses?.at(-1) ?? null;
+  let message;
+  if (question.status === "cancelled") {
+    message = "Learner cancelled the persisted free-response prompt.";
+  } else if (question.status === "gap" || latest?.dontKnow) {
+    message = "Learner said I don't know. The admitted gap was persisted without fabricating an assessment.";
+  } else if (question.status === "resolved" && question.activityType === "productive-failure") {
+    message = "Learner's bounded productive-failure attempt was persisted ungraded. Teach the mechanism, then use a new transfer question.";
+  } else {
+    message = "Learner response persisted and awaiting an explicit Correct, Partial, or Incorrect assessment.";
+  }
+  return {
+    content: [{ type: "text", text: message }],
+    details: { question: safeQuestionDetails(question) },
+  };
+}
+
+async function persistFreeResponse(runCli, ctx, params, response, signal, responseTimeMs) {
+  const responseId = randomUUID();
+  const answerArgs = [
+    "--question-id", params.id,
+    "--response-id", responseId,
+    ...(response.dontKnow ? ["--dont-know"] : ["--text-answer", response.textAnswer]),
+    ...(response.confidence === undefined ? [] : ["--confidence", String(response.confidence)]),
+    "--response-time-ms", String(responseTimeMs),
+    ...(response.note ? ["--note-id", `${responseId}-note`, "--note", response.note] : []),
+    ...(response.rationale ? ["--rationale", response.rationale] : []),
+  ];
+  const answered = await runCli("answer-question", answerArgs, ctx.cwd, runOptions(ctx, signal));
+  if (!response.dontKnow) return answered.active.question;
+
+  const admitted = await runCli(
+    "record-admitted-gap",
+    [
+      "--id", `${responseId}-gap`,
+      "--question-id", params.id,
+      "--node", params.nodeId,
+      "--statement", response.note || "I don't know this mechanism yet.",
+      "--evidence", `The learner explicitly admitted a gap on persisted free-response question ${params.id}.`,
+    ],
+    ctx.cwd,
+    runOptions(ctx, signal),
+  );
+  return admitted.active.question;
+}
+
+function optionalArg(args, flag, value) {
+  if (value !== undefined && value !== null && value !== "") args.push(flag, String(value));
+}
+
 export function createAdaptiveLearningExtension({
   runCli = runAdaptiveLearningCli,
   askQuiz = showAdaptiveQuiz,
+  askResponse = showAdaptiveResponse,
 } = {}) {
   return function adaptiveLearningExtension(pi) {
     pi.registerTool({
@@ -752,10 +1094,18 @@ export function createAdaptiveLearningExtension({
           details: { question: safeQuestionDetails(params) },
         });
 
+        const startedAt = Date.now();
         const submitted = await askQuiz({
           ctx,
           question: params,
-          submit: (response) => persistQuizResponse(runCli, ctx, params, response, signal),
+          submit: (response) => persistQuizResponse(
+            runCli,
+            ctx,
+            params,
+            response,
+            signal,
+            Math.max(0, Date.now() - startedAt),
+          ),
         });
         if (submitted?.error) throw submitted.error;
         if (submitted === null) {
@@ -779,6 +1129,184 @@ export function createAdaptiveLearningExtension({
       },
       renderResult(result) {
         return staticTextComponent(result.content?.map((item) => item.text) ?? ["Quiz finished."]);
+      },
+    });
+
+    pi.registerTool({
+      name: "adaptive_learning_response",
+      label: "Adaptive Learning Response",
+      description:
+        "Ask one persisted free-response learning question, capture the learner's exact words, confidence, timing, and optional note, then wait for a separate assessment.",
+      promptSnippet:
+        "Use adaptive_learning_response for explanation, prediction, transfer, contrastive, reconstruction, and debugging checkpoints.",
+      promptGuidelines: [
+        "Persist and ask one fully framed question at a time.",
+        "Never grade or paraphrase the answer inside this tool; assess the exact persisted response afterward.",
+        "Use productive failure only when recommend-next explicitly permits it.",
+      ],
+      parameters: AdaptiveResponseParameters,
+      async execute(_toolCallId, params, signal, onUpdate, ctx) {
+        if (ctx.mode !== "tui" || !ctx.hasUI || typeof ctx.ui?.custom !== "function") {
+          throw new AdaptiveLearningCliError(
+            "The adaptive-learning response requires Pi TUI mode; no prompt was persisted or shown.",
+            "RESPONSE_UI_UNAVAILABLE",
+          );
+        }
+        const startArgs = [
+          "--id", params.id,
+          "--stage", params.stage,
+          "--node", params.nodeId,
+          "--kind", params.kind,
+          "--question", params.question,
+          "--mode", "free-response",
+        ];
+        optionalArg(startArgs, "--activity-type", params.activityType);
+        optionalArg(startArgs, "--strategy-reason", params.strategyReason);
+        optionalArg(startArgs, "--support-level", params.supportLevel);
+        optionalArg(startArgs, "--transfer-level", params.transferLevel);
+        optionalArg(startArgs, "--parent-question-id", params.parentQuestionId);
+        optionalArg(startArgs, "--adaptation-reason", params.adaptationReason);
+
+        try {
+          await runCli("start-question", startArgs, ctx.cwd, runOptions(ctx, signal));
+        } catch (error) {
+          if (error?.code !== "DUPLICATE_QUESTION") throw error;
+          const pending = await runCli("pending-question", [], ctx.cwd, runOptions(ctx, signal));
+          const digest = createHash("sha256")
+            .update(JSON.stringify(freeResponseDefinition(params)))
+            .digest("hex");
+          if (
+            !pending.question ||
+            !["awaiting-answer", "retry-required"].includes(pending.question.status) ||
+            !sameVisibleFreeResponse(pending.question, params) ||
+            pending.definitionDigest !== digest
+          ) {
+            throw error;
+          }
+        }
+        onUpdate?.({
+          content: [{ type: "text", text: "Free-response prompt persisted and awaiting learner input." }],
+          details: { question: safeQuestionDetails({ ...params, mode: "free-response" }) },
+        });
+
+        const startedAt = Date.now();
+        const submitted = await askResponse({
+          ctx,
+          question: params,
+          submit: (response) => persistFreeResponse(
+            runCli,
+            ctx,
+            params,
+            response,
+            signal,
+            Math.max(0, Date.now() - startedAt),
+          ),
+        });
+        if (submitted?.error) throw submitted.error;
+        if (submitted === null) {
+          const cancelled = await runCli(
+            "cancel-question",
+            ["--question-id", params.id],
+            ctx.cwd,
+            runOptions(ctx, signal),
+          );
+          return responseResult(cancelled.active.question);
+        }
+        return responseResult(submitted);
+      },
+      renderCall(params) {
+        return staticTextComponent([
+          `Adaptive free response: ${params.question}`,
+          "Answer in your own words",
+          "Confidence 0-100 (optional)",
+          "Note (optional)",
+          "I don't know",
+        ]);
+      },
+      renderResult(result) {
+        return staticTextComponent(result.content?.map((item) => item.text) ?? ["Response finished."]);
+      },
+    });
+
+    pi.registerTool({
+      name: "adaptive_learning_assess_response",
+      label: "Assess Adaptive Response",
+      description:
+        "Assess the exact persisted free response as Correct, Partial, or Incorrect and optionally record or resolve a durable misconception.",
+      promptSnippet:
+        "After adaptive_learning_response, use adaptive_learning_assess_response to assess only the explicit persisted question and answer.",
+      promptGuidelines: [
+        "Give an explicit Correct, Partial, or Incorrect grade.",
+        "Evidence must name the exact demonstrated, missing, or incorrect mechanism.",
+        "On a first genuine miss, preserve the same-question retry and do not reveal the answer.",
+      ],
+      parameters: AdaptiveAssessmentParameters,
+      async execute(_toolCallId, params, signal, onUpdate, ctx) {
+        const pending = await runCli("pending-question", [], ctx.cwd, runOptions(ctx, signal));
+        const question = pending.question;
+        const response = question?.responses?.at(-1) ?? null;
+        if (
+          !question ||
+          question.id !== params.questionId ||
+          question.mode !== "free-response" ||
+          question.status !== "awaiting-assessment" ||
+          !response ||
+          response.dontKnow ||
+          !response.textAnswer
+        ) {
+          throw new AdaptiveLearningCliError(
+            `Question ${params.questionId} has no persisted free response awaiting assessment.`,
+            "RESPONSE_NOT_AWAITING_ASSESSMENT",
+          );
+        }
+        const args = [
+          "--id", params.id,
+          "--question-id", question.id,
+          "--node", question.nodeId,
+          "--stage", question.stage,
+          "--kind", question.kind,
+          "--question", question.question,
+          "--answer", response.textAnswer,
+          "--grade", params.grade,
+          "--evidence", params.evidence,
+        ];
+        optionalArg(args, "--mistake-type", params.mistakeType);
+        if (params.contaminated) args.push("--contaminated");
+        optionalArg(args, "--misconception-id", params.misconceptionId);
+        optionalArg(args, "--misconception-statement", params.misconceptionStatement);
+        optionalArg(args, "--counterexample", params.counterexample);
+        optionalArg(args, "--repair", params.repair);
+        for (const id of params.resolveMisconceptionIds ?? []) {
+          args.push("--resolve-misconception", id);
+        }
+        onUpdate?.({
+          content: [{ type: "text", text: "Assessing the exact persisted learner response." }],
+          details: { questionId: question.id },
+        });
+        const recorded = await runCli(
+          "record-assessment",
+          args,
+          ctx.cwd,
+          runOptions(ctx, signal),
+        );
+        const label = params.grade[0].toUpperCase() + params.grade.slice(1);
+        return {
+          content: [{ type: "text", text: `${label}. ${params.evidence}` }],
+          details: {
+            question: recorded.active?.question ?? safeQuestionDetails(question),
+            grade: params.grade,
+            evidence: params.evidence,
+          },
+        };
+      },
+      renderCall(params) {
+        return staticTextComponent([
+          `Assess persisted response ${params.questionId}: ${params.grade}`,
+          params.evidence,
+        ]);
+      },
+      renderResult(result) {
+        return staticTextComponent(result.content?.map((item) => item.text) ?? ["Assessment recorded."]);
       },
     });
 

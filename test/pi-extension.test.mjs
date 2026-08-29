@@ -61,6 +61,8 @@ test("Pi extension registers the chat-first learning commands", () => {
     assert.equal(typeof command.handler, "function");
   }
   assert.equal(tools.has("adaptive_learning_quiz"), true);
+  assert.equal(tools.has("adaptive_learning_response"), true);
+  assert.equal(tools.has("adaptive_learning_assess_response"), true);
 });
 
 test("/teach-from persists an anchor material before dispatching source-guided learning", async () => {

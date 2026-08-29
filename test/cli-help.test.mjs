@@ -29,6 +29,8 @@ test("help lists the complete learning-session lifecycle", () => {
     "begin-teach",
     "record-step",
     "record-assessment",
+    "recommend-next",
+    "practice-plan",
     "start-synthesis",
     "record-synthesis",
     "add-visual",
@@ -47,6 +49,38 @@ test("help lists the complete learning-session lifecycle", () => {
   ]) {
     assert.match(result.stdout, new RegExp(`\\b${command}\\b`));
   }
+});
+
+test("adaptive-response help exposes strategy, confidence, and misconception evidence", () => {
+  const startHelp = spawnSync(
+    process.execPath,
+    [cli, "start-question", "--help"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.equal(startHelp.status, 0, startHelp.stderr);
+  assert.match(startHelp.stdout, /--mode <value>\s+single-select, multi-select, or free-response/i);
+  assert.match(startHelp.stdout, /--activity-type <value>/);
+  assert.match(startHelp.stdout, /--support-level <value>/);
+  assert.match(startHelp.stdout, /--transfer-level <value>/);
+
+  const answerHelp = spawnSync(
+    process.execPath,
+    [cli, "answer-question", "--help"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.equal(answerHelp.status, 0, answerHelp.stderr);
+  assert.match(answerHelp.stdout, /--text-answer <value>\s+Learner's own words/i);
+  assert.match(answerHelp.stdout, /--confidence <value>\s+Learner confidence from 0 to 100/i);
+  assert.match(answerHelp.stdout, /--response-time-ms <value>/);
+
+  const assessmentHelp = spawnSync(
+    process.execPath,
+    [cli, "record-assessment", "--help"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.equal(assessmentHelp.status, 0, assessmentHelp.stderr);
+  assert.match(assessmentHelp.stdout, /--misconception-statement <value>/);
+  assert.match(assessmentHelp.stdout, /--resolve-misconception <value>.*repeatable/i);
 });
 
 test("review-checkpoint help makes the pre-answer persistence contract explicit", () => {

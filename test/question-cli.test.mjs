@@ -177,7 +177,69 @@ test("question commands reject malformed choices and unsupported options", () =>
   assert.notEqual(malformed.status, 0);
   assert.match(malformed.stderr, /INVALID_CHOICE/);
 
-  const unknown = invoke(root, "answer-question", ["--answer", "A"]);
+  const unknown = invoke(root, "answer-question", ["--unsupported-answer", "A"]);
   assert.notEqual(unknown.status, 0);
   assert.match(unknown.stderr, /Unknown option/);
+});
+
+test("CLI persists a free response, confidence, timing, strategy, and misconception assessment", () => {
+  const root = initializedRoot();
+  payload(invoke(root, "start-question", [
+    "--id", "probe-free-1",
+    "--stage", "probe",
+    "--node", "attention",
+    "--kind", "explanation",
+    "--question", "Why can identical token IDs become contextually different?",
+    "--mode", "free-response",
+    "--activity-type", "contrastive-case",
+    "--strategy-reason", "Contrast identical embeddings with contextual representations.",
+    "--support-level", "1",
+    "--transfer-level", "2",
+    "--now", T1,
+  ]));
+
+  const answered = payload(invoke(root, "answer-question", [
+    "--question-id", "probe-free-1",
+    "--response-id", "response-free-1",
+    "--text-answer", "Attention changes the token ID itself.",
+    "--confidence", "88",
+    "--response-time-ms", "42000",
+    "--note-id", "note-free-1",
+    "--note", "I am unsure whether the ID or representation changes.",
+    "--now", T2,
+  ]));
+  assert.equal(answered.active.question.status, "awaiting-assessment");
+  assert.equal(answered.active.question.responses[0].textAnswer, "Attention changes the token ID itself.");
+  assert.equal(answered.active.question.responses[0].confidence, 88);
+  assert.equal(answered.active.question.responses[0].responseTimeMs, 42000);
+
+  payload(invoke(root, "record-assessment", [
+    "--id", "assessment-free-1",
+    "--question-id", "probe-free-1",
+    "--node", "attention",
+    "--stage", "probe",
+    "--kind", "explanation",
+    "--question", "Why can identical token IDs become contextually different?",
+    "--answer", "Attention changes the token ID itself.",
+    "--grade", "incorrect",
+    "--evidence", "The answer changes the token identity instead of the contextual representation.",
+    "--mistake-type", "identity-versus-representation",
+    "--misconception-id", "misconception-token-id",
+    "--misconception-statement", "Attention changes token IDs rather than contextual representations.",
+    "--counterexample", "The token ID stays fixed while hidden states differ across contexts.",
+    "--repair", "Separate immutable input identity from context-dependent hidden state.",
+    "--now", T2,
+  ]));
+
+  const state = readState(root);
+  const stored = state.sessions["session-1"].questions[0];
+  const assessment = state.sessions["session-1"].assessments[0];
+  assert.equal(stored.activityType, "contrastive-case");
+  assert.equal(stored.strategyReason, "Contrast identical embeddings with contextual representations.");
+  assert.equal(assessment.confidence, 88);
+  assert.equal(assessment.responseTimeMs, 42000);
+  assert.equal(assessment.transferLevel, 2);
+  assert.equal(assessment.supportLevel, 1);
+  assert.deepEqual(assessment.misconceptionIds, ["misconception-token-id"]);
+  assert.equal(state.misconceptions["misconception-token-id"].status, "active");
 });
