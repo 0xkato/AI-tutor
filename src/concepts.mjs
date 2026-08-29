@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { LearningError, requireText } from "./errors.mjs";
-import { createMasteryProfile } from "./learning-strategy.mjs";
+import { applyAssessmentToMastery, createMasteryProfile } from "./learning-strategy.mjs";
 import { advanceReview } from "./retention.mjs";
 
 const DURABLE_KINDS = new Set(["transfer", "reconstruction", "debugging", "synthesis", "retention"]);
@@ -197,6 +197,7 @@ export function recordConceptAssessment(
   concept.latestGrade = assessment.grade;
   concept.retry = retry;
   concept.updatedAt = assessment.createdAt;
+  applyAssessmentToMastery(concept, assessment);
 
   if (assessment.grade === "correct") {
     concept.status = assessment.kind === "multiple-choice" ? "fragile" : "developing";

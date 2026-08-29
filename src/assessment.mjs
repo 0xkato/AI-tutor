@@ -8,6 +8,7 @@ import {
 } from "./concepts.mjs";
 import { LearningError, requireText } from "./errors.mjs";
 import { nextFrontier } from "./graph.mjs";
+import { resolveMisconceptions, upsertMisconception } from "./learning-strategy.mjs";
 import { updateActiveSession } from "./model.mjs";
 import { bindQuestionAssessment } from "./questions.mjs";
 import { recordReviewAssessment } from "./reviews.mjs";
@@ -19,6 +20,7 @@ const KINDS = new Set([
   "explanation",
   "prediction",
   "transfer",
+  "contrastive",
   "reconstruction",
   "debugging",
   "synthesis",
@@ -55,6 +57,27 @@ function validate(input) {
       "WEAK_EVIDENCE",
     );
   }
+  const boundedInteger = (value, label, maximum = Number.MAX_SAFE_INTEGER) => {
+    if (!Number.isSafeInteger(value) || value < 0 || value > maximum) {
+      throw new LearningError(
+        `${label} must be an integer from 0 to ${maximum}`,
+        "INVALID_ASSESSMENT_METRIC",
+      );
+    }
+    return value;
+  };
+  const confidence = input.confidence === undefined || input.confidence === null
+    ? null
+    : boundedInteger(input.confidence, "confidence", 100);
+  const responseTimeMs = input.responseTimeMs === undefined || input.responseTimeMs === null
+    ? null
+    : boundedInteger(input.responseTimeMs, "responseTimeMs");
+  const transferLevel = input.transferLevel === undefined || input.transferLevel === null
+    ? null
+    : boundedInteger(input.transferLevel, "transferLevel", 4);
+  const supportLevel = input.supportLevel === undefined || input.supportLevel === null
+    ? null
+    : boundedInteger(input.supportLevel, "supportLevel", 4);
   return {
     id: input.id ?? randomUUID(),
     questionId: requireText(input.questionId, "questionId"),
@@ -67,6 +90,14 @@ function validate(input) {
     evidence,
     mistakeType: typeof input.mistakeType === "string" ? input.mistakeType.trim() : "",
     contaminated: input.contaminated === true,
+    confidence,
+    responseTimeMs,
+    transferLevel,
+    supportLevel,
+    activityType: typeof input.activityType === "string" && input.activityType.trim()
+      ? input.activityType.trim()
+      : "assessment",
+    misconceptionIds: [],
     conceptId: null,
     createdAt: input.now ?? new Date().toISOString(),
   };
@@ -283,6 +314,19 @@ function updateTeachingCheckpoint(session, assessment, retry) {
 
 export function recordAssessment(state, input) {
   const assessment = validate(input);
+  const misconceptionInput = {
+    id: typeof input.misconceptionId === "string" && input.misconceptionId.trim()
+      ? input.misconceptionId.trim()
+      : undefined,
+    statement: typeof input.misconceptionStatement === "string" && input.misconceptionStatement.trim()
+      ? input.misconceptionStatement.trim()
+      : assessment.mistakeType || undefined,
+    counterexample: input.counterexample,
+    repair: input.repair,
+  };
+  const resolveMisconceptionIds = Array.isArray(input.resolveMisconceptionIds)
+    ? input.resolveMisconceptionIds
+    : [];
   return updateActiveSession(
     state,
     (session, next) => {
@@ -343,6 +387,12 @@ export function recordAssessment(state, input) {
         const retry = transitionRetry(concept.retry, assessment, {
           durableRequired: assessment.stage !== "probe",
         });
+        if (["partial", "incorrect"].includes(assessment.grade) && misconceptionInput.statement) {
+          upsertMisconception(next, concept, assessment, misconceptionInput);
+        }
+        if (resolveMisconceptionIds.length > 0) {
+          resolveMisconceptions(next, concept, assessment, resolveMisconceptionIds);
+        }
         if (session.kind === "review") {
           recordReviewAssessment(next, session, concept, assessment);
           recordConceptAssessment(next, session, concept, assessment, retry, {

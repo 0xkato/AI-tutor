@@ -121,3 +121,77 @@ test("clarification cannot be recorded as a graded assessment", () => {
     /Clarifications do not count as assessments/,
   );
 });
+
+test("assessment persists calibration, transfer, support, and misconception evidence", () => {
+  let state = recordAssessment(
+    fresh(),
+    attempt({
+      confidence: 90,
+      responseTimeMs: 12_500,
+      transferLevel: 0,
+      supportLevel: 4,
+      activityType: "contrastive-case",
+      misconceptionId: "misconception-direction",
+      misconceptionStatement: "The optimizer should move in the local loss-increasing direction.",
+      counterexample: "A one-dimensional loss rises when the parameter moves with the gradient.",
+      repair: "Separate the gradient direction from the optimizer update direction.",
+    }),
+  );
+  let session = getActiveSession(state);
+  let recorded = session.assessments.at(-1);
+  const concept = conceptForNode(state, session, "gradient-direction");
+
+  assert.equal(recorded.confidence, 90);
+  assert.equal(recorded.responseTimeMs, 12_500);
+  assert.equal(recorded.transferLevel, 0);
+  assert.equal(recorded.supportLevel, 4);
+  assert.equal(recorded.activityType, "contrastive-case");
+  assert.deepEqual(recorded.misconceptionIds, ["misconception-direction"]);
+  assert.equal(state.misconceptions["misconception-direction"].status, "active");
+  assert.equal(concept.mastery.prediction.attempts, 1);
+
+  state = recordAssessment(
+    state,
+    attempt({
+      id: "assessment-2",
+      confidence: 70,
+      responseTimeMs: 9_000,
+      evidence: "The second attempt still moves with the local loss-increasing direction.",
+      misconceptionId: "misconception-direction",
+      misconceptionStatement: "The optimizer should move in the local loss-increasing direction.",
+    }),
+  );
+  state = recordAssessment(
+    state,
+    attempt({
+      id: "assessment-3",
+      questionId: "q-transfer-direction",
+      kind: "transfer",
+      question: "For a new scalar objective, which direction locally reduces the value?",
+      answer: "Move opposite the gradient.",
+      grade: "correct",
+      evidence: "The answer transfers the descent direction to a new scalar objective.",
+      mistakeType: "",
+      confidence: 80,
+      transferLevel: 2,
+      supportLevel: 2,
+      resolveMisconceptionIds: ["misconception-direction"],
+    }),
+  );
+
+  session = getActiveSession(state);
+  recorded = session.assessments.at(-1);
+  assert.deepEqual(recorded.misconceptionIds, ["misconception-direction"]);
+  assert.equal(state.misconceptions["misconception-direction"].status, "resolved");
+});
+
+test("assessment rejects invalid confidence and transfer levels", () => {
+  assert.throws(
+    () => recordAssessment(fresh(), attempt({ confidence: 101 })),
+    /confidence must be an integer from 0 to 100/,
+  );
+  assert.throws(
+    () => recordAssessment(fresh(), attempt({ transferLevel: 5 })),
+    /transferLevel must be an integer from 0 to 4/,
+  );
+});
