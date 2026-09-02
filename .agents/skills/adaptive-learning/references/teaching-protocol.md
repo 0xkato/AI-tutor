@@ -28,6 +28,19 @@ question and answer. Recognition is calibration evidence, not mastery.
 
 In Pi, call `adaptive_learning_quiz`; it persists the question, response, note,
 and assessment before returning feedback. Do not duplicate those mutations.
+If context already contains a pending question in `awaiting-answer` or
+`retry-required`, call `adaptive_learning_resume_question` with the exact
+question ID. It presents the stored definition in the native Pi interface and
+does not recreate the question or regenerate its hidden grading fields. If the
+native selectable menu is available, it is the only answer-choice surface; the
+tool-call or transcript renderer must not enumerate or list the choices before
+that menu opens. If the
+Pi tool or UI fails or is unavailable, report the failure and stop. Do not turn
+the pending item into a plain-text, manual, or numbered question. The
+numbered-card fallback is Codex-only.
+Closing the native Pi surface pauses it. The durable question remains
+`awaiting-answer` and must reopen on the next continuation; ordinary Escape is
+not an instruction to cancel or discard the checkpoint.
 For a free-response checkpoint, call `adaptive_learning_response` to collect the
 learner's own words, confidence, and note and persist the response before any
 assessment. Then call `adaptive_learning_assess_response` against that exact
@@ -90,6 +103,16 @@ For one frontier node only:
 Motivate every move; never dump the completed route and call it teaching. Use
 one reasoning step at a time and wait for the checkpoint before advancing.
 
+After persisting a teaching checkpoint with `record-step`, call
+`adaptive_learning_resume_question` with its exact question ID. The Pi runtime
+owns the internal transition: it materializes the exact persisted
+free-response or selectable definition when only the checkpoint exists, or
+resumes the stored definition when the interactive question is already
+pending. A selectable `record-step` must persist its mode, choices, private
+answer key, explanation, and adaptive parent/reason before presentation. The
+agent must not choose between a create call and a resume call based on those
+internal persistence states.
+
 ### 4.1 Select the activity from evidence
 
 Run `recommend-next` for the current node rather than defaulting to another
@@ -141,6 +164,11 @@ Use exactly:
 Assess the learner's latest clarified answer, not stale wording. State the
 exact demonstrated part, missing link, or error type. Never invent a criticism
 to make feedback appear rigorous.
+
+After every assessment, continue the learning loop until a native interactive
+checkpoint is open, the session is complete, or a real blocker is reported.
+Feedback alone does not complete the turn. Do not end or stop by merely
+announcing the next frontier or saying what the next move would be.
 
 Capture confidence before feedback so it reflects the learner's belief rather
 than agreement with the grade. Store response time, attempt count, support

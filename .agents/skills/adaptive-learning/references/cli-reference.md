@@ -23,6 +23,25 @@ Run `context --json` before probing, resuming, or teaching an active session.
 It returns the cross-session `learnerProfile`, durable session, retries, due
 reviews, and synthesis flag.
 
+## Complete restart
+
+When the learner explicitly asks to start the active target over from the
+beginning, preserve the stopped session and atomically open a new empty probe:
+
+```bash
+node bin/learn.mjs restart --root <root> \
+  --reason "The learner explicitly requested a complete restart from the beginning."
+```
+
+The successor keeps the same target, topic, learner context, and supplied
+material references, but starts with no questions, assessments, concepts,
+plan, frontier, or teaching checkpoint. The predecessor records `restartedAt`,
+`restartReason`, and `replacedBySessionId`; its unresolved interactive question
+is cancelled, and its pending retention schedules are made inactive so they do
+not steer the fresh calibration. Run `context --json`, then begin with the required broad
+multiple-choice probe. Do not use `record-admitted-gap` or `record-step` as a
+restart substitute.
+
 ## Learner profile
 
 The profile belongs to canonical state and is shared by Codex, Pi, and the
@@ -402,6 +421,36 @@ a second teaching step until the checkpoint resolves, except after a second
 miss when teaching is permitted: record the repaired explanation and a new
 transfer question as a replacement step on the same node before accepting the
 new answer.
+
+For a selectable teaching checkpoint, persist the complete private definition
+in the same `record-step` mutation:
+
+```bash
+node bin/learn.mjs record-step --root <root> \
+  --node covectors --foundation "<known invariant>" \
+  --motivation "<problem forcing the step>" \
+  --explanation "<one new causal move>" \
+  --question-id teach-choice-q1 --kind multiple-choice \
+  --question "<fully framed checkpoint>" \
+  --checkpoint-mode single-select \
+  --checkpoint-choice '{"value":"a","label":"Option A"}' \
+  --checkpoint-choice '{"value":"b","label":"Option B"}' \
+  --checkpoint-correct a \
+  --checkpoint-explanation "<feedback shown only when permitted>"
+```
+
+If an adaptive parent exists, add both `--checkpoint-parent-question-id` and
+`--checkpoint-adaptation-reason`. The engine rejects a multiple-choice step
+whose choices or private answer key are not durable.
+
+In Pi, `record-step` creates the durable teaching checkpoint but may not yet
+create the interactive question record. Immediately call
+`adaptive_learning_resume_question` with the checkpoint question ID. The
+extension asks the engine to materialize the exact stored free-response or
+selectable definition when needed, or resumes the already-pending definition,
+so the agent never selects between those two internal states. The lower-level
+`materialize-checkpoint` command is runtime-owned; agents should use the resume
+tool instead of invoking it directly.
 
 ## Assessed synthesis and closure
 

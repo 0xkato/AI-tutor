@@ -39,6 +39,17 @@ The learner supplies the learning target; do not silently replace or broaden it.
 - In Pi, use `adaptive_learning_quiz`. It persists the question, answer, note,
   and assessment itself; do not duplicate those mutations with separate CLI
   calls.
+- When durable context already contains a pending question with status
+  `awaiting-answer` or `retry-required`, call
+  `adaptive_learning_resume_question` with its exact ID. That tool presents the
+  stored question in the native Pi UI without reconstructing its redacted
+  answer key or explanation. Do not call a create-shaped question tool first.
+- The native selectable menu is the only answer-choice surface in Pi. Tool-call
+  or transcript rendering must not enumerate or list the choices before that
+  menu opens.
+- If a Pi interactive tool or UI is unavailable or fails, stop and report the
+  exact interaction failure. Do not print a plain-text, manual, or numbered
+  question as a fallback. The numbered-card fallback below is Codex-only.
 - In Codex, use the numbered-card fallback: run `start-question` and wait until
   it succeeds before showing the question, then accept one numbered choice or
   `I don't know` plus an optional `Note: ...`, and run `submit-question` before
@@ -54,6 +65,17 @@ The learner supplies the learning target; do not silently replace or broaden it.
 - Build and validate a prerequisite dependency DAG before teaching. Show the
   same plan as Mermaid so the route and target remain visible.
 - Begin at the first teachable frontier.
+
+### Complete restart
+
+When the learner explicitly asks to restart completely, from the beginning, or
+with fresh questions, run `restart --reason ...` before any further probe,
+teaching, planning, or question persistence. A complete restart preserves the
+old session only as stopped history and opens a new empty `probe` session for
+the same learner-owned target. Do not substitute `record-admitted-gap`, a new
+teaching step, or another checkpoint on the old frontier. Do not reuse prior
+questions, answers, assessments, gaps, plans, or teaching checkpoints as
+current evidence. Begin again with the required broad multiple-choice probe.
 
 ### Source-guided target
 
@@ -86,6 +108,11 @@ substitute model recall for an unavailable source.
 
 ### Teaching
 
+- Teaching presentation must be visually scan-friendly. Use compact **Why**,
+  **Rule**, and **Example** blocks when they fit the mechanism, keep the lesson
+  and its checkpoint within one normal terminal screen where practical, and
+  place a symbol's meaning next to its first use. Avoid a dense definition dump
+  or repeating the same rule in several paragraphs before the checkpoint.
 - Run `recommend-next --node ... --json` before choosing each activity. Preserve
   its activity type, reason, support level, and transfer level in the question
   or teaching-step record.
@@ -95,8 +122,20 @@ substitute model recall for an unavailable source.
 - Teach one reasoning step at a time. Before presenting its checkpoint, persist
   the foundation, motivation, explanation, question ID, question text, and
   kind with `record-step`.
+- For a multiple-choice teaching checkpoint, `record-step` must also persist
+  `--checkpoint-mode`, every `--checkpoint-choice`, the private
+  `--checkpoint-correct` key, `--checkpoint-explanation`, and any adaptive
+  parent/reason. Never leave a selectable checkpoint whose hidden definition
+  exists only in the model turn.
+- Immediately after `record-step`, call `adaptive_learning_resume_question`
+  with that checkpoint's exact question ID. This is the single Pi presentation
+  path: when only the teaching checkpoint exists the engine materializes its
+  exact persisted free-response or selectable definition, and when that
+  question is already pending it resumes the stored definition. Do not choose
+  between create and resume based on the two internal persistence states.
 - Resolve that checkpoint before advancing to another step.
-- Use `adaptive_learning_response` for own-words Pi checkpoints and
+- Use `adaptive_learning_response` for own-words Pi probes that do not have an
+  active `record-step` checkpoint, and
   `adaptive_learning_assess_response` only after the response is persisted.
   In Codex, use `start-question --mode free-response`, then `answer-question`,
   then `record-assessment` in that order.
@@ -107,6 +146,10 @@ substitute model recall for an unavailable source.
 
 - Assess substantive answers as exactly **Correct**, **Partial**, or
   **Incorrect**, followed by the specific evidence.
+- After every assessment, continue the learning loop until a native interactive
+  checkpoint is open, the session is complete, or a real blocker is reported.
+  Assessment feedback is not a stopping point. Do not end or stop by merely
+  announcing the next frontier or describing what the next move would be.
 - An admitted gap is diagnostic context, not a substantive answer. When the
   learner selects **I don't know** in an interactive question, let
   `submit-question` or `adaptive_learning_quiz` persist it, teach the missing

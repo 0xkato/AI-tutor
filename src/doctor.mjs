@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { listBackups } from "./backup.mjs";
+import { DEFAULT_PROJECT_MODEL } from "./pi-model-preference.mjs";
 import { inspectRenderProjection } from "./render-manifest.mjs";
 import { validateState } from "./schema.mjs";
 import { inspectLock, pathsFor } from "./store.mjs";
@@ -111,10 +112,16 @@ export function doctor(root) {
     enableSkillCommands: parsedPiSettings?.enableSkillCommands === true,
     defaultProvider: parsedPiSettings?.defaultProvider ?? null,
     defaultModel: parsedPiSettings?.defaultModel ?? null,
+    initialProvider: DEFAULT_PROJECT_MODEL.provider,
+    initialModel: DEFAULT_PROJECT_MODEL.id,
+    remembersModelSelection:
+      parsedPiSettings !== null
+      && !Object.hasOwn(parsedPiSettings, "defaultProvider")
+      && !Object.hasOwn(parsedPiSettings, "defaultModel"),
     valid:
       parsedPiSettings?.enableSkillCommands === true
-      && parsedPiSettings?.defaultProvider === "openai-codex"
-      && parsedPiSettings?.defaultModel === "gpt-5.5",
+      && !Object.hasOwn(parsedPiSettings, "defaultProvider")
+      && !Object.hasOwn(parsedPiSettings, "defaultModel"),
   };
   const discovery = {
     codex: fs.existsSync(codexSkill) && fs.statSync(codexSkill).isFile(),
@@ -161,7 +168,7 @@ export function doctor(root) {
   if (!platform.supported) actions.push("Use macOS for the supported first release.");
   if (!discovery.codex) actions.push("Restore the Codex adaptive-learning skill files.");
   if (!discovery.pi) {
-    actions.push("Restore the Pi extension and its OpenAI Codex project defaults.");
+    actions.push("Restore the Pi extension and its project model-persistence configuration.");
   }
   if (!vault.exists) actions.push("Run setup or repair-render to create the Obsidian vault.");
   if (vault.exists && !vault.ownerOnly) actions.push("Restrict vault permissions to the current user.");

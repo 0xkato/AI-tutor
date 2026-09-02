@@ -48,6 +48,48 @@ test("independent CLI invocations initialize, mutate, render, and resume state",
   );
 });
 
+test("CLI restart preserves history and opens an empty probe for the same target", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-cli-restart-"));
+  run(root, "init", "--now", "2026-08-24T08:00:00.000Z");
+  run(
+    root,
+    "start",
+    "--id",
+    "session-1",
+    "--topic",
+    "Transformers",
+    "--target",
+    "Build a durable mental model of transformers",
+    "--now",
+    "2026-08-24T08:01:00.000Z",
+  );
+
+  run(
+    root,
+    "restart",
+    "--id",
+    "session-2",
+    "--reason",
+    "The learner explicitly requested a complete restart from the beginning.",
+    "--now",
+    "2026-08-24T08:02:00.000Z",
+  );
+
+  const context = JSON.parse(run(root, "context", "--json"));
+  assert.equal(context.session.id, "session-2");
+  assert.equal(context.session.phase, "probe");
+  assert.equal(context.session.restartedFromSessionId, "session-1");
+  assert.deepEqual(context.session.questions, []);
+  assert.deepEqual(context.session.assessments, []);
+
+  const state = JSON.parse(
+    fs.readFileSync(path.join(root, ".adaptive-learning", "state.json"), "utf8"),
+  );
+  assert.equal(state.sessions["session-1"].replacedBySessionId, "session-2");
+  assert.equal(state.sessions["session-1"].restartedAt, "2026-08-24T08:02:00.000Z");
+  assert.match(state.sessions["session-1"].restartReason, /complete restart/i);
+});
+
 test("CLI persists a complete source-guided material and coverage lifecycle", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learn-source-guided-cli-"));
   const planFile = path.join(root, "plan.json");

@@ -397,6 +397,22 @@ export function recordAssessment(state, input) {
       assessment.conceptId = concept?.id ?? null;
       validateCheckpointIdentity(session, assessment);
 
+      if (assessment.contaminated && assessment.stage === "teach") {
+        if (!concept) {
+          throw new LearningError(
+            `Assessment concept is not declared in this session: ${assessment.nodeId}`,
+            "CONCEPT_NOT_DECLARED",
+          );
+        }
+        const retry = newTransferRequired(assessment, {
+          attempts: session.checkpoint?.attempts ?? 0,
+          answerMayBeTaught: false,
+        });
+        concept.retry = retry;
+        concept.updatedAt = assessment.createdAt;
+        updateTeachingCheckpoint(session, assessment, retry);
+      }
+
       if (!assessment.contaminated) {
         validateRetryIdentity(session, concept, assessment);
         const retry = transitionRetry(concept.retry, assessment, {

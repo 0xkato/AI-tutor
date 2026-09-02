@@ -111,6 +111,10 @@ test("skill corpus preserves the complete adaptive-learning behavior", () => {
     ["unconditional foundations", /unconditional foundations|definitions and invariants/i],
     ["motivated discovery", /motivat(e|ion).*every (move|step)/i],
     ["one reasoning step", /one reasoning step at a time/i],
+    [
+      "scan-friendly teaching layout",
+      /teaching presentation[\s\S]*why[\s\S]*rule[\s\S]*example[\s\S]*screen[\s\S]*avoid[\s\S]*dense definition/i,
+    ],
     ["checkpoint gate", /checkpoint.*before advancing/i],
     ["free-response reasoning", /adaptive_learning_response[\s\S]*learner['’]s own words[\s\S]*persist.*before.*assess/is],
     ["multidimensional mastery", /mastery[\s\S]*recall[\s\S]*explanation[\s\S]*prediction[\s\S]*application[\s\S]*discrimination[\s\S]*debugging[\s\S]*integration[\s\S]*retention/i],
@@ -233,6 +237,49 @@ test("new targets begin with a persisted interactive multiple-choice card", () =
     "I don't know teaches before testing",
     /I don['’]t know[\s\S]*record-admitted-gap[\s\S]*teach[\s\S]*new (transfer )?(question|example)/i,
   );
+});
+
+test("Pi resumes persisted questions natively and never degrades to a manual prompt", () => {
+  const skill = read("SKILL.md");
+  const protocol = read("references/teaching-protocol.md");
+  const corpus = `${skill}\n${protocol}`;
+
+  assert.match(
+    corpus,
+    /pending question[\s\S]*adaptive_learning_resume_question[\s\S]*stored (question|definition)/i,
+  );
+  assert.match(
+    corpus,
+    /Pi[\s\S]*(tool|UI).*(fails|unavailable)[\s\S]*do not[\s\S]*(plain[- ]text|manual|numbered).*(question|prompt|fallback)/i,
+  );
+  assert.match(
+    corpus,
+    /native (selectable )?menu[\s\S]*(only answer|sole answer)[- ]choice surface[\s\S]*(tool[- ]call|transcript)[\s\S]*(must not|never)[\s\S]*(enumerate|list).*(choices|options)/i,
+  );
+  assert.match(corpus, /numbered[- ]card fallback[\s\S]*Codex[- ]only/i);
+  assert.match(
+    corpus,
+    /record-step[\s\S]*adaptive_learning_resume_question[\s\S]*materializ[\s\S]*(free-response|selectable)[\s\S]*definition[\s\S]*already pending[\s\S]*resume/i,
+  );
+  assert.match(corpus, /closing[\s\S]*Pi[\s\S]*pause[\s\S]*awaiting-answer[\s\S]*not[\s\S]*(cancel|discard)/i);
+});
+
+test("the learning loop cannot stop after feedback while durable state requires progression", () => {
+  for (const [label, text] of [
+    ["skill", read("SKILL.md")],
+    ["teaching protocol", read("references/teaching-protocol.md")],
+  ]) {
+    assert.match(
+      text,
+      /after.*assessment[\s\S]*continue[\s\S]*until[\s\S]*(native|interactive)[\s\S]*checkpoint[\s\S]*(complete|block)/i,
+      `${label} must require progression after assessment until a checkpoint, completion, or blocker`,
+    );
+    assert.match(
+      text,
+      /do not (end|stop)[\s\S]*next frontier/i,
+      `${label} must forbid ending on a next-frontier status message`,
+    );
+  }
 });
 
 test("CLI reference demonstrates question, response, and note persistence", () => {

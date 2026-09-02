@@ -255,7 +255,7 @@ test("synthesis follows same-question retry, teaching permission, and new-transf
   assert.equal(getActiveSession(state).synthesisCheckpoint.status, "resolved");
 });
 
-test("contaminated synthesis evidence cannot resolve the final checkpoint", () => {
+test("contaminated synthesis evidence requires and permits a fresh transfer checkpoint", () => {
   let state = startSynthesis(readyForSynthesis(), {
     questionId: "synthesis-q1",
     question: "Connect process memory, durable state, and recovery after a crash.",
@@ -266,9 +266,20 @@ test("contaminated synthesis evidence cannot resolve the final checkpoint", () =
     evidence: "The answer was exposed before the learner responded, so it cannot prove synthesis.",
   }));
 
-  assert.equal(getActiveSession(state).synthesisCheckpoint.status, "awaiting-answer");
+  assert.equal(getActiveSession(state).synthesisCheckpoint.status, "new-transfer-required");
+  assert.equal(getActiveSession(state).synthesisCheckpoint.priorQuestionId, "synthesis-q1");
+  assert.equal(getActiveSession(state).synthesisCheckpoint.resolvedEvidenceId, null);
   assert.throws(
     () => closeSession(state, { unresolvedGaps: [], now: NOW }),
     (error) => error.code === "SYNTHESIS_UNRESOLVED",
   );
+
+  state = startSynthesis(state, {
+    questionId: "synthesis-clean-transfer-q1",
+    question: "A browser crashes after saving one draft but not another. What survives and how is it recovered?",
+    now: NOW,
+  });
+  assert.equal(getActiveSession(state).synthesisCheckpoint.status, "awaiting-answer");
+  assert.equal(getActiveSession(state).synthesisCheckpoint.questionId, "synthesis-clean-transfer-q1");
+  assert.equal(getActiveSession(state).synthesisCheckpoint.priorQuestionId, "synthesis-q1");
 });

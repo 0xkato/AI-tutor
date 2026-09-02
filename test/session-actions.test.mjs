@@ -123,6 +123,43 @@ test("a teaching step persists the selected adaptive strategy", () => {
   });
 });
 
+test("a selectable teaching step cannot commit without a complete durable definition", () => {
+  let state = setPlan(planned(), { plan: dependencyPlan(), now });
+  state = beginTeach(state, { now });
+  const incomplete = {
+    id: "selectable-step-1",
+    nodeId: "covectors",
+    foundation: "A covector is a linear functional.",
+    motivation: "The learner needs a bounded recognition bridge before transfer.",
+    explanation: "A covector consumes a vector and produces a scalar.",
+    checkpointQuestionId: "selectable-q1",
+    checkpointKind: "multiple-choice",
+    checkpointQuestion: "Which output does a covector produce?",
+    now,
+  };
+
+  assert.throws(
+    () => recordStep(state, incomplete),
+    (error) => error.code === "CHECKPOINT_DEFINITION_REQUIRED",
+  );
+  assert.equal(getActiveSession(state).activeStepId, null);
+
+  state = recordStep(state, {
+    ...incomplete,
+    checkpointMode: "single-select",
+    checkpointChoices: [
+      { value: "scalar", label: "A scalar" },
+      { value: "vector", label: "A vector" },
+    ],
+    checkpointCorrectChoiceValues: ["scalar"],
+    checkpointExplanation: "A covector maps its vector input to one scalar.",
+  });
+  assert.deepEqual(
+    getActiveSession(state).steps[0].checkpointDefinition.correctChoiceValues,
+    ["scalar"],
+  );
+});
+
 test("an evidence-backed fading step may reinforce a demonstrated node after it leaves the dependency frontier", () => {
   let state = setPlan(planned(), { plan: dependencyPlan(), now });
   state = beginTeach(state, { now });

@@ -229,6 +229,55 @@ function validateSynthesisCheckpoint(checkpoint, label) {
   }
 }
 
+function validateCheckpointDefinition(definition, checkpointKind, label) {
+  if (definition === null) return;
+  object(definition, label);
+  oneOf(definition.mode, QUESTION_MODES, `${label}.mode`);
+  const isFreeResponse = definition.mode === "free-response";
+  if (
+    (isFreeResponse && checkpointKind === "multiple-choice") ||
+    (!isFreeResponse && checkpointKind !== "multiple-choice")
+  ) {
+    invalid(`${label}.mode is incompatible with checkpoint kind ${checkpointKind}`);
+  }
+  const choices = array(definition.choices, `${label}.choices`);
+  const choiceValues = new Set();
+  if (isFreeResponse && choices.length !== 0) invalid(`${label}.choices must be empty for free response`);
+  if (!isFreeResponse && (choices.length < 2 || choices.length > 12)) {
+    invalid(`${label}.choices must contain 2 to 12 items`);
+  }
+  for (const [index, choice] of choices.entries()) {
+    const choiceLabel = `${label}.choices[${index}]`;
+    object(choice, choiceLabel);
+    text(choice.value, `${choiceLabel}.value`);
+    text(choice.label, `${choiceLabel}.label`);
+    nullableText(choice.description, `${choiceLabel}.description`);
+    if (choiceValues.has(choice.value)) invalid(`${label}.choices contains duplicate values`);
+    choiceValues.add(choice.value);
+  }
+  const correctValues = uniqueTextArray(
+    definition.correctChoiceValues,
+    `${label}.correctChoiceValues`,
+  );
+  if (isFreeResponse && correctValues.length !== 0) {
+    invalid(`${label}.correctChoiceValues must be empty for free response`);
+  }
+  if (!isFreeResponse && (
+    correctValues.length === 0 ||
+    correctValues.some((value) => !choiceValues.has(value)) ||
+    (definition.mode === "single-select" && correctValues.length !== 1)
+  )) {
+    invalid(`${label}.correctChoiceValues do not match the choices and mode`);
+  }
+  if (isFreeResponse) nullableText(definition.explanation, `${label}.explanation`);
+  else text(definition.explanation, `${label}.explanation`);
+  nullableText(definition.parentQuestionId, `${label}.parentQuestionId`);
+  nullableText(definition.adaptationReason, `${label}.adaptationReason`);
+  if ((definition.parentQuestionId === null) !== (definition.adaptationReason === null)) {
+    invalid(`${label} parentQuestionId and adaptationReason must be supplied together`);
+  }
+}
+
 function validateAssessment(item, label, globalAssessmentIds) {
   object(item, label);
   text(item.id, `${label}.id`);
@@ -422,11 +471,34 @@ function validateSession(
   stateInstant(session.createdAt, `${label}.createdAt`);
   stateInstant(session.updatedAt, `${label}.updatedAt`);
   nullableInstant(session.completedAt, `${label}.completedAt`);
+  if (!("restartedAt" in session)) session.restartedAt = null;
+  if (!("restartReason" in session)) session.restartReason = null;
+  if (!("replacedBySessionId" in session)) session.replacedBySessionId = null;
+  if (!("restartedFromSessionId" in session)) session.restartedFromSessionId = null;
+  nullableInstant(session.restartedAt, `${label}.restartedAt`);
+  nullableText(session.restartReason, `${label}.restartReason`);
+  nullableText(session.replacedBySessionId, `${label}.replacedBySessionId`);
+  nullableText(session.restartedFromSessionId, `${label}.restartedFromSessionId`);
   if (session.phase === "complete" && session.completedAt === null) {
     invalid(`${label}.completedAt is required for a complete session`);
   }
   if (session.phase !== "complete" && session.completedAt !== null) {
     invalid(`${label}.completedAt requires the complete phase`);
+  }
+  if (
+    session.restartedAt === null &&
+    (session.restartReason !== null || session.replacedBySessionId !== null)
+  ) {
+    invalid(`${label}.restart metadata requires restartedAt`);
+  }
+  if (
+    session.restartedAt !== null &&
+    (session.restartReason === null || session.replacedBySessionId === null)
+  ) {
+    invalid(`${label}.restartedAt requires a reason and replacement session`);
+  }
+  if (session.restartedAt !== null && session.completedAt !== null) {
+    invalid(`${label} cannot be both completed and restarted`);
   }
   text(session.probeSummary, `${label}.probeSummary`, { allowEmpty: true });
 
@@ -664,6 +736,11 @@ function validateSession(
     }
     nullableText(step.checkpointQuestionId, `${stepLabel}.checkpointQuestionId`);
     nullableText(step.checkpointKind, `${stepLabel}.checkpointKind`);
+    validateCheckpointDefinition(
+      step.checkpointDefinition,
+      step.checkpointKind,
+      `${stepLabel}.checkpointDefinition`,
+    );
     text(step.activityType, `${stepLabel}.activityType`);
     text(step.strategyReason, `${stepLabel}.strategyReason`);
     if (step.supportLevel !== null) boundedInteger(step.supportLevel, `${stepLabel}.supportLevel`, 4);
@@ -1067,6 +1144,7 @@ export function validateState(value) {
         if (!step || typeof step !== "object" || Array.isArray(step)) continue;
         if (!("checkpointQuestionId" in step)) step.checkpointQuestionId = null;
         if (!("checkpointKind" in step)) step.checkpointKind = null;
+        if (!("checkpointDefinition" in step)) step.checkpointDefinition = null;
         if (!("activityType" in step)) step.activityType = "guided-explanation";
         if (!("strategyReason" in step)) step.strategyReason = "Legacy teaching activity.";
         if (!("supportLevel" in step)) step.supportLevel = null;
@@ -1161,11 +1239,28 @@ export function validateState(value) {
       visualIds,
     );
   }
+  for (const [id, session] of Object.entries(state.sessions)) {
+    if (session.replacedBySessionId !== null) {
+      const replacement = state.sessions[session.replacedBySessionId];
+      if (!replacement || replacement.restartedFromSessionId !== id) {
+        invalid(`sessions.${id}.replacedBySessionId must reference its restart successor`);
+      }
+    }
+    if (session.restartedFromSessionId !== null) {
+      const predecessor = state.sessions[session.restartedFromSessionId];
+      if (!predecessor || predecessor.replacedBySessionId !== id) {
+        invalid(`sessions.${id}.restartedFromSessionId must reference its restart predecessor`);
+      }
+    }
+  }
   if (state.activeSessionId !== null && !state.sessions[state.activeSessionId]) {
     invalid("activeSessionId references an unknown session");
   }
   if (state.activeSessionId !== null && state.sessions[state.activeSessionId].phase === "complete") {
     invalid("activeSessionId cannot reference a complete session");
+  }
+  if (state.activeSessionId !== null && state.sessions[state.activeSessionId].restartedAt !== null) {
+    invalid("activeSessionId cannot reference a restarted session");
   }
 
   validateReviews(state);

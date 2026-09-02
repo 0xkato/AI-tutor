@@ -31,6 +31,7 @@ const TEACHING_CHECKPOINT_KINDS = new Set([
   "reconstruction",
   "debugging",
 ]);
+const SELECTABLE_CHECKPOINT_MODES = new Set(["single-select", "multi-select"]);
 const MATERIAL_RESOLUTION_STATUSES = new Set(["verified", "unavailable"]);
 const SOURCE_ROLES = new Set(["anchor", "supplemental"]);
 
@@ -44,6 +45,103 @@ function optionalBoundedInteger(value, label, maximum) {
     throw new LearningError(`${label} must be an integer from 0 to ${maximum}`, "INVALID_ACTIVITY_METRIC");
   }
   return value;
+}
+
+function checkpointDefinition(input, checkpointKind) {
+  const parentQuestionId = input.checkpointParentQuestionId === undefined
+    ? null
+    : safeIdentifier(input.checkpointParentQuestionId, "checkpoint parent question ID");
+  const adaptationReason = input.checkpointAdaptationReason === undefined
+    ? null
+    : safeText(input.checkpointAdaptationReason, "checkpoint adaptation reason");
+  if ((parentQuestionId === null) !== (adaptationReason === null)) {
+    throw new LearningError(
+      "checkpoint parent question ID and adaptation reason must be supplied together",
+      "INVALID_CHECKPOINT_DEFINITION",
+    );
+  }
+
+  if (checkpointKind !== "multiple-choice") {
+    if (
+      input.checkpointMode !== undefined && input.checkpointMode !== "free-response" ||
+      (input.checkpointChoices?.length ?? 0) > 0 ||
+      (input.checkpointCorrectChoiceValues?.length ?? 0) > 0 ||
+      input.checkpointExplanation !== undefined
+    ) {
+      throw new LearningError(
+        "Free-response teaching checkpoints cannot include selectable answer-key fields",
+        "INVALID_CHECKPOINT_DEFINITION",
+      );
+    }
+    return {
+      mode: "free-response",
+      choices: [],
+      correctChoiceValues: [],
+      explanation: null,
+      parentQuestionId,
+      adaptationReason,
+    };
+  }
+
+  if (input.checkpointMode === undefined) {
+    throw new LearningError(
+      "Multiple-choice teaching checkpoints require their full persisted selectable definition",
+      "CHECKPOINT_DEFINITION_REQUIRED",
+    );
+  }
+  const mode = safeIdentifier(input.checkpointMode, "checkpoint mode");
+  if (!SELECTABLE_CHECKPOINT_MODES.has(mode)) {
+    throw new LearningError(
+      "Multiple-choice teaching checkpoints require single-select or multi-select mode",
+      "CHECKPOINT_DEFINITION_REQUIRED",
+    );
+  }
+  if (!Array.isArray(input.checkpointChoices) || input.checkpointChoices.length < 2 || input.checkpointChoices.length > 12) {
+    throw new LearningError(
+      "Multiple-choice teaching checkpoints require 2 to 12 persisted choices",
+      "CHECKPOINT_DEFINITION_REQUIRED",
+    );
+  }
+  const choices = input.checkpointChoices.map((choice, index) => {
+    if (!choice || typeof choice !== "object" || Array.isArray(choice)) {
+      throw new LearningError(`checkpoint choices[${index}] must be an object`, "INVALID_CHECKPOINT_DEFINITION");
+    }
+    return {
+      value: safeIdentifier(choice.value, `checkpoint choices[${index}].value`),
+      label: safeSingleLine(choice.label, `checkpoint choices[${index}].label`, { maxLength: 1_024 }),
+      description: choice.description === undefined || choice.description === null
+        ? null
+        : safeText(choice.description, `checkpoint choices[${index}].description`, { maxLength: 4_096 }),
+    };
+  });
+  const choiceValues = new Set(choices.map((choice) => choice.value));
+  if (choiceValues.size !== choices.length) {
+    throw new LearningError("checkpoint choice values must be unique", "INVALID_CHECKPOINT_DEFINITION");
+  }
+  if (!Array.isArray(input.checkpointCorrectChoiceValues)) {
+    throw new LearningError("A persisted checkpoint answer key is required", "CHECKPOINT_DEFINITION_REQUIRED");
+  }
+  const correctChoiceValues = input.checkpointCorrectChoiceValues.map((value, index) =>
+    safeIdentifier(value, `checkpoint correct choices[${index}]`));
+  if (
+    correctChoiceValues.length === 0 ||
+    new Set(correctChoiceValues).size !== correctChoiceValues.length ||
+    correctChoiceValues.some((value) => !choiceValues.has(value)) ||
+    (mode === "single-select" && correctChoiceValues.length !== 1)
+  ) {
+    throw new LearningError(
+      "The persisted checkpoint answer key must match its choices and mode",
+      "INVALID_CHECKPOINT_DEFINITION",
+    );
+  }
+  return {
+    mode,
+    choices,
+    correctChoiceValues,
+    explanation: safeText(input.checkpointExplanation, "checkpoint explanation"),
+    parentQuestionId,
+    adaptationReason,
+  };
 }
 
 export function createInitialState({ now } = {}) {
@@ -175,6 +273,10 @@ export function startSession(state, input) {
     createdAt,
     updatedAt: createdAt,
     completedAt: null,
+    restartedAt: null,
+    restartReason: null,
+    replacedBySessionId: null,
+    restartedFromSessionId: null,
     probeSummary: "",
     admittedGaps: [],
     checkpointGaps: [],
@@ -209,6 +311,65 @@ export function startSession(state, input) {
     bindConceptToSession(next, next.sessions[id], conceptId);
   }
   return next;
+}
+
+export function restartSession(state, input = {}) {
+  const current = getActiveSession(state);
+  if (current.kind !== "learn") {
+    throw new LearningError(
+      "A retention review cannot be restarted as a new learning target",
+      "INVALID_SESSION_KIND",
+    );
+  }
+
+  const restartedAt = timestamp(input.now);
+  const reason = safeText(input.reason, "restart reason");
+  const replacementId = safeIdentifier(input.id ?? randomUUID(), "session id");
+  if (state.sessions[replacementId]) {
+    throw new LearningError(`Session already exists: ${replacementId}`, "DUPLICATE_SESSION");
+  }
+
+  const stoppedId = current.id;
+  const materials = current.materials.map((material) => ({ reference: material.reference }));
+  const stopped = structuredClone(state);
+  const stoppedSession = stopped.sessions[stoppedId];
+  for (const question of stoppedSession.questions) {
+    if (["awaiting-answer", "awaiting-assessment", "retry-required"].includes(question.status)) {
+      question.status = "cancelled";
+      question.cancelledAt = restartedAt;
+    }
+  }
+  stoppedSession.activeStepId = null;
+  stoppedSession.checkpoint = null;
+  for (const conceptId of stoppedSession.conceptIds) {
+    const reviewId = stopped.concepts[conceptId]?.reviewId;
+    const review = reviewId ? stopped.reviews[reviewId] : null;
+    if (!review) continue;
+    review.status = "inactive";
+    review.dueAt = null;
+    review.claimedBySessionId = null;
+    review.claimedAt = null;
+    review.deferredReason = null;
+    review.updatedAt = restartedAt;
+  }
+  stoppedSession.restartedAt = restartedAt;
+  stoppedSession.restartReason = reason;
+  stoppedSession.replacedBySessionId = replacementId;
+  stoppedSession.updatedAt = restartedAt;
+  stopped.activeSessionId = null;
+  stopped.updatedAt = restartedAt;
+
+  const restarted = startSession(stopped, {
+    id: replacementId,
+    topicId: current.topicId,
+    topic: current.topic,
+    target: current.target,
+    context: current.learnerContext,
+    materials,
+    now: restartedAt,
+  });
+  restarted.sessions[replacementId].restartedFromSessionId = stoppedId;
+  return restarted;
 }
 
 function materialKind(reference) {
@@ -771,6 +932,7 @@ export function recordStep(state, input) {
     : safeText(input.strategyReason, "strategy reason");
   const supportLevel = optionalBoundedInteger(input.supportLevel, "supportLevel", 4);
   const transferLevel = optionalBoundedInteger(input.transferLevel, "transferLevel", 4);
+  const persistedCheckpointDefinition = checkpointDefinition(input, checkpointKind);
   const step = {
     id: safeIdentifier(input.id ?? randomUUID(), "step id"),
     nodeId: safeIdentifier(input.nodeId, "nodeId"),
@@ -787,6 +949,7 @@ export function recordStep(state, input) {
     strategyReason,
     supportLevel,
     transferLevel,
+    checkpointDefinition: persistedCheckpointDefinition,
     createdAt: timestamp(input.now),
   };
   return updateActiveSession(

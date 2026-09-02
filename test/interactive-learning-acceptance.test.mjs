@@ -85,12 +85,6 @@ test("Pi tool persistence path records recognition, adaptive gap, free-response 
         note: "I need query, key, and value roles taught before this boundary.",
       });
     },
-    askResponse: async ({ submit }) => submit({
-      textAnswer: "The current token's query describes what it seeks, each other token's key describes what it can match, and the matched values carry the information combined into the result.",
-      confidence: 86,
-      note: "The library analogy helped separate matching from carried information.",
-      rationale: "A query is compared with keys; the resulting weights combine values.",
-    }),
   })(pi.api);
 
   const tool = pi.registered.tools.get("adaptive_learning_quiz");
@@ -99,7 +93,37 @@ test("Pi tool persistence path records recognition, adaptive gap, free-response 
     cwd: root,
     mode: "tui",
     hasUI: true,
-    ui: { custom() { throw new Error("Injected acceptance quiz should handle input"); } },
+    ui: {
+      custom(factory) {
+        return new Promise((resolve) => {
+          const controller = factory(
+            { requestRender() {}, terminal: { rows: 40 } },
+            {},
+            { matches() { return false; } },
+            resolve,
+          );
+          const initial = controller.render(100).join("\n");
+          assert.match(initial, /In a library analogy, explain the distinct jobs/);
+          assert.match(initial, /YOUR ANSWER · EDITING/);
+          controller.handleInput("The current token's query describes what it seeks, each other token's key describes what it can match, and the matched values carry the information combined into the result.");
+          controller.handleInput("\t");
+          controller.handleInput("86");
+          controller.handleInput("\t");
+          controller.handleInput("The library analogy helped separate matching from carried information.");
+          controller.handleInput("\t");
+          controller.handleInput("\r");
+          const closeAfterPersistence = () => {
+            const rendered = controller.render(100).join("\n");
+            if (/Response saved; an explicit assessment is next\./.test(rendered)) {
+              controller.handleInput("\r");
+              return;
+            }
+            setTimeout(closeAfterPersistence, 10);
+          };
+          setTimeout(closeAfterPersistence, 10);
+        });
+      },
+    },
   };
 
   const first = await tool.execute("call-1", question(), undefined, undefined, ctx);
@@ -158,24 +182,33 @@ test("Pi tool persistence path records recognition, adaptive gap, free-response 
       "--question-id", "teach-q1",
       "--kind", "multiple-choice",
       "--question", "Which learned object represents what the current token is looking for?",
+      "--checkpoint-mode", "single-select",
+      "--checkpoint-choice", JSON.stringify({ value: "query", label: "Its query" }),
+      "--checkpoint-choice", JSON.stringify({ value: "value", label: "Its value" }),
+      "--checkpoint-correct", "query",
+      "--checkpoint-explanation", "The query represents what the current token seeks from other tokens.",
+      "--checkpoint-parent-question-id", "probe-q2",
+      "--checkpoint-adaptation-reason", "The admitted gap is now taught; check recognition before a new transfer task.",
     ],
     root,
   );
-  const teachQuestion = question({
-    id: "teach-q1",
-    stage: "teach",
-    nodeId: "query-key-value",
-    question: "Which learned object represents what the current token is looking for?",
-    choices: [
-      { value: "query", label: "Its query" },
-      { value: "value", label: "Its value" },
-    ],
-    correctChoiceValues: ["query"],
-    explanation: "The query represents what the current token seeks from other tokens.",
-    parentQuestionId: "probe-q2",
-    adaptationReason: "The admitted gap is now taught; check recognition before a new transfer task.",
-  });
-  const taught = await tool.execute("call-3", teachQuestion, undefined, undefined, ctx);
+  const beforeMaterialization = await runAdaptiveLearningCli("context", [], root);
+  assert.equal(
+    "checkpointDefinition" in beforeMaterialization.session.steps.at(-1),
+    false,
+    "private selectable checkpoint keys must not leak through learner-facing context",
+  );
+  assert.deepEqual(
+    readState(root).sessions["session-1"].steps.at(-1).checkpointDefinition.correctChoiceValues,
+    ["query"],
+  );
+  const taught = await pi.registered.tools.get("adaptive_learning_resume_question").execute(
+    "call-3",
+    { questionId: "teach-q1" },
+    undefined,
+    undefined,
+    ctx,
+  );
   assert.match(taught.content[0].text, /answered correctly/i);
 
   const recommendation = await runAdaptiveLearningCli(
@@ -204,28 +237,13 @@ test("Pi tool persistence path records recognition, adaptive gap, free-response 
     ],
     root,
   );
-  const responseTool = pi.registered.tools.get("adaptive_learning_response");
+  const resumeTool = pi.registered.tools.get("adaptive_learning_resume_question");
   const assessmentTool = pi.registered.tools.get("adaptive_learning_assess_response");
-  assert.ok(responseTool);
+  assert.ok(resumeTool);
   assert.ok(assessmentTool);
-  const transferParams = {
-    id: "teach-transfer-q1",
-    stage: "teach",
-    nodeId: "query-key-value",
-    kind: "transfer",
-    question: transferQuestion,
-    activityType: recommendation.type,
-    strategyReason: recommendation.reason,
-    supportLevel: recommendation.supportLevel,
-    ...(recommendation.transferLevel === null
-      ? {}
-      : { transferLevel: recommendation.transferLevel }),
-    parentQuestionId: "teach-q1",
-    adaptationReason: "Recognition passed, so the next checkpoint requires an explanation in a new analogy.",
-  };
-  const transferred = await responseTool.execute(
+  const transferred = await resumeTool.execute(
     "call-4",
-    transferParams,
+    { questionId: "teach-transfer-q1" },
     undefined,
     undefined,
     ctx,
@@ -288,6 +306,8 @@ test("Pi tool persistence path records recognition, adaptive gap, free-response 
   assert.equal(session.questions[2].status, "resolved");
   assert.equal(session.questions[3].status, "resolved");
   assert.equal(session.questions[3].mode, "free-response");
+  assert.equal(session.questions[3].parentQuestionId, "teach-q1");
+  assert.equal(session.questions[3].adaptationReason, recommendation.reason);
   assert.equal(session.questions[3].responses[0].confidence, 86);
   assert.equal(session.checkpoint.status, "resolved");
   assert.equal(session.visuals[0].id, "attention-visual");
@@ -348,7 +368,7 @@ test("Pi retries the exact persisted question without trying to create it again"
   assert.equal(state.sessions["session-retry"].assessments.length, 2);
 });
 
-test("Pi rejects a retry whose hidden answer key or explanation changed", async () => {
+test("Pi resumes from the stored answer key when replayed hidden fields changed", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learning-interactive-identity-"));
   await runAdaptiveLearningCli("init", [], root);
   await runAdaptiveLearningCli(
@@ -373,23 +393,26 @@ test("Pi rejects a retry whose hidden answer key or explanation changed", async 
   };
 
   await tool.execute("identity-call-1", question(), undefined, undefined, ctx);
-  await assert.rejects(
-    () => tool.execute(
-      "identity-call-2",
-      question({
-        correctChoiceValues: ["position"],
-        explanation: "Changed after the learner's first attempt.",
-      }),
-      undefined,
-      undefined,
-      ctx,
-    ),
-    (error) => error.code === "DUPLICATE_QUESTION",
+  const second = await tool.execute(
+    "identity-call-2",
+    question({
+      correctChoiceValues: ["position"],
+      explanation: "Changed after the learner's first attempt.",
+    }),
+    undefined,
+    undefined,
+    ctx,
   );
 
   const state = readState(root);
-  assert.equal(state.sessions["session-identity"].questions[0].responses.length, 1);
+  assert.match(second.content[0].text, /permits teaching/i);
+  assert.doesNotMatch(second.content[0].text, /answered correctly/i);
+  assert.equal(state.sessions["session-identity"].questions[0].responses.length, 2);
   assert.deepEqual(state.sessions["session-identity"].questions[0].correctChoiceValues, ["context"]);
+  assert.equal(
+    state.sessions["session-identity"].questions[0].explanation,
+    question().explanation,
+  );
 });
 
 test("a teach-stage I don't know opens a new-transfer repair without a false assessment", async () => {
@@ -443,6 +466,13 @@ test("a teach-stage I don't know opens a new-transfer repair without a false ass
     "--question-id", "teach-q1",
     "--kind", "multiple-choice",
     "--question", teachQuestion,
+    "--checkpoint-mode", "single-select",
+    "--checkpoint-choice", JSON.stringify({ value: "query", label: "Its query" }),
+    "--checkpoint-choice", JSON.stringify({ value: "value", label: "Its value" }),
+    "--checkpoint-correct", "query",
+    "--checkpoint-explanation", "The query states what the current token seeks.",
+    "--checkpoint-parent-question-id", "probe-gap",
+    "--checkpoint-adaptation-reason", "The probe exposed this mechanism as an admitted gap, so it was taught before checking it.",
   ], root);
 
   const result = await tool.execute("teach-gap-question", question({
@@ -536,6 +566,13 @@ test("a teach-stage first miss can retry the exact persisted question", async ()
     "--question-id", "teach-retry-q1",
     "--kind", "multiple-choice",
     "--question", prompt,
+    "--checkpoint-mode", "single-select",
+    "--checkpoint-choice", JSON.stringify({ value: "query", label: "Its query" }),
+    "--checkpoint-choice", JSON.stringify({ value: "value", label: "Its value" }),
+    "--checkpoint-correct", "query",
+    "--checkpoint-explanation", "The query states what the current token seeks.",
+    "--checkpoint-parent-question-id", "probe-gap",
+    "--checkpoint-adaptation-reason", "The probe exposed this mechanism as an admitted gap, so it was taught before checking it.",
   ], root);
   phase = "teach";
   const teachQuestion = question({

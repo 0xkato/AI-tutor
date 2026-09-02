@@ -97,8 +97,11 @@ second approval was required.
 
 1. Restart Pi and complete a native quiz acceptance pass covering arrow
    navigation, Enter submission, Tab note focus, printable note input,
-   Backspace, Ctrl+J newline, Escape cancellation, and feedback dismissal;
-   confirm that the persisted response count advances exactly once.
+   Backspace, Ctrl+J newline, Escape cancellation, and feedback dismissal. For
+   free response, also verify bracketed paste, cursor edits, Tab and Shift+Tab
+   in both directions, Up from **Submit response** back to the draft, and that
+   leaving the editor does not submit. Confirm that the persisted response
+   count advances exactly once.
 2. Have the founder independently review the fresh Codex and Pi packages and
    replace each `pending` verdict with a justified `pass` or `fail`.
 3. Validate both accepted packages without `--allow-failed`.

@@ -16,6 +16,7 @@ import {
   answerQuestion,
   cancelQuestion,
   learnerQuestion,
+  materializeTeachingCheckpointQuestion,
   startQuestion,
 } from "../src/questions.mjs";
 import { validateState } from "../src/schema.mjs";
@@ -267,12 +268,103 @@ test("a teach-stage question must exactly match the active persisted checkpoint"
     checkpointQuestionId: "teach-q1",
     checkpointKind: "multiple-choice",
     checkpointQuestion: firstQuestion().question,
+    checkpointMode: "single-select",
+    checkpointChoices: firstQuestion().choices,
+    checkpointCorrectChoiceValues: firstQuestion().correctChoiceValues,
+    checkpointExplanation: firstQuestion().explanation,
     now: T3,
   });
 
   assert.throws(
     () => startQuestion(state, firstQuestion({ id: "wrong-teach-q", stage: "teach", now: T3 })),
     (error) => error.code === "CHECKPOINT_IDENTITY_MISMATCH",
+  );
+
+  const exact = firstQuestion({ id: "teach-q1", stage: "teach", now: T3 });
+  state = startQuestion(state, exact);
+  state = cancelQuestion(state, { questionId: exact.id, now: T3 });
+  state.sessions["session-1"].steps[0].checkpointDefinition = null;
+  state = materializeTeachingCheckpointQuestion(state, { questionId: exact.id, now: T3 });
+  assert.equal(state.sessions["session-1"].questions[0].status, "awaiting-answer");
+});
+
+test("a cancelled teach checkpoint can resume only with the exact persisted question", () => {
+  let state = recordAdmittedGap(fresh(), {
+    id: "gap-attention-resume",
+    nodeId: "attention",
+    statement: "I do not yet understand how attention changes a token representation.",
+    evidence: "The learner explicitly identified contextual token mixing as the missing mechanism.",
+    now: T1,
+  });
+  state = finishProbe(state, { summary: "Attention is the admitted gap.", now: T2 });
+  state = setPlan(state, {
+    plan: {
+      targetNodeId: "attention",
+      nodes: [{ id: "attention", title: "Contextual token mixing" }],
+      edges: [],
+    },
+    now: T2,
+  });
+  state = beginTeach(state, { now: T2 });
+  const checkpointQuestion = "Explain why contextual mixing is needed.";
+  state = recordStep(state, {
+    id: "teach-step-resume",
+    nodeId: "attention",
+    foundation: "Tokens begin with independent representations.",
+    motivation: "The model needs each token to use relevant context.",
+    explanation: "Self-attention mixes information from other token representations.",
+    checkpointQuestionId: "teach-free-resume",
+    checkpointKind: "explanation",
+    checkpointQuestion,
+    activityType: "worked-example",
+    strategyReason: "A missing foundation needs a worked example.",
+    supportLevel: 4,
+    now: T3,
+  });
+  const params = {
+    id: "teach-free-resume",
+    stage: "teach",
+    nodeId: "attention",
+    kind: "explanation",
+    question: checkpointQuestion,
+    mode: "free-response",
+    activityType: "worked-example",
+    strategyReason: "A missing foundation needs a worked example.",
+    supportLevel: 4,
+    now: T3,
+  };
+
+  state = startQuestion(state, params);
+  state = cancelQuestion(state, { questionId: params.id, now: T3 });
+  state = materializeTeachingCheckpointQuestion(state, { questionId: params.id, now: T3 });
+
+  let question = state.sessions["session-1"].questions[0];
+  assert.equal(state.sessions["session-1"].questions.length, 1);
+  assert.equal(question.status, "awaiting-answer");
+  assert.equal(question.cancelledAt, null);
+
+  state = cancelQuestion(state, { questionId: params.id, now: T3 });
+  assert.throws(
+    () => startQuestion(state, { ...params, activityType: "contrastive-case" }),
+    (error) => error.code === "DUPLICATE_QUESTION",
+  );
+});
+
+test("a cancelled probe can resume only with the exact persisted question", () => {
+  const params = firstQuestion();
+  let state = startQuestion(fresh(), params);
+  state = cancelQuestion(state, { questionId: params.id, now: T2 });
+  state = startQuestion(state, params);
+
+  let question = state.sessions["session-1"].questions[0];
+  assert.equal(state.sessions["session-1"].questions.length, 1);
+  assert.equal(question.status, "awaiting-answer");
+  assert.equal(question.cancelledAt, null);
+
+  state = cancelQuestion(state, { questionId: params.id, now: T3 });
+  assert.throws(
+    () => startQuestion(state, { ...params, explanation: "A different hidden definition." }),
+    (error) => error.code === "DUPLICATE_QUESTION",
   );
 });
 

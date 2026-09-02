@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { LearningError } from "./errors.mjs";
 import { safeIdentifier, safeSingleLine, safeText } from "./inputs.mjs";
 import { recommendNextActivity } from "./learning-strategy.mjs";
-import { updateActiveSession } from "./model.mjs";
+import { getActiveSession, updateActiveSession } from "./model.mjs";
 import { parseInstant } from "./schema.mjs";
 
 const STAGES = new Set(["probe", "teach"]);
@@ -74,6 +74,17 @@ function sameSet(left, right) {
   if (left.length !== right.length) return false;
   const expected = new Set(right);
   return left.every((value) => expected.has(value));
+}
+
+function sameChoices(left, right) {
+  return left.length === right.length && left.every((choice, index) => {
+    const candidate = right[index];
+    return (
+      choice.value === candidate.value &&
+      choice.label === candidate.label &&
+      (choice.description ?? null) === (candidate.description ?? null)
+    );
+  });
 }
 
 function findQuestion(session, questionId) {
@@ -185,7 +196,11 @@ export function startQuestion(state, input = {}) {
           "INVALID_PHASE",
         );
       }
-      if (session.questions.some((candidate) => candidate.id === id)) {
+      const existingQuestion = session.questions.find((candidate) => candidate.id === id);
+      const resumingCancelledQuestion =
+        existingQuestion?.status === "cancelled" &&
+        existingQuestion.responses.length === 0;
+      if (existingQuestion && !resumingCancelledQuestion) {
         throw new LearningError(`Question already exists: ${id}`, "DUPLICATE_QUESTION");
       }
       if (stage === "teach") {
@@ -249,6 +264,30 @@ export function startQuestion(state, input = {}) {
         );
       }
 
+      if (existingQuestion) {
+        const exactReplay =
+          existingQuestion.stage === stage &&
+          existingQuestion.nodeId === nodeId &&
+          existingQuestion.kind === kind &&
+          existingQuestion.question === question &&
+          existingQuestion.mode === mode &&
+          sameChoices(existingQuestion.choices, choices) &&
+          sameSet(existingQuestion.correctChoiceValues, correctChoiceValues) &&
+          existingQuestion.explanation === explanation &&
+          existingQuestion.activityType === activityType &&
+          existingQuestion.strategyReason === strategyReason &&
+          existingQuestion.supportLevel === supportLevel &&
+          existingQuestion.transferLevel === transferLevel &&
+          (existingQuestion.parentQuestionId ?? null) === parentQuestionId &&
+          (existingQuestion.adaptationReason ?? null) === adaptationReason;
+        if (!exactReplay) {
+          throw new LearningError(`Question already exists: ${id}`, "DUPLICATE_QUESTION");
+        }
+        existingQuestion.status = "awaiting-answer";
+        existingQuestion.cancelledAt = null;
+        return;
+      }
+
       session.questions.push({
         id,
         stage,
@@ -273,6 +312,80 @@ export function startQuestion(state, input = {}) {
     },
     { now: createdAt },
   );
+}
+
+export function materializeTeachingCheckpointQuestion(state, { questionId, now } = {}) {
+  const id = safeIdentifier(questionId, "questionId");
+  const session = getActiveSession(state);
+  if (session.kind !== "learn" || session.phase !== "teach" || !session.activeStepId) {
+    throw new LearningError(
+      "A materialized teaching question requires an active teaching step",
+      "INVALID_CHECKPOINT",
+    );
+  }
+  const step = session.steps.find((candidate) => candidate.id === session.activeStepId);
+  const checkpoint = session.checkpoint;
+  if (
+    !step ||
+    !checkpoint ||
+    checkpoint.status !== "awaiting-answer" ||
+    step.checkpointQuestionId !== id ||
+    checkpoint.questionId !== id
+  ) {
+    throw new LearningError(
+      `Teaching checkpoint ${id} is not awaiting learner input`,
+      "QUESTION_NOT_RESUMABLE",
+    );
+  }
+
+  const cancelledQuestion = session.questions.find((question) =>
+    question.id === id &&
+    question.status === "cancelled" &&
+    question.responses.length === 0 &&
+    question.stage === "teach" &&
+    question.nodeId === step.nodeId &&
+    question.kind === step.checkpointKind &&
+    question.question === step.checkpointQuestion);
+  const usingCancelledDefinition = !step.checkpointDefinition && Boolean(cancelledQuestion);
+  const definition = step.checkpointDefinition ?? (cancelledQuestion
+    ? {
+        mode: cancelledQuestion.mode,
+        choices: cancelledQuestion.choices,
+        correctChoiceValues: cancelledQuestion.correctChoiceValues,
+        explanation: cancelledQuestion.explanation,
+        parentQuestionId: cancelledQuestion.parentQuestionId,
+        adaptationReason: cancelledQuestion.adaptationReason,
+      }
+    : null);
+  if (step.checkpointKind === "multiple-choice" && !definition) {
+    throw new LearningError(
+      `Teaching checkpoint ${id} has no persisted selectable definition`,
+      "CHECKPOINT_DEFINITION_REQUIRED",
+    );
+  }
+  const eligibleParent = [...session.questions]
+    .reverse()
+    .find((question) => ADAPTIVE_PARENT_STATUSES.has(question.status)) ?? null;
+  const parentQuestionId = definition?.parentQuestionId ?? eligibleParent?.id;
+  const adaptationReason = definition?.adaptationReason ?? (eligibleParent ? step.strategyReason : undefined);
+
+  return startQuestion(state, {
+    id,
+    stage: "teach",
+    nodeId: step.nodeId,
+    kind: step.checkpointKind,
+    question: step.checkpointQuestion,
+    mode: definition?.mode ?? "free-response",
+    choices: definition?.choices ?? [],
+    correctChoiceValues: definition?.correctChoiceValues ?? [],
+    explanation: definition?.explanation ?? undefined,
+    activityType: usingCancelledDefinition ? cancelledQuestion.activityType : step.activityType,
+    strategyReason: usingCancelledDefinition ? cancelledQuestion.strategyReason : step.strategyReason,
+    supportLevel: usingCancelledDefinition ? cancelledQuestion.supportLevel : step.supportLevel,
+    transferLevel: usingCancelledDefinition ? cancelledQuestion.transferLevel : step.transferLevel,
+    ...(parentQuestionId ? { parentQuestionId, adaptationReason } : {}),
+    now,
+  });
 }
 
 function noteTargetExists(state, session, targetType, targetId) {

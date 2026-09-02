@@ -128,6 +128,39 @@ test("CLI atomically submits a choice, note, and deterministic assessment", () =
   assert.equal(state.sessions["session-1"].assessments[0].id, "assessment-atomic");
 });
 
+test("CLI atomically submits a free-response I don't know and its admitted gap", () => {
+  const root = initializedRoot();
+  payload(invoke(root, "start-question", [
+    "--id", "probe-free-gap",
+    "--stage", "probe",
+    "--node", "contextual-representation",
+    "--kind", "explanation",
+    "--question", "Why is a fixed token embedding not the final representation?",
+    "--mode", "free-response",
+    "--now", T1,
+  ]));
+  const before = readState(root);
+
+  const submitted = payload(invoke(root, "submit-question", [
+    "--question-id", "probe-free-gap",
+    "--response-id", "response-free-gap",
+    "--dont-know",
+    "--note-id", "note-free-gap",
+    "--note", "I do not yet understand how context changes the representation.",
+    "--outcome-id", "gap-free-atomic",
+    "--now", T2,
+  ]));
+
+  assert.equal(submitted.active.question.status, "gap");
+  const state = readState(root);
+  assert.equal(state.revision, before.revision + 1);
+  const session = state.sessions["session-1"];
+  assert.equal(session.questions[0].responses[0].dontKnow, true);
+  assert.equal(session.admittedGaps[0].id, "gap-free-atomic");
+  assert.equal(session.assessments.length, 0);
+  assert.equal(session.notes[0].id, "note-free-gap");
+});
+
 test("CLI supports I don't know, cancellation, and generic learner notes", () => {
   const gapRoot = initializedRoot();
   payload(invoke(gapRoot, "start-question", questionArgs()));

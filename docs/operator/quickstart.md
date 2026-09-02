@@ -29,7 +29,7 @@ npm run setup
 The command:
 
 1. validates Node.js and macOS;
-2. checks the Codex skill, Pi extension, and OpenAI Codex project defaults;
+2. checks the Codex skill, Pi extension, and project model persistence;
 3. creates `.adaptive-learning/state.json` with owner-only permissions;
 4. creates the repository-relative `vault/` directory;
 5. renders the initial `Home.md`, `Profile.md`, and `Reviews.md` files;
@@ -158,8 +158,10 @@ Until the live-host acceptance record reports an accepted Pi artifact, treat
 these commands as integration-testing instructions rather than a support
 claim.
 
-OpenAI Codex is the project default provider and `gpt-5.5` is the project
-default model. Pi CLI flags and `/model` can override both. If Pi is not already
+On the first launch, AI Tutor selects OpenAI Codex (`openai-codex`) with
+`gpt-5.6-sol`. A later `/model` choice is saved locally for this project and
+restored after restart. An explicit Pi `--model` or resumed session keeps its
+own selection instead of being overwritten. If Pi is not already
 authenticated, complete Pi's login flow before `/teach`.
 
 Launch Pi from the repository root, then use:
@@ -175,6 +177,12 @@ Launch Pi from the repository root, then use:
 `/teach` without an argument resumes the active target. A different target
 cannot silently replace an active session.
 
+If you explicitly want to discard the current frontier and begin the same
+target from fresh calibration questions, run `/teach-restart`. It preserves the
+old session as stopped history, creates a new empty probe, and starts again with
+a selectable multiple-choice question. It does not carry the old answers,
+assessments, gaps, plan, or teaching checkpoint into the new session.
+
 Run `/teach-from` again with another source and the same target to add an
 accessible replacement or another guide. If every supplied source is
 unavailable, the lesson stays blocked until you explicitly choose to continue
@@ -183,10 +191,16 @@ using verified supplemental research; that choice is saved in the session.
 The Pi extension provides the interactive version of the same question. Use
 the arrow keys to move between choices, press Tab to edit the optional note,
 Enter to submit or return to the choices, Ctrl+J for a note newline, Backspace
-to edit, and Escape to cancel. **I don't know** records an admitted gap so the
+to edit, and Escape to pause the native surface without discarding the
+persisted question. **I don't know** records an admitted gap so the
 agent teaches the missing mechanism before asking a new transfer question.
 For an own-words checkpoint, Pi opens the free-response editor: enter the
-answer, confidence, and optional note, or select **I don't know**. The agent
+answer, confidence, and optional note. Paste normally and use the arrow keys to
+edit at the cursor. Tab moves forward through the fields and actions;
+Shift+Tab moves back without losing the draft. Enter in the answer moves to the
+actions and does not submit. Only Enter on **Submit response** or **I don't
+know** makes the decision. From **Submit response**, Up returns to the answer
+for another edit. The agent
 must run the separate assessment tool against that persisted response before
 showing a grade.
 
@@ -209,6 +223,7 @@ teaching philosophy and preferences applied by both hosts.
 | `.adaptive-learning/backups/` | Checksummed canonical-state snapshots |
 | `.adaptive-learning/render-manifest.json` | Generated-file ownership and hashes |
 | `.adaptive-learning/render-pending.json` | Interrupted-render recovery marker |
+| `.adaptive-learning/pi-model-preference.json` | Last model selected for this project |
 | `vault/` | Derived Markdown plus learner-supplied visual files |
 
 All paths are relative to the repository root. No personal absolute path is

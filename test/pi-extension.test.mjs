@@ -12,13 +12,21 @@ import {
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-function harness(responses = {}) {
+function harness(responses = {}, options = {}) {
   const commands = new Map();
   const tools = new Map();
+  const events = new Map();
   const messages = [];
+  const customMessages = [];
   const notifications = [];
   const calls = [];
+  const selectedModels = [];
   const pi = {
+    on(name, handler) {
+      const handlers = events.get(name) ?? [];
+      handlers.push(handler);
+      events.set(name, handlers);
+    },
     registerCommand(name, command) {
       commands.set(name, command);
     },
@@ -28,9 +36,23 @@ function harness(responses = {}) {
     sendUserMessage(message, options) {
       messages.push({ message, options });
     },
+    sendMessage(message, options) {
+      customMessages.push({ message, options });
+    },
+    async setModel(model) {
+      selectedModels.push(model);
+      return options.setModelResult ?? true;
+    },
   };
   const ctx = {
-    cwd: "/tmp/adaptive-learning-root",
+    cwd: options.cwd ?? "/tmp/adaptive-learning-root",
+    mode: "tui",
+    model: options.currentModel,
+    modelRegistry: {
+      find(provider, id) {
+        return options.models?.find((model) => model.provider === provider && model.id === id);
+      },
+    },
     isIdle: () => true,
     ui: {
       notify(message, level = "info") {
@@ -43,14 +65,29 @@ function harness(responses = {}) {
     const value = responses[command];
     return typeof value === "function" ? value({ command, args, root, calls }) : value;
   };
-  createAdaptiveLearningExtension({ runCli })(pi);
-  return { commands, tools, messages, notifications, calls, ctx };
+  createAdaptiveLearningExtension({ runCli, cliArgs: options.cliArgs ?? [] })(pi);
+  const emit = async (name, event, eventContext = ctx) => {
+    for (const handler of events.get(name) ?? []) await handler(event, eventContext);
+  };
+  return {
+    commands,
+    tools,
+    events,
+    messages,
+    customMessages,
+    notifications,
+    calls,
+    selectedModels,
+    ctx,
+    emit,
+  };
 }
 
 test("Pi extension registers the chat-first learning commands", () => {
   const { commands, tools } = harness();
   assert.deepEqual([...commands.keys()], [
     "teach",
+    "teach-restart",
     "teach-from",
     "learn-profile",
     "learn-status",
@@ -61,8 +98,181 @@ test("Pi extension registers the chat-first learning commands", () => {
     assert.equal(typeof command.handler, "function");
   }
   assert.equal(tools.has("adaptive_learning_quiz"), true);
+  assert.equal(tools.has("adaptive_learning_resume_question"), true);
   assert.equal(tools.has("adaptive_learning_response"), true);
   assert.equal(tools.has("adaptive_learning_assess_response"), true);
+});
+
+test("Pi starts on 5.6 Sol once and restores the learner's later project model choice", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learning-model-"));
+  const sol = { provider: "openai-codex", id: "gpt-5.6-sol" };
+  const terra = { provider: "openai-codex", id: "gpt-5.6-terra" };
+  const legacyDefault = { provider: "openai-codex", id: "gpt-5.5" };
+  const options = { cwd: root, models: [sol, terra, legacyDefault], currentModel: legacyDefault };
+
+  const firstLaunch = harness({}, options);
+  await firstLaunch.emit("session_start", { type: "session_start", reason: "startup" });
+  assert.deepEqual(firstLaunch.selectedModels, [sol]);
+
+  await firstLaunch.emit("model_select", {
+    type: "model_select",
+    source: "set",
+    previousModel: sol,
+    model: terra,
+  });
+
+  const restarted = harness({}, options);
+  await restarted.emit("session_start", { type: "session_start", reason: "startup" });
+  assert.deepEqual(restarted.selectedModels, [terra]);
+});
+
+test("Pi restores the project model when an ordinary launch resumes a session", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learning-model-"));
+  const sol = { provider: "openai-codex", id: "gpt-5.6-sol" };
+  const terra = { provider: "openai-codex", id: "gpt-5.6-terra" };
+
+  const resumed = harness({}, {
+    cwd: root,
+    models: [sol, terra],
+    currentModel: terra,
+  });
+  await resumed.emit("session_start", { type: "session_start", reason: "resume" });
+  assert.deepEqual(resumed.selectedModels, [sol]);
+});
+
+test("Pi model restoration does not override an explicit CLI model or session selection", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "adaptive-learning-model-"));
+  const sol = { provider: "openai-codex", id: "gpt-5.6-sol" };
+  const terra = { provider: "openai-codex", id: "gpt-5.6-terra" };
+
+  const explicit = harness({}, {
+    cwd: root,
+    models: [sol, terra],
+    currentModel: terra,
+    cliArgs: ["--model", "openai-codex/gpt-5.6-terra"],
+  });
+  await explicit.emit("session_start", { type: "session_start", reason: "startup" });
+  assert.deepEqual(explicit.selectedModels, []);
+
+  const explicitResume = harness({}, {
+    cwd: root,
+    models: [sol, terra],
+    currentModel: terra,
+    cliArgs: ["--resume"],
+  });
+  await explicitResume.emit("session_start", { type: "session_start", reason: "resume" });
+  assert.deepEqual(explicitResume.selectedModels, []);
+});
+
+test("Pi automatically advances a graded learning turn instead of stopping at the next-frontier status", async () => {
+  const question = {
+    id: "teach-token-1",
+    nodeId: "token-representations",
+    stage: "teach",
+    kind: "prediction",
+    mode: "free-response",
+    question: "Does the same token ID start from the same vector?",
+    status: "awaiting-assessment",
+    responses: [{
+      id: "teach-token-1-response",
+      textAnswer: "Yes, because the ID performs the same embedding lookup.",
+      dontKnow: false,
+    }],
+  };
+  const h = harness({
+    "pending-question": { question },
+    "record-assessment": {
+      active: { question: { ...question, status: "resolved" } },
+    },
+    context: {
+      session: {
+        id: "session-transformers",
+        phase: "teach",
+        completedAt: null,
+        questions: [{ ...question, status: "resolved" }],
+        assessments: [{ id: "teach-token-1-assessment" }],
+        checkpoint: {
+          status: "new-transfer-required",
+          nodeId: "token-representations",
+          questionId: "teach-token-1",
+          priorQuestionId: "teach-token-1",
+        },
+      },
+      retry: [{
+        status: "new-transfer-required",
+        questionId: "teach-token-1",
+        priorQuestionId: "teach-token-1",
+        answerMayBeTaught: false,
+        requiresNewTransfer: true,
+      }],
+      dueReviews: [],
+      synthesisDue: false,
+    },
+  });
+
+  await h.tools.get("adaptive_learning_assess_response").execute(
+    "assessment-call",
+    {
+      id: "teach-token-1-assessment",
+      questionId: "teach-token-1",
+      grade: "correct",
+      evidence: "The answer preserves token identity as the fixed embedding lookup.",
+    },
+    undefined,
+    undefined,
+    h.ctx,
+  );
+  await h.emit("agent_settled", { type: "agent_settled" });
+
+  assert.equal(h.customMessages.length, 1);
+  assert.equal(h.customMessages[0].message.display, false);
+  assert.match(h.customMessages[0].message.content, /new-transfer-required/i);
+  assert.match(h.customMessages[0].message.content, /do not end.*next frontier/i);
+  assert.deepEqual(h.customMessages[0].options, {
+    deliverAs: "followUp",
+    triggerTurn: true,
+  });
+});
+
+test("/teach-restart atomically starts a fresh probe and requires selectable calibration", async () => {
+  const h = harness({
+    status: {
+      active: {
+        id: "session-1",
+        topic: "Transformers",
+        target: "Build a durable transformer mental model",
+        phase: "teach",
+      },
+    },
+    restart: {
+      active: {
+        id: "session-2",
+        topic: "Transformers",
+        target: "Build a durable transformer mental model",
+        phase: "probe",
+      },
+    },
+    context: {
+      session: {
+        id: "session-2",
+        target: "Build a durable transformer mental model",
+        phase: "probe",
+        questions: [],
+        restartedFromSessionId: "session-1",
+      },
+    },
+  });
+
+  await h.commands.get("teach-restart").handler("", h.ctx);
+
+  assert.deepEqual(h.calls.map((call) => call.command), ["status", "restart", "context"]);
+  assert.deepEqual(h.calls[1].args, [
+    "--reason",
+    "The learner explicitly requested a complete restart from the beginning.",
+  ]);
+  assert.match(h.messages[0].message, /completely fresh probe/i);
+  assert.match(h.messages[0].message, /first broad probe must be multiple-choice/i);
+  assert.doesNotMatch(h.messages[0].message, /resume/i);
 });
 
 test("/teach-from persists an anchor material before dispatching source-guided learning", async () => {
@@ -295,6 +505,125 @@ test("/teach resumes an active session without creating or overwriting state", a
   assert.deepEqual(h.messages[0].options, { expandPromptTemplates: true });
 });
 
+test("/teach tells Pi to reopen the exact pending question instead of recreating it", async () => {
+  const h = harness({
+    status: {
+      active: {
+        topic: "Transformers",
+        target: "Build a durable transformer mental model",
+        phase: "probe",
+      },
+    },
+    context: {
+      session: {
+        id: "session-1",
+        questions: [{
+          id: "transformers-fresh-probe-1",
+          status: "awaiting-answer",
+        }],
+      },
+    },
+  });
+
+  await h.commands.get("teach").handler("", h.ctx);
+
+  assert.match(h.messages[0].message, /adaptive_learning_resume_question/);
+  assert.match(h.messages[0].message, /transformers-fresh-probe-1/);
+  assert.match(h.messages[0].message, /do not recreate/i);
+});
+
+test("/teach routes an answered free response to assessment instead of trying to reopen it", async () => {
+  const h = harness({
+    status: {
+      active: {
+        kind: "learn",
+        topic: "Transformers",
+        target: "Build a durable transformer mental model",
+        phase: "teach",
+      },
+    },
+    context: {
+      session: {
+        id: "session-1",
+        questions: [{
+          id: "transformers-own-words-1",
+          status: "awaiting-assessment",
+          mode: "free-response",
+          responses: [{ textAnswer: "Attention changes the representation using context." }],
+        }],
+      },
+    },
+  });
+
+  await h.commands.get("teach").handler("", h.ctx);
+
+  assert.match(h.messages[0].message, /adaptive_learning_assess_response/);
+  assert.match(h.messages[0].message, /transformers-own-words-1/);
+  assert.match(h.messages[0].message, /exact persisted.*response/i);
+  assert.doesNotMatch(h.messages[0].message, /adaptive_learning_resume_question/);
+});
+
+test("/teach reopens a checkpoint that was persisted before its question record existed", async () => {
+  const h = harness({
+    status: {
+      active: {
+        kind: "learn",
+        topic: "Transformers",
+        target: "Build a durable transformer mental model",
+        phase: "teach",
+      },
+    },
+    context: {
+      session: {
+        id: "session-1",
+        questions: [],
+        activeStepId: "teach-step-1",
+        checkpoint: {
+          status: "awaiting-answer",
+          questionId: "teach-checkpoint-1",
+        },
+      },
+    },
+  });
+
+  await h.commands.get("teach").handler("", h.ctx);
+
+  assert.match(h.messages[0].message, /adaptive_learning_resume_question/);
+  assert.match(h.messages[0].message, /teach-checkpoint-1/);
+  assert.match(h.messages[0].message, /materialize.*or.*resume/i);
+});
+
+test("/teach-from preserves exact checkpoint continuation ahead of generic source inspection", async () => {
+  const h = harness({
+    status: {
+      active: {
+        kind: "learn",
+        target: "Understand attention",
+        phase: "teach",
+      },
+    },
+    context: {
+      session: {
+        target: "Understand attention",
+        materials: [{ reference: "local:./notes/attention.md", status: "verified" }],
+        questions: [{
+          id: "source-response-1",
+          status: "awaiting-assessment",
+          mode: "free-response",
+          responses: [{ textAnswer: "Queries are compared with keys." }],
+        }],
+      },
+    },
+  });
+
+  await h.commands.get("teach-from").handler("", h.ctx);
+
+  assert.match(h.messages[0].message, /adaptive_learning_assess_response/);
+  assert.match(h.messages[0].message, /source-response-1/);
+  assert.match(h.messages[0].message, /local:\.\/notes\/attention\.md/);
+  assert.doesNotMatch(h.messages[0].message, /inspect unresolved material before teaching/i);
+});
+
 test("/teach refuses ambiguity instead of replacing a different active target", async () => {
   const h = harness({
     status: {
@@ -314,7 +643,7 @@ test("/teach refuses ambiguity instead of replacing a different active target", 
   assert.equal(h.notifications[0].level, "warning");
 });
 
-test("status and due review commands expose durable state without shell interpolation", async () => {
+test("status and review commands refuse to start retention work over an active learning session", async () => {
   const h = harness({
     status: {
       active: {
@@ -334,14 +663,11 @@ test("status and due review commands expose durable state without shell interpol
   await h.commands.get("learn-review").handler("", h.ctx);
 
   assert.match(h.notifications[0].message, /Gradient descent.*teach.*local-slope/i);
-  assert.deepEqual(h.messages[0], {
-    message:
-      "/skill:adaptive-learning Run the 1 due retention review from durable context. Preserve the assessment and retry rules.",
-    options: { expandPromptTemplates: true },
-  });
+  assert.match(h.notifications[1].message, /active learning session.*finish or close/i);
+  assert.equal(h.messages.length, 0);
   assert.deepEqual(h.calls, [
     { command: "status", args: [], root: h.ctx.cwd },
-    { command: "due", args: [], root: h.ctx.cwd },
+    { command: "status", args: [], root: h.ctx.cwd },
   ]);
 
   const source = fs.readFileSync(
@@ -350,6 +676,94 @@ test("status and due review commands expose durable state without shell interpol
   );
   assert.match(source, /spawn\(executable, \[selectedCliPath, command, \.\.\.args/);
   assert.doesNotMatch(source, /spawnSync|shell\s*:\s*true|execSync|import\s*\{[^}]*\bexec\b/);
+});
+
+test("/learn-review resumes an already claimed review checkpoint instead of querying due work", async () => {
+  const h = harness({
+    status: {
+      active: {
+        id: "review-session-1",
+        kind: "review",
+        topic: "Transformers",
+        target: "Retention review",
+        phase: "review",
+      },
+    },
+    context: {
+      session: {
+        id: "review-session-1",
+        kind: "review",
+        phase: "review",
+        checkpoint: {
+          status: "awaiting-answer",
+          questionId: "retention-q1",
+          question: "Explain why causal masking is required.",
+          nodeId: "causal-masking",
+        },
+        questions: [],
+      },
+    },
+  });
+
+  await h.commands.get("learn-review").handler("", h.ctx);
+
+  assert.deepEqual(h.calls.map((call) => call.command), ["status", "context"]);
+  assert.match(h.messages[0].message, /already claimed.*review/i);
+  assert.match(h.messages[0].message, /retention-q1/);
+  assert.match(h.messages[0].message, /do not call.*start-review|do not start.*review/i);
+});
+
+test("/learn-review resumes an active review synthesis checkpoint before concept review state", async () => {
+  const h = harness({
+    status: {
+      active: {
+        id: "review-session-2",
+        kind: "review",
+        topic: "Transformers",
+        target: "Retention review",
+        phase: "review",
+      },
+    },
+    context: {
+      session: {
+        id: "review-session-2",
+        kind: "review",
+        phase: "review",
+        checkpoint: { status: "resolved", questionId: "retention-q1" },
+        synthesisCheckpoint: {
+          status: "retry-required",
+          questionId: "review-synthesis-q1",
+          question: "Connect masking, attention, and next-token prediction.",
+        },
+        questions: [],
+      },
+    },
+  });
+
+  await h.commands.get("learn-review").handler("", h.ctx);
+
+  assert.deepEqual(h.calls.map((call) => call.command), ["status", "context"]);
+  assert.match(h.messages[0].message, /synthesis checkpoint review-synthesis-q1/i);
+  assert.match(h.messages[0].message, /do not call due or start-review again/i);
+});
+
+test("/learn-review starts due work only when no session is active", async () => {
+  const h = harness({
+    status: { active: null },
+    due: {
+      reviews: [{ topic: "Gradient descent", nodeId: "local-slope" }],
+      synthesisDue: false,
+    },
+  });
+
+  await h.commands.get("learn-review").handler("", h.ctx);
+
+  assert.deepEqual(h.calls.map((call) => call.command), ["status", "due"]);
+  assert.deepEqual(h.messages[0], {
+    message:
+      "/skill:adaptive-learning Run the 1 due retention review from durable context. Preserve the assessment and retry rules.",
+    options: { expandPromptTemplates: true },
+  });
 });
 
 test("command handlers await asynchronous CLI state before dispatching the skill", async () => {

@@ -166,7 +166,7 @@ test("doctor reports state, ownership, backups, render revision, and permissions
   assert.equal(report.actions.includes("Run repair-render to reconcile the Obsidian projection."), true);
   assert.equal(report.actions.includes("Restore the Codex adaptive-learning skill files."), true);
   assert.equal(
-    report.actions.includes("Restore the Pi extension and its OpenAI Codex project defaults."),
+    report.actions.includes("Restore the Pi extension and its project model-persistence configuration."),
     true,
   );
   assert.equal(report.actions.includes("Run setup or repair-render to create the Obsidian vault."), true);

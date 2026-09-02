@@ -49,7 +49,7 @@ try {
       report.runtime.piMinimumSatisfied
         ? "Pi: run npm run pi here, then enter /teach <your learning target> (Pi 0.84 requires Node.js 22.19 or newer)."
         : "Pi: upgrade to Node.js 22.19 or newer before launching Pi 0.84.",
-      "Pi project default: OpenAI Codex / gpt-5.5 (override with /model or Pi CLI flags).",
+      `Pi first launch: ${report.piConfiguration.initialProvider} / ${report.piConfiguration.initialModel}; later /model choices are saved for this project and restored after restart.`,
       "Pi host authentication and live quiz controls: not checked by setup.",
       "",
     ].join("\n"),

@@ -2,17 +2,24 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  Editor,
   KeybindingsManager,
   TUI_KEYBINDINGS,
 } from "@earendil-works/pi-tui";
 
-import { createQuizController } from "../.pi/extensions/adaptive-learning.js";
+import {
+  createQuizController,
+  createResponseController,
+} from "../.pi/extensions/adaptive-learning.js";
 
 const KEY = {
   enter: "\x1b[13u",
   escape: "\x1b[27u",
   tab: "\x1b[9u",
+  shiftTab: "\x1b[9;2u",
+  up: "\x1b[1;1A",
   down: "\x1b[1;1B",
+  left: "\x1b[1;1D",
   backspace: "\x1b[127u",
   newline: "\x1b[106;5u",
   space: "\x1b[32u",
@@ -57,6 +64,51 @@ function controllerHarness({ quiz = question(), keybindings, submit } = {}) {
     completed: () => completed,
     submitted: () => submitted,
   };
+}
+
+function responseHarness() {
+  let submitted = null;
+  const tui = {
+    requestRender() {},
+    terminal: { rows: 40 },
+  };
+  const identity = (value) => value;
+  const theme = {
+    fg(_color, value) { return value; },
+    bold: identity,
+  };
+  const answerEditor = new Editor(tui, {
+    borderColor: identity,
+    selectList: {
+      selectedPrefix: identity,
+      selectedText: identity,
+      description: identity,
+      scrollInfo: identity,
+      noMatch: identity,
+    },
+  });
+  const controller = createResponseController({
+    question: {
+      id: "teach-free-1",
+      stage: "teach",
+      nodeId: "attention",
+      kind: "explanation",
+      question: "Explain why attention mixes values.",
+      mode: "free-response",
+      choices: [],
+      activityType: "worked-example",
+    },
+    requestRender() {},
+    done() {},
+    answerEditor,
+    theme,
+    keybindings: new KeybindingsManager(TUI_KEYBINDINGS),
+    submit: async (response) => {
+      submitted = response;
+      return { status: "awaiting-assessment", responses: [response] };
+    },
+  });
+  return { controller, submitted: () => submitted };
 }
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
@@ -119,7 +171,7 @@ test("Pi 0.84 bracketed paste is captured as note text without paste markers", a
   assert.equal(h.submitted().note, "first line\nsecond line");
 });
 
-test("Pi 0.84 modern Escape cancels a quiz before any answer is submitted", () => {
+test("Pi 0.84 modern Escape pauses a quiz before any answer is submitted", () => {
   const h = controllerHarness();
 
   h.controller.handleInput(KEY.escape);
@@ -144,6 +196,58 @@ test("Pi 0.84 modern Space toggles a multi-select choice before confirmation", a
     selectedChoiceValues: ["context"],
     dontKnow: false,
   });
+});
+
+test("Pi 0.84 bracketed paste is inserted into the free-response answer without markers", async () => {
+  const h = responseHarness();
+
+  h.controller.handleInput("\x1b[200~first line\nsecond line\x1b[201~");
+  h.controller.handleInput(KEY.enter);
+  assert.equal(h.submitted(), null, "leaving the editor must not submit the draft");
+  h.controller.handleInput(KEY.enter);
+  await flush();
+
+  assert.deepEqual(h.submitted(), {
+    textAnswer: "first line\nsecond line",
+    dontKnow: false,
+  });
+});
+
+test("free-response actions let the learner return to the answer and revise before submitting", async () => {
+  const h = responseHarness();
+
+  h.controller.handleInput(KEY.a);
+  h.controller.handleInput(KEY.b);
+  h.controller.handleInput(KEY.c);
+  h.controller.handleInput(KEY.down);
+  assert.match(h.controller.render(100).join("\n"), /YOUR ANSWER · EDITING/);
+  h.controller.handleInput(KEY.tab);
+  h.controller.handleInput(KEY.tab);
+  h.controller.handleInput(KEY.tab);
+  h.controller.handleInput(KEY.up);
+  assert.match(h.controller.render(100).join("\n"), /YOUR ANSWER · EDITING/);
+
+  h.controller.handleInput(KEY.left);
+  h.controller.handleInput(KEY.backspace);
+  h.controller.handleInput(KEY.enter);
+  h.controller.handleInput(KEY.enter);
+  await flush();
+
+  assert.deepEqual(h.submitted(), {
+    textAnswer: "ac",
+    dontKnow: false,
+  });
+});
+
+test("Shift+Tab moves backward through free-response fields", () => {
+  const h = responseHarness();
+
+  h.controller.handleInput(KEY.tab);
+  h.controller.handleInput(KEY.tab);
+  assert.match(h.controller.render(100).join("\n"), /Note \(optional\) · editing/);
+
+  h.controller.handleInput(KEY.shiftTab);
+  assert.match(h.controller.render(100).join("\n"), /Confidence 0-100 \(optional\) · editing/);
 });
 
 test("quiz actions honor learner-configured Pi keybindings", async () => {

@@ -29,6 +29,9 @@
 
 ### Fixed
 
+- Pi now starts a fresh project with `openai-codex` / `gpt-5.6-sol`, then
+  remembers later `/model` choices per project across restarts. Checked-in
+  project settings no longer shadow Pi's saved selection.
 - Evidence-backed fading, contrastive, and transfer activities may reinforce a
   demonstrated concept after it leaves the dependency frontier, while all
   other off-frontier teaching remains rejected.

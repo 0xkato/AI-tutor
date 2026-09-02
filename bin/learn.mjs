@@ -27,6 +27,7 @@ import {
   recordSourceCoverage,
   recordStep,
   recordAdmittedGap,
+  restartSession,
   resolveMaterial,
   setPlan,
   startSession,
@@ -38,6 +39,7 @@ import {
   answerQuestion,
   cancelQuestion,
   learnerQuestion,
+  materializeTeachingCheckpointQuestion,
   questionDefinitionDigest,
   startQuestion,
 } from "../src/questions.mjs";
@@ -62,9 +64,11 @@ const commands = [
   ["profile", "Show the durable cross-session learner profile"],
   ["set-profile", "Update one or more learner teaching preferences"],
   ["start", "Start a learning session from a learner-supplied target"],
+  ["restart", "Preserve the active session and restart its target from a fresh probe"],
   ["record-probe", "Record one diagnostic question and assessment"],
   ["record-admitted-gap", "Record an ungraded probe or active-checkpoint gap"],
   ["start-question", "Persist a selectable or free-response item before showing it"],
+  ["materialize-checkpoint", "Materialize the exact active teaching checkpoint as a question"],
   ["pending-question", "Show the unresolved question without its answer key"],
   ["answer-question", "Persist the learner answer, confidence, timing, and optional note"],
   ["submit-question", "Atomically persist an answer, note, and deterministic outcome"],
@@ -112,6 +116,7 @@ const COMMAND_OPTIONS = {
     "source-preferences",
   ],
   start: ["id", "topic", "target", "context", "topic-id", "reuse-concept", "material"],
+  restart: ["id", "reason"],
   "record-probe": [
     "id",
     "question-id",
@@ -142,6 +147,7 @@ const COMMAND_OPTIONS = {
     "support-level",
     "transfer-level",
   ],
+  "materialize-checkpoint": ["question-id"],
   "pending-question": [],
   "answer-question": [
     "question-id",
@@ -199,6 +205,12 @@ const COMMAND_OPTIONS = {
     "strategy-reason",
     "support-level",
     "transfer-level",
+    "checkpoint-mode",
+    "checkpoint-choice",
+    "checkpoint-correct",
+    "checkpoint-explanation",
+    "checkpoint-parent-question-id",
+    "checkpoint-adaptation-reason",
   ],
   "record-assessment": [
     "id",
@@ -256,6 +268,7 @@ const REPEATABLE_OPTIONS = {
   start: new Set(["reuse-concept", "material"]),
   "start-review": new Set(["review"]),
   "start-question": new Set(["choice", "correct"]),
+  "record-step": new Set(["checkpoint-choice", "checkpoint-correct"]),
   "answer-question": new Set(["selected"]),
   "submit-question": new Set(["selected"]),
   "record-assessment": new Set(["resolve-misconception"]),
@@ -300,6 +313,12 @@ const OPTION_DESCRIPTIONS = {
   "strategy-reason": "Why durable learner evidence selected this activity",
   "support-level": "Scaffold level from 0 (independent) to 4 (fully worked)",
   "transfer-level": "Transfer distance from 0 (near) to 4 (whole system)",
+  "checkpoint-mode": "Persisted teaching checkpoint mode",
+  "checkpoint-choice": "Persisted teaching checkpoint choice JSON (repeatable)",
+  "checkpoint-correct": "Persisted correct choice value (repeatable)",
+  "checkpoint-explanation": "Persisted private multiple-choice feedback",
+  "checkpoint-parent-question-id": "Persisted adaptive parent question",
+  "checkpoint-adaptation-reason": "Persisted reason this checkpoint follows its parent",
   "response-id": "Stable response identifier",
   selected: "Selected stable choice value (repeatable)",
   "text-answer": "Learner's own words for a free-response item",
@@ -514,10 +533,12 @@ function parseChoice(value, index) {
 }
 
 function publicSession(session) {
-  return {
+  const visible = {
     ...structuredClone(session),
     questions: (session.questions ?? []).map(learnerQuestion),
   };
+  for (const step of visible.steps ?? []) delete step.checkpointDefinition;
+  return visible;
 }
 
 function retryList(state, session) {
@@ -691,6 +712,13 @@ function commandResult(command, options, root) {
       now: last(options, "now"),
       });
     }
+    if (command === "restart") {
+      return restartSession(current, {
+        id: last(options, "id"),
+        reason: last(options, "reason"),
+        now: last(options, "now"),
+      });
+    }
     if (command === "add-material") {
       return addMaterial(current, {
         id: last(options, "id"),
@@ -759,6 +787,12 @@ function commandResult(command, options, root) {
         strategyReason: last(options, "strategy-reason"),
         supportLevel: optionalInteger(options, "support-level", 4),
         transferLevel: optionalInteger(options, "transfer-level", 4),
+        now: last(options, "now"),
+      });
+    }
+    if (command === "materialize-checkpoint") {
+      return materializeTeachingCheckpointQuestion(current, {
+        questionId: last(options, "question-id"),
         now: last(options, "now"),
       });
     }
@@ -858,6 +892,12 @@ function commandResult(command, options, root) {
       strategyReason: last(options, "strategy-reason"),
       supportLevel: optionalInteger(options, "support-level", 4),
       transferLevel: optionalInteger(options, "transfer-level", 4),
+      checkpointMode: last(options, "checkpoint-mode"),
+      checkpointChoices: all(options, "checkpoint-choice").map(parseChoice),
+      checkpointCorrectChoiceValues: all(options, "checkpoint-correct"),
+      checkpointExplanation: last(options, "checkpoint-explanation"),
+      checkpointParentQuestionId: last(options, "checkpoint-parent-question-id"),
+      checkpointAdaptationReason: last(options, "checkpoint-adaptation-reason"),
       now: last(options, "now"),
       });
     }

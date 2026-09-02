@@ -281,6 +281,13 @@ test("a correct teaching multiple-choice answer can advance to a new durable tra
     checkpointQuestionId: "recognition-q1",
     checkpointKind: "multiple-choice",
     checkpointQuestion: "Which output type does a linear functional produce?",
+    checkpointMode: "single-select",
+    checkpointChoices: [
+      { value: "scalar", label: "A scalar" },
+      { value: "vector", label: "A vector" },
+    ],
+    checkpointCorrectChoiceValues: ["scalar"],
+    checkpointExplanation: "A linear functional produces one scalar.",
     now: "2026-08-24T08:04:00.000Z",
   });
   state = recordAssessment(state, {
@@ -425,15 +432,36 @@ test("a teaching checkpoint follows retry, teaching permission, and new transfer
   assert.equal(conceptForNode(state, session, "linear-functional").retry, null);
 });
 
-test("contaminated evidence cannot resolve an awaiting teaching checkpoint", () => {
-  const state = recordAssessment(teaching(), teachingAttempt({
+test("contaminated teaching evidence requires and permits a fresh transfer checkpoint", () => {
+  let state = recordAssessment(teaching(), teachingAttempt({
     grade: "correct",
     answer: "The answer was exposed before I responded.",
     evidence: "Answer exposure makes this response unusable as checkpoint evidence.",
     contaminated: true,
   }));
-  assert.equal(getActiveSession(state).activeStepId, "step-1");
-  assert.equal(getActiveSession(state).checkpoint.status, "awaiting-answer");
+  let session = getActiveSession(state);
+  assert.equal(session.activeStepId, "step-1");
+  assert.equal(session.checkpoint.status, "new-transfer-required");
+  assert.equal(session.checkpoint.priorQuestionId, "teach-q1");
+  assert.equal(session.checkpoint.resolvedEvidenceId, null);
+  assert.equal(conceptForNode(state, session, "linear-functional").retry.status, "new-transfer-required");
+
+  state = recordStep(state, {
+    id: "replacement-step",
+    nodeId: "linear-functional",
+    foundation: "The exposed answer cannot count as learner evidence.",
+    motivation: "A clean transfer question is required to resume assessment.",
+    explanation: "Use the same mechanism in a new setting without reusing the exposed answer.",
+    checkpointQuestionId: "teach-clean-transfer-q1",
+    checkpointKind: "transfer",
+    checkpointQuestion: "What must a linear tax sensitivity consume and produce?",
+    now: "2026-08-24T08:06:00.000Z",
+  });
+  session = getActiveSession(state);
+  assert.equal(session.activeStepId, "replacement-step");
+  assert.equal(session.checkpoint.status, "awaiting-answer");
+  assert.equal(session.checkpoint.questionId, "teach-clean-transfer-q1");
+  assert.equal(session.checkpoint.priorQuestionId, "teach-q1");
 });
 
 test("a learning session cannot close from probe or plan", () => {

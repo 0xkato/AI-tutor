@@ -182,7 +182,15 @@ export function recordSynthesisAssessment(state, input) {
       }
 
       session.assessments.push(assessment);
-      if (assessment.contaminated) return;
+      if (assessment.contaminated) {
+        Object.assign(checkpoint, {
+          status: "new-transfer-required",
+          priorQuestionId: checkpoint.questionId,
+          resolvedEvidenceId: null,
+          mistakeType: assessment.mistakeType,
+        });
+        return;
+      }
 
       if (assessment.grade === "correct") {
         Object.assign(checkpoint, {

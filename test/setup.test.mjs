@@ -61,7 +61,8 @@ test("one-command setup works from a fresh path with spaces and prints portable 
   assert.match(setup.stdout, /Built-in teaching defaults: active/i);
   assert.match(setup.stdout, /npm run pi/);
   assert.match(setup.stdout, /Pi:[^\n]*\/teach <your learning target>/i);
-  assert.match(setup.stdout, /Pi project default:[^\n]*OpenAI Codex[^\n]*gpt-5\.5/i);
+  assert.match(setup.stdout, /Pi first launch:[^\n]*openai-codex[^\n]*gpt-5\.6-sol/i);
+  assert.match(setup.stdout, /later \/model choices[^\n]*saved[^\n]*project/i);
   assert.match(setup.stdout, /Pi host authentication and live quiz controls:[^\n]*not checked/i);
   assert.doesNotMatch(setup.stdout, /describe how you learn best|run \/learn-profile/i);
   assert.match(setup.stdout, /npm run doctor/);
@@ -92,8 +93,11 @@ test("one-command setup works from a fresh path with spaces and prints portable 
   assert.equal(report.discovery.pi, true);
   assert.deepEqual(report.piConfiguration, {
     enableSkillCommands: true,
-    defaultProvider: "openai-codex",
-    defaultModel: "gpt-5.5",
+    defaultProvider: null,
+    defaultModel: null,
+    initialProvider: "openai-codex",
+    initialModel: "gpt-5.6-sol",
+    remembersModelSelection: true,
     valid: true,
   });
   assert.deepEqual(report.hostAcceptance, {

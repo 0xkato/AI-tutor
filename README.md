@@ -46,15 +46,15 @@ anchor or choose supplemental-only; that decision is saved.
 - Enter: submit
 - **I don't know**: record an ungraded gap
 - Tab: add an optional note
-- Esc: cancel
+- Esc: pause the question without discarding it
 
 Sessions save automatically. Use:
 
 - `/teach` to resume
+- `/teach-restart` to preserve the old session and restart with fresh selectable calibration
 - `/learn-status` to see your next step
 - `/learn-review` to complete due review work
 - `/learn-profile` to optionally change the teaching style
-
 Built-in defaults work immediately. The optional learner profile stores your
 teaching philosophy in `vault/Profile.md`.
 

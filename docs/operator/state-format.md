@@ -75,11 +75,31 @@ exact `textAnswer`, `confidence`, `responseTimeMs`, rationale, attempt count,
 strategy fields, plus any misconception records created or resolved by the
 evidence. The answer is persisted before assessment feedback is shown.
 
+Every newly recorded teaching step also owns a private
+`checkpointDefinition`. Free-response checkpoints persist their mode and
+adaptive linkage. Multiple-choice checkpoints additionally persist their
+choices, answer key, and feedback in the same mutation as the teaching step.
+Public status and context remove this private definition. The runtime-owned
+`materialize-checkpoint` transition creates the exact question record from it
+after a restart, so the model never reconstructs hidden grading fields.
+
+Closing a native Pi question does not mutate canonical state: the question
+remains `awaiting-answer`. A free-response **I don't know** response and its
+admitted-gap transition commit in one canonical revision, preventing an
+interruption between response storage and checkpoint repair.
+
 Sessions store an auditable `activityHistory` for worked examples, faded
 examples, contrastive cases, transfer cases, and whole-system synthesis.
 Conditional `productiveAttempts` are separate, explicitly ungraded diagnostic
 records: they never become mastery evidence merely because the learner made an
 independent attempt.
+
+An explicit complete restart is also auditable. The stopped predecessor stores
+`restartedAt`, `restartReason`, and `replacedBySessionId`; the fresh successor
+stores `restartedFromSessionId`. The old session is not labeled complete and
+its evidence is not copied into the successor's empty probe. Pending reviews
+for the stopped session's concepts become inactive rather than steering the
+fresh calibration.
 
 Review records add learner-specific scheduling fields: `stabilityDays`,
 `difficulty`, `lapses`, and append-only `history`. Each history entry preserves

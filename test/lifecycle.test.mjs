@@ -6,6 +6,7 @@ import {
   finishProbe,
   getActiveSession,
   recordAdmittedGap,
+  restartSession,
   setPlan,
   startSession,
 } from "../src/model.mjs";
@@ -70,6 +71,47 @@ test("a second active session is rejected", () => {
     () => startSession(state, { topic: "Other", target: "Other target", now }),
     /A learning session is already active/,
   );
+});
+
+test("restartSession preserves the stopped session but starts a clean probe for the same target", () => {
+  let state = start();
+  state = recordAssessment(state, {
+    id: "old-transfer-assessment",
+    questionId: "old-transfer-question",
+    nodeId: "vector-calculus",
+    stage: "probe",
+    kind: "transfer",
+    question: "How would a line integral change if the path direction were reversed?",
+    answer: "Its sign reverses while the geometric path remains the same.",
+    grade: "correct",
+    evidence: "The learner transferred orientation to a new line-integral case.",
+    now: "2026-08-24T08:04:00.000Z",
+  });
+  const oldConceptId = state.sessions["session-1"].conceptIds[0];
+  const oldReviewId = state.concepts[oldConceptId].reviewId;
+  assert.equal(state.reviews[oldReviewId].status, "scheduled");
+
+  state = restartSession(state, {
+    id: "session-2",
+    reason: "The learner explicitly requested a complete restart from the beginning.",
+    now: "2026-08-24T08:05:00.000Z",
+  });
+
+  assert.equal(state.activeSessionId, "session-2");
+  assert.equal(state.sessions["session-1"].restartedAt, "2026-08-24T08:05:00.000Z");
+  assert.equal(state.sessions["session-1"].replacedBySessionId, "session-2");
+  assert.match(state.sessions["session-1"].restartReason, /complete restart/i);
+  assert.equal(state.reviews[oldReviewId].status, "inactive");
+  assert.equal(state.reviews[oldReviewId].dueAt, null);
+
+  const restarted = getActiveSession(state);
+  assert.equal(restarted.phase, "probe");
+  assert.equal(restarted.target, "A solid introduction to differential forms");
+  assert.equal(restarted.topicId, state.sessions["session-1"].topicId);
+  assert.equal(restarted.restartedFromSessionId, "session-1");
+  assert.deepEqual(restarted.questions, []);
+  assert.deepEqual(restarted.assessments, []);
+  assert.deepEqual(restarted.conceptIds, []);
 });
 
 test("finishProbe requires evidence and then enters plan", () => {

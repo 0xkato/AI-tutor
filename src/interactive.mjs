@@ -22,7 +22,7 @@ export function submitQuestion(state, input = {}) {
   const question = persistedQuestion(answered, input.questionId);
   const response = question.responses.at(-1);
 
-  if (question.mode === "free-response") {
+  if (question.mode === "free-response" && !response.dontKnow) {
     throw new LearningError(
       "Free responses require an explicit host assessment after the answer is persisted",
       "EXPLICIT_ASSESSMENT_REQUIRED",
